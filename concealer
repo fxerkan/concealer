@@ -12,7 +12,7 @@ Audit: keys/audit.log (JSONL, HMAC-zincirli, tamper-evident). Sadece anahtar
 ISIMLERI ve eylemleri tutar, secret DEGERLERINI tutmaz.
 """
 import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse, html, getpass
-import hashlib, hmac, shlex, re, csv, io
+import hashlib, hmac, shlex, re, csv, io, tempfile, base64
 from datetime import datetime, timezone
 
 BASE = os.path.dirname(os.path.realpath(__file__))
@@ -24,12 +24,29 @@ PUBKEY   = os.path.join(HOME, "keys", "pubkey.txt")
 MASTER   = os.path.join(HOME, "keys", "master.json")
 AUDITKEY = os.path.join(HOME, "keys", "audit.key")
 AUDITLOG = os.path.join(HOME, "keys", "audit.log")
+AUDITHEAD= os.path.join(HOME, "keys", "audit.head")   # son satir capasi (kuyruk-kirpma tespiti)
+RECOVERY = os.path.join(HOME, "keys", "recovery.json")# recovery kod hash'leri + kod-sarmali age key
+CONFIG   = os.path.join(HOME, "keys", "config.json")
 SOPSCFG  = os.path.join(HOME, ".sops.yaml")
 WEBUI    = os.path.join(BASE, "webui.html")
 DIMS = ["tenant", "project", "environment", "repo"]
 FLAGS = {"--tenant": "tenant", "--project": "project", "--env": "environment",
          "--repo": "repo", "--name": "name", "--type": "type"}
-IDLE_SECONDS = int(os.environ.get("CONCEALER_IDLE", "300"))
+
+# ---- calisma-zamani ayarlari (keys/config.json; secret icermez) ----
+_DEFAULT_CFG = {"idle": 300, "confirm_ops": ["export", "delete", "settings"]}
+def load_cfg():
+    cfg = dict(_DEFAULT_CFG)
+    if os.path.exists(CONFIG):
+        try: cfg.update(json.load(open(CONFIG)))
+        except Exception: pass
+    if os.environ.get("CONCEALER_IDLE"): cfg["idle"] = int(os.environ["CONCEALER_IDLE"])  # env override
+    return cfg
+def save_cfg(cfg):
+    os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
+    with open(CONFIG, "w") as f: json.dump(cfg, f)
+    os.chmod(CONFIG, 0o600)
+CFG = load_cfg()
 
 # ---- secret tipleri: alan sablonlari (secret alanlar maskelenir) ----
 TYPES = {
@@ -125,11 +142,34 @@ def _last_hash():
                 except Exception: pass
     return last
 
-def audit(action, key="", source="cli", detail=""):
-    entry = {"ts": now_iso(), "action": action, "key": key, "source": source, "detail": detail}
+def _last_seq():
+    # monoton sira no: eksik (eski) satirlar sirayi korur, silinen kuyruk anchor ile yakalanir
+    if not os.path.exists(AUDITLOG): return 0
+    last = 0
+    with open(AUDITLOG) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try: last = json.loads(line).get("seq", last)
+                except Exception: pass
+    return last
+
+def _write_anchor(seq, h):
+    with open(AUDITHEAD, "w") as f: json.dump({"seq": seq, "hash": h}, f)
+    os.chmod(AUDITHEAD, 0o600)
+def _read_anchor():
+    try: return json.load(open(AUDITHEAD))
+    except Exception: return None
+
+def audit(action, key="", source="cli", detail="", actor=None):
+    # actor: eylemi yapan aktor (agent adi vb). CONCEALER_ACTOR env'inden gelir.
+    if actor is None: actor = os.environ.get("CONCEALER_ACTOR", "")
+    entry = {"ts": now_iso(), "seq": _last_seq() + 1, "action": action, "key": key, "source": source, "detail": detail}
+    if actor: entry["actor"] = actor   # yeni alan; bos ise eski satirlarla ayni kalir
     prev = _last_hash()
     h = hmac.new(_audit_key(), (prev + json.dumps(entry, sort_keys=True)).encode(), hashlib.sha256).hexdigest()
     with open(AUDITLOG, "a") as f: f.write(json.dumps({**entry, "prev": prev, "hash": h}) + "\n")
+    _write_anchor(entry["seq"], h)   # capa: son satirin silinip atilmasini (truncation) yakalar
 
 def audit_rows():
     rows = []
@@ -142,21 +182,187 @@ def audit_rows():
     return rows
 
 def audit_verify():
-    prev = "genesis"; bad = None; n = 0
+    # ponytail: audit.key diskte oldugundan FS-root saldirgan zinciri bastan yazabilir; bu dogrulama
+    # ekleme/silme/yeniden-siralama ve KUYRUK-KIRPMAyi (anchor) yakalar. Tam degismezlik icin
+    # audit.key/anchor makine-disi olmali (upgrade path). Bkz. write_master ile ayni tehdit modeli.
+    prev = "genesis"; bad = None; n = 0; last_seq = 0; reason = None
     for i, rec in enumerate(audit_rows()):
         n += 1
-        entry = {k: rec[k] for k in ("ts", "action", "key", "source", "detail")}
+        # hash yuku = prev/hash/n disindaki tum alanlar → yeni alan (actor/seq) geriye donuk uyumlu
+        entry = {k: v for k, v in rec.items() if k not in ("prev", "hash", "n")}
         h = hmac.new(_audit_key(), (prev + json.dumps(entry, sort_keys=True)).encode(), hashlib.sha256).hexdigest()
-        if h != rec["hash"] or rec["prev"] != prev: bad = i + 1; break
+        if h != rec["hash"] or rec["prev"] != prev: bad = i + 1; reason = "chain"; break
+        s = rec.get("seq")
+        if s is not None:
+            if last_seq and s != last_seq + 1: bad = i + 1; reason = "seq"; break  # atlanmis/tekrar sira no
+            last_seq = s
         prev = rec["hash"]
-    return {"ok": bad is None, "count": n, "broken_at": bad}
+    res = {"ok": bad is None, "count": n, "broken_at": bad}
+    if reason: res["reason"] = reason
+    anc = _read_anchor()   # capa: son hash/seq eslesmezse kuyruk silinmis demektir
+    if bad is None and anc and (anc.get("hash") != prev or (last_seq and anc.get("seq") != last_seq)):
+        res.update(ok=False, reason="truncated", broken_at=n + 1)
+    return res
+
+_ACCESS_ACTS = {"reveal", "copy", "get", "inject", "create", "update", "rotate", "set_secret"}
+def last_access():
+    """name -> {ts, source, action, actor}: audit'ten turetilen son erisim."""
+    acc = {}
+    for r in audit_rows():
+        if r.get("action") in _ACCESS_ACTS:
+            for k in str(r.get("key", "")).split(","):
+                k = k.strip()
+                if k: acc[k] = {"ts": r["ts"], "source": r.get("source", ""),
+                                "action": r["action"], "actor": r.get("actor", "")}
+    return acc
+
+# ---------------- leak / yeniden-kullanim taramasi ----------------
+def leak_scan(d=None):
+    """Ayni secret DEGERINI paylasan kayitlari bulur ve risk skorlar. Deger sizmaz (maskeli)."""
+    d = d or load(); by_val = {}
+    for e in secs(d):
+        for fn, fv in e["fields"].items():
+            if not fv or not field_is_secret(e["type"], fn): continue
+            by_val.setdefault(str(fv), []).append(
+                {"id": e["id"], "name": e["name"], "field": fn, "scope": label(e),
+                 "project": e.get("project", ""), "environment": e.get("environment", "")})
+    groups = []
+    for val, uses in by_val.items():
+        if len(uses) < 2: continue
+        projects = sorted({u["project"] for u in uses if u["project"]})
+        envs = sorted({u["environment"] for u in uses if u["environment"]})
+        names = {u["name"] for u in uses}
+        # skor: kullanim sayisi + proje/ortam yayilimi + farkli isim + prod paylasimi
+        score = min(100, len(uses) * 12 + max(0, len(projects) - 1) * 20 +
+                    max(0, len(envs) - 1) * 15 + (10 if len(names) > 1 else 0) +
+                    (15 if any(x.lower() == "prod" for x in envs) else 0))
+        sev = "high" if score >= 70 else "med" if score >= 40 else "low"
+        groups.append({"count": len(uses), "projects": projects, "envs": envs,
+                       "score": score, "severity": sev, "mask": mask(val), "uses": uses})
+    groups.sort(key=lambda g: -g["score"])
+    return groups
+
+# ---------------- klasor tarama / iceri aktarma ----------------
+_TOKEN_PATTERNS = [
+    ("aws_access_key", re.compile(r"AKIA[0-9A-Z]{16}")),
+    ("openai",         re.compile(r"sk-[A-Za-z0-9_-]{20,}")),
+    ("github_pat",     re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}")),
+    ("slack",          re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}")),
+    ("google_api",     re.compile(r"AIza[0-9A-Za-z_-]{35}")),
+    ("jwt",            re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}")),
+]
+_ENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*$")
+_SKIP_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__", "dist", "build", ".next", ".terraform"}
+def _unquote(v):
+    v = v.strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'": v = v[1:-1]
+    return v
+def _looks_secret(name, val):
+    if len(val) < 6 or val.startswith("$"): return False
+    if _SECRETY.search(name): return True
+    if any(rx.search(val) for _, rx in _TOKEN_PATTERNS): return True
+    # yuksek entropi + uzunluk (rastgele token)
+    return (len(val) >= 20 and len(set(val)) >= 12
+            and bool(re.search(r"[0-9]", val)) and bool(re.search(r"[A-Za-z]", val)))
+def scan_folder(root, history=False):
+    """Klasordeki .env/.tfvars/.envrc + (opsiyonel) shell history icinden secret-benzeri
+    KEY=VALUE ciftlerini aday olarak dondurur. Deger disari verilmez (mask ile listelenir)."""
+    root = os.path.expanduser(root or ""); cands = {}
+    def add(name, val, src):
+        val = _unquote(val)
+        if _looks_secret(name, val):
+            cands.setdefault((name, val), {"name": name, "value": val, "mask": mask(val), "source": src})
+    if os.path.isdir(root):
+        for dp, dns, fns in os.walk(root):
+            dns[:] = [x for x in dns if x not in _SKIP_DIRS]
+            for fn in fns:
+                if not (fn.startswith(".env") or fn.endswith(".env") or fn == ".envrc" or fn.endswith(".tfvars")): continue
+                fp = os.path.join(dp, fn)
+                try: txt = open(fp, errors="ignore").read()
+                except Exception: continue
+                for line in txt.splitlines():
+                    if line.lstrip().startswith("#"): continue
+                    m = _ENV_LINE.match(line)
+                    if m: add(m.group(1), m.group(2), os.path.relpath(fp, root))
+    if history:
+        for hf in ("~/.zsh_history", "~/.bash_history"):
+            hp = os.path.expanduser(hf)
+            if not os.path.exists(hp): continue
+            try: txt = open(hp, errors="ignore").read()
+            except Exception: continue
+            for m in re.finditer(r"(?:export\s+)?([A-Z][A-Z0-9_]{2,})=([^\s;|&'\"]+)", txt):
+                add(m.group(1), m.group(2), os.path.basename(hp))
+    return sorted(cands.values(), key=lambda c: c["name"])
+def _import_cands(d, cands, scope):
+    n_new = n_skip = 0
+    for c in cands:
+        ident = dict(scope); ident["name"] = c["name"]
+        hit = next((e for e in secs(d) if matches(e, ident)), None)
+        if hit and str(hit["fields"].get("value")) == c["value"]: n_skip += 1; continue
+        if hit:
+            hit["fields"]["value"] = c["value"]; hit["updated"] = now_iso(); n_new += 1
+        else:
+            e = dict(ident); e["type"] = "api_key"; e["fields"] = {"value": c["value"]}
+            e["tags"] = ["scan"]; e["url"] = ""; e["notes"] = f"scan: {c['source']}"
+            secs(d).append(norm(e)); n_new += 1
+    return n_new, n_skip
+
+# ---------------- tasinabilir export / import (age -p ile sifreli) ----------------
+def merge_secrets(d, incoming):
+    """incoming kayitlarini vault'a birlestir: ayni id (yoksa name+kapsam) → guncelle, degilse ekle."""
+    n_new = n_upd = 0
+    for raw in incoming:
+        e = norm(dict(raw)); cur = by_id(d, e["id"])
+        if not cur:   # farkli makine farkli id uretebilir → name+kapsam ile de dene
+            ident = {dim: e.get(dim, "") for dim in DIMS}; ident["name"] = e["name"]
+            cur = next((x for x in secs(d) if matches(x, ident)), None)
+        if cur:
+            for k in ["name", "type"] + DIMS + ["tags", "url", "notes", "fields"]: cur[k] = e[k]
+            cur["updated"] = now_iso(); n_upd += 1
+        else:
+            secs(d).append(e); n_new += 1
+    return n_new, n_upd
+
+def export_bundle(pw):
+    """Vault'u JSON'a cozup master parola ile 'age -p' sifreler; tasinabilir .age bytes dondurur."""
+    d = load()
+    plain = json.dumps({"secrets": secs(d), "exported": now_iso()}).encode()
+    # ponytail: age dosya-arguman ister → duz metin kisa sure temp'te (0600), finally'de silinir
+    tin = tempfile.NamedTemporaryFile(delete=False); tout = tin.name + ".age"
+    try:
+        tin.write(plain); tin.close(); os.chmod(tin.name, 0o600)
+        rc, err = _age_pw(["-p", "-o", tout, tin.name], pw, confirm=True)
+        if rc: raise RuntimeError(err.strip() or "age sifreleme hatasi")
+        return open(tout, "rb").read()
+    finally:
+        for p in (tin.name, tout):
+            try: os.remove(p)
+            except OSError: pass
+
+def import_bundle(pw, blob):
+    """'age -p' ile sifreli bundle'i coz ve vault'a birlestir. pw = bundle'in (kaynak makine) parolasi."""
+    tin = tempfile.NamedTemporaryFile(delete=False, suffix=".age"); tout = tin.name + ".json"
+    try:
+        tin.write(blob); tin.close()
+        rc, err = _age_pw(["-d", "-o", tout, tin.name], pw)
+        if rc: raise RuntimeError("parola yanlis veya bozuk bundle")
+        data = json.loads(open(tout, errors="ignore").read())
+        d = load(); nn, nu = merge_secrets(d, data.get("secrets", [])); save(d)
+        return nn, nu
+    finally:
+        for p in (tin.name, tout):
+            try: os.remove(p)
+            except OSError: pass
 
 # ---------------- age (expect) / master password ----------------
 def _age_pw(args, passphrase, confirm=False):
+    # NOT: age sifreleme prompt'u "Enter passphrase (leave empty ...): " → sonu "passphrase:" DEGIL.
+    # Bu yuzden "passphrase" substring'iyle esles (hem sifreleme hem cozme prompt'unda gecer),
+    # yoksa her cagri timeout'a dusup 30s bekler.
     lines = ["set timeout 30", "set pw $env(CONCEALER_PW)",
              "spawn age " + " ".join(shlex.quote(a) for a in args),
-             'expect "passphrase:"', 'send -- "$pw\\r"']
-    if confirm: lines += ['expect "passphrase:"', 'send -- "$pw\\r"']
+             'expect "passphrase"', 'send -- "$pw\\r"']
+    if confirm: lines += ['expect "passphrase"', 'send -- "$pw\\r"']
     lines += ["expect eof", "catch wait rc", "exit [lindex $rc 3]"]
     r = subprocess.run(["expect", "-c", "\n".join(lines)],
                        env=dict(os.environ, CONCEALER_PW=passphrase), capture_output=True, text=True)
@@ -188,6 +394,75 @@ def verify_master(pw):
         return rc == 0
     return True
 
+# ---------------- recovery kodlari ----------------
+# Amac: (a) master password unutulursa vault'u kurtarma, (b) master password'u TEK BASINA
+# ele geciren kisinin sifreyi degistirip devralmasini engelleme (passwd 2. faktor).
+# Kod = ~100-bit; her kod age key'i (age -p) sarmalar → herhangi biri kurtarir. Diske
+# yalniz scrypt hash'i + kod-sarmali sifreli key yazilir, DUZ METIN kod ASLA saklanmaz.
+RECV_N = 8
+_RC_ALPHA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"   # karisikligi az (0/O/1/I yok); 256%32==0 → bias yok
+def _gen_codes(n=RECV_N):
+    def one():
+        raw = "".join(_RC_ALPHA[b % 32] for b in os.urandom(20))   # 20*5 = 100 bit
+        return "-".join(raw[i:i+4] for i in range(0, 20, 4))
+    return [one() for _ in range(n)]
+
+def _age_wrap(pw):
+    """KEY dosyasini pw ile sifrele, ciphertext bytes dondur."""
+    tout = tempfile.NamedTemporaryFile(delete=False, suffix=".age").name
+    try:
+        rc, err = _age_pw(["-p", "-o", tout, KEY], pw, confirm=True)
+        if rc: raise RuntimeError(err.strip() or "age wrap hatasi")
+        return open(tout, "rb").read()
+    finally:
+        try: os.remove(tout)
+        except OSError: pass
+
+def _age_unwrap(blob, pw):
+    """kod-sarmali key ciphertext'i coz, age key metnini dondur."""
+    tin = tempfile.NamedTemporaryFile(delete=False, suffix=".age"); tout = tin.name + ".key"
+    try:
+        tin.write(blob); tin.close()
+        rc, err = _age_pw(["-d", "-o", tout, tin.name], pw)
+        if rc: raise RuntimeError("kod yanlis veya bozuk")
+        return open(tout, "rb").read()
+    finally:
+        for p in (tin.name, tout):
+            try: os.remove(p)
+            except OSError: pass
+
+def write_recovery(codes):
+    salt = os.urandom(16)
+    entries = [{"h": _scrypt(c, salt).hex(), "blob": base64.b64encode(_age_wrap(c)).decode()} for c in codes]
+    with open(RECOVERY, "w") as f: json.dump({"salt": salt.hex(), "codes": entries}, f)
+    os.chmod(RECOVERY, 0o600)
+
+def _recovery_data():
+    return json.load(open(RECOVERY)) if os.path.exists(RECOVERY) else None
+def recovery_index(code):
+    d = _recovery_data()
+    if not d: return None
+    h = _scrypt(code.strip(), bytes.fromhex(d["salt"])).hex()
+    for i, e in enumerate(d["codes"]):
+        if hmac.compare_digest(e["h"], h): return i
+    return None
+def consume_recovery(i):
+    d = _recovery_data(); d["codes"].pop(i)
+    with open(RECOVERY, "w") as f: json.dump(d, f)
+    os.chmod(RECOVERY, 0o600)
+
+def _print_codes(codes):
+    bar = "=" * 58
+    print("\n" + bar)
+    print("  RECOVERY KODLARI — BU EKRAN BIR KEZ GOSTERILIR")
+    print("  Bunlari BASKA bir yere kaydet (parola yoneticisi/kasa/kagit).")
+    print("  Diskte DUZ METIN saklanmaz; buradan kopyalamazsan geri gelmez.")
+    print("   - master password'u UNUTURSAN:      concealer recover")
+    print("   - master password'u DEGISTIRMEK icin de bir kod gerekir (passwd)")
+    print(bar)
+    for i, c in enumerate(codes, 1): print(f"   {i}.  {c}")
+    print(bar + "\n")
+
 def detect(dim):
     if dim in ("repo", "project"):
         r = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
@@ -210,25 +485,72 @@ def init(force=False):
     rc, err = _age_pw(["-p", "-o", BACKUP, KEY], pw, confirm=True)
     if rc: sys.exit(f"parolali yedek olusturulamadi: {err.strip()}")
     write_master(pw); _audit_key()
+    for f in (RECOVERY, AUDITHEAD):   # force yeniden-kurulumda eski kalintiyi temizle
+        if os.path.exists(f): os.remove(f)
+    codes = _gen_codes(); write_recovery(codes)
     with open(SOPSCFG, "w") as f:
         f.write("creation_rules:\n  - path_regex: \\.enc\\.(yaml|yml|json)$\n" f'    age: "{pub}"\n')
     save({"secrets": []}); audit("init", source="cli")
     with open(os.path.join(HOME, ".gitignore"), "w") as f:
-        f.write("keys/age-key.txt\nkeys/audit.key\n")
+        f.write("keys/age-key.txt\nkeys/audit.key\nkeys/audit.head\nkeys/recovery.json\n")
     print(f"kuruldu: {HOME}\n  public key: {pub}\n  web: concealer web")
+    _print_codes(codes)
 
 def passwd():
     if not os.path.exists(KEY): sys.exit("once 'concealer init' calistir.")
+    # 1. faktor: mevcut master password. Tek basina yetmez → devralmayi zorlastir.
+    cur = getpass.getpass("Mevcut master password: ")
+    if not verify_master(cur): sys.exit("mevcut parola yanlis.")
+    # 2. faktor: gecerli bir recovery kodu (tuketilir).
+    d = _recovery_data()
+    if not d or not d["codes"]:
+        sys.exit("recovery kodu gerekli ama kalmadi/yok.\n"
+                 "  once yeni set uret:  concealer recovery   (master password ister)")
+    code = getpass.getpass("Recovery kodu (2. faktor): ")
+    i = recovery_index(code)
+    if i is None: sys.exit("gecersiz recovery kodu.")
     pw = _ask_new_password(); tmp = BACKUP + ".new"
     if os.path.exists(tmp): os.remove(tmp)
     rc, err = _age_pw(["-p", "-o", tmp, KEY], pw, confirm=True)
     if rc: sys.exit(f"hata: {err.strip()}")
-    os.replace(tmp, BACKUP); write_master(pw); audit("passwd", source="cli")
-    print("master password guncellendi.")
+    os.replace(tmp, BACKUP); write_master(pw); consume_recovery(i); audit("passwd", source="cli")
+    left = len(_recovery_data()["codes"])
+    print(f"master password guncellendi. kalan recovery kodu: {left}"
+          + ("\n  UYARI: kod kalmadi → 'concealer recovery' ile yenile." if left == 0 else ""))
+
+def recover():
+    """Master password unutuldu: recovery kodu ile age key'i geri getir + yeni parola ata."""
+    if not os.path.exists(RECOVERY): sys.exit("recovery.json yok; bu vault recovery kodu ile kurulmamis.")
+    code = getpass.getpass("Recovery kodu: ")
+    i = recovery_index(code)
+    if i is None: sys.exit("gecersiz recovery kodu.")
+    blob = base64.b64decode(_recovery_data()["codes"][i]["blob"])
+    try: keytext = _age_unwrap(blob, code.strip())
+    except Exception as ex: sys.exit(f"cozme hatasi: {ex}")
+    os.makedirs(os.path.dirname(KEY), exist_ok=True)
+    with open(KEY, "wb") as f: f.write(keytext)      # kayip age key'i geri yaz
+    os.chmod(KEY, 0o600)
+    pw = _ask_new_password(); tmp = BACKUP + ".new"
+    if os.path.exists(tmp): os.remove(tmp)
+    rc, err = _age_pw(["-p", "-o", tmp, KEY], pw, confirm=True)
+    if rc: sys.exit(f"yedek olusturulamadi: {err.strip()}")
+    os.replace(tmp, BACKUP); write_master(pw); consume_recovery(i); audit("recover", source="cli")
+    left = len(_recovery_data()["codes"])
+    print(f"kurtarildi; yeni master password ayarlandi. kalan recovery kodu: {left}"
+          + ("\n  UYARI: kod kalmadi → 'concealer recovery' ile yenile." if left == 0 else ""))
+
+def recovery_regen():
+    """Yeni recovery kod seti uret (eskiler gecersiz olur). Master password ister."""
+    if not os.path.exists(KEY): sys.exit("once 'concealer init' calistir.")
+    pw = getpass.getpass("Master password: ")
+    if not verify_master(pw): sys.exit("parola yanlis.")
+    codes = _gen_codes(); write_recovery(codes); audit("recovery_regen", source="cli")
+    _print_codes(codes)
 
 # ---------------- injection ----------------
-def inject_env(target, source="cli"):
-    d = load(); chosen = {}
+def collect_secrets(target, d=None):
+    """target boyutlarina uyan secret'lari {ENV_KEY: value} olarak topla (en spesifik kazanir)."""
+    d = d or load(); chosen = {}
     for e in secs(d):
         spec = 0; ok = True
         for dim in DIMS:
@@ -239,16 +561,43 @@ def inject_env(target, source="cli"):
         if not ok: continue
         if e["name"] not in chosen or spec > chosen[e["name"]][0]:
             chosen[e["name"]] = (spec, e)
-    env = dict(os.environ); used = []
+    kv = {}
     for name, (sp, e) in chosen.items():
-        used.append(name)
-        if e["type"] == "api_key":
-            env[name] = str(e["fields"].get("value", ""))
+        if e["type"] == "api_key": kv[name] = str(e["fields"].get("value", ""))
         else:
-            for fn, fv in e["fields"].items():
-                env[f"{name}_{fn.upper()}"] = str(fv)
-    if used: audit("inject", key=",".join(sorted(used)), source=source, detail=label(target))
+            for fn, fv in e["fields"].items(): kv[f"{name}_{fn.upper()}"] = str(fv)
+    return kv, d
+
+def inject_env(target, source="cli"):
+    kv, d = collect_secrets(target)
+    env = dict(os.environ); env.update(kv)
+    if kv: audit("inject", key=",".join(sorted(kv)), source=source, detail=label(target))
     return env, d
+
+# ---------------- deploy / hedef formatlarina render ----------------
+DEPLOY_TARGETS = ["dotenv", "export", "docker", "json", "k8s", "aws-secrets", "aws-ssm", "github"]
+def deploy_render(scope, target):
+    """Kapsama uyan secret'lari secili deploy hedefi icin metne render eder (komut/manifest uretir)."""
+    kv, d = collect_secrets(scope)
+    stem = "-".join(scope.get(x) for x in DIMS if scope.get(x)) or "concealer"
+    if target == "dotenv": return "\n".join(f"{k}={v}" for k, v in kv.items())
+    if target == "export": return "\n".join(f"export {k}={shlex.quote(v)}" for k, v in kv.items())
+    if target == "docker": return " ".join(f"-e {k}={shlex.quote(v)}" for k, v in kv.items())
+    if target == "json":   return json.dumps(kv, indent=2)
+    if target == "k8s":
+        body = "\n".join(f"  {k}: {base64.b64encode(v.encode()).decode()}" for k, v in kv.items())
+        return f"apiVersion: v1\nkind: Secret\nmetadata:\n  name: {stem}\ntype: Opaque\ndata:\n{body}"
+    if target == "aws-secrets":
+        return "\n".join(
+            f"aws secretsmanager put-secret-value --secret-id {stem}/{k} --secret-string {shlex.quote(v)} \\\n"
+            f"  || aws secretsmanager create-secret --name {stem}/{k} --secret-string {shlex.quote(v)}"
+            for k, v in kv.items())
+    if target == "aws-ssm":
+        return "\n".join(f"aws ssm put-parameter --name /{stem}/{k} --type SecureString --value {shlex.quote(v)} --overwrite"
+                         for k, v in kv.items())
+    if target == "github":
+        return "\n".join(f"gh secret set {k} --body {shlex.quote(v)}" for k, v in kv.items())
+    return "bilinmeyen hedef"
 
 def redact(text, d):
     for e in secs(d):
@@ -277,6 +626,8 @@ def cli(argv):
     cmd = argv[0] if argv else "help"; a = argv[1:]
     if cmd == "init": return init("--force" in a)
     if cmd == "passwd": return passwd()
+    if cmd == "recover": return recover()
+    if cmd == "recovery": return recovery_regen()
     if cmd == "list":
         tag = _flag(a, "--tag"); sel = _sel(a); typ = sel.pop("type", None)
         _print(filt(load(), sel, tag, a[0] if a else None, typ))
@@ -289,7 +640,8 @@ def cli(argv):
     elif cmd == "audit":
         if a and a[0] == "verify": print(audit_verify()); return
         for r in audit_rows()[-40:]:
-            print(f"{r['ts']:20} {r['source']:6} {r['action']:10} {r['key']:24} {r.get('detail','')}")
+            who = f"[{r['actor']}] " if r.get("actor") else ""
+            print(f"{r['ts']:20} {r['source']:6} {r['action']:10} {r['key']:24} {who}{r.get('detail','')}")
     elif cmd == "get":
         hits = filt(load(), _sel(a))
         if len(hits) != 1: sys.exit(f"{len(hits)} kayit eslesti, tekillestir.")
@@ -336,13 +688,65 @@ def cli(argv):
         env, _ = inject_env(sel, source="cli")
         sys.stderr.write(f"[concealer] {label(sel)}\n")
         os.execvpe(a[0], a, env)
+    elif cmd == "leaks":
+        gs = leak_scan(); audit("leak_scan", source="cli")
+        if not gs: print("paylasilan (yeniden kullanilan) secret degeri yok."); return
+        for g in gs:
+            print(f"[{g['severity']:4}] score {g['score']:3}  x{g['count']}  {g['mask']:14}  "
+                  f"projects={','.join(g['projects']) or '-'}  envs={','.join(g['envs']) or '-'}")
+            for u in g["uses"]: print(f"        - {u['name']} @ {u['scope']} ({u['field']})")
+    elif cmd == "scan":
+        if not a or a[0].startswith("--"):
+            sys.exit("kullanim: concealer scan <klasor> [--import] [--history] [--project P --env E ..]")
+        root = a.pop(0)
+        do_import = "--import" in a; history = "--history" in a
+        a = [x for x in a if x not in ("--import", "--history")]
+        sel = _sel(a); cands = scan_folder(root, history)
+        if not cands: print("aday secret bulunamadi."); return
+        print(f"{len(cands)} aday:")
+        for c in cands: print(f"  {c['name']:28} {c['mask']:14} <- {c['source']}")
+        if not do_import: print("\n(kuru calisma) iceri aktarmak icin --import ekle"); return
+        d = load(); scope = {dim: sel.get(dim, "") for dim in DIMS}
+        if not scope["project"]: scope["project"] = os.path.basename(os.path.abspath(os.path.expanduser(root)))
+        n_new, n_skip = _import_cands(d, cands, scope); save(d)
+        audit("scan_import", key=f"{n_new} secrets", source="scan", detail=root)
+        print(f"\niceri aktarildi: {n_new}, atlandi (mevcut): {n_skip}  @ {label(scope)}")
+    elif cmd == "export":
+        out = a[0] if a and not a[0].startswith("--") else f"concealer-export-{now_iso()[:10]}.age"
+        pw = getpass.getpass("Master password (bundle şifreleme): ")
+        if not verify_master(pw): sys.exit("parola yanlış.")
+        blob = export_bundle(pw); open(out, "wb").write(blob)
+        audit("export", source="cli", detail=out); print(f"export: {out} ({len(blob)} bytes)")
+    elif cmd == "import":
+        if not a: sys.exit("kullanım: concealer import <bundle.age>")
+        pw = getpass.getpass("Bundle parolası: ")
+        try: nn, nu = import_bundle(pw, open(a[0], "rb").read())
+        except Exception as ex: sys.exit(f"import hatası: {ex}")
+        audit("import", source="cli", detail=a[0]); print(f"import: +{nn} yeni, ~{nu} güncellendi")
+    elif cmd == "config":
+        if not a:
+            for k, v in CFG.items(): print(f"{k} = {v}")
+        elif len(a) == 1: print(CFG.get(a[0]))
+        else:
+            k, v = a[0], a[1]
+            CFG[k] = int(v) if k == "idle" else ([x for x in v.split(",") if x] if k == "confirm_ops" else v)
+            save_cfg({"idle": CFG["idle"], "confirm_ops": CFG["confirm_ops"]}); print(f"{k} = {CFG[k]}")
+    elif cmd == "deploy":
+        target = _flag(a, "--target") or "dotenv"
+        scope = _sel(a); scope.pop("name", None); scope.pop("type", None)
+        out = deploy_render(scope, target)
+        audit("deploy", source="cli", detail=f"{target} {label(scope)}")
+        print(out or "(eşleşme yok)")
     elif cmd == "web": serve_web(int(a[0]) if a else 8787)
     elif cmd == "mcp": mcp_stdio()
     else:
-        print("concealer — lokal secret manager (SOPS+age)\n"
-              "  init [--force] | passwd | web [port] | mcp\n"
+        print("concealer — lokal secret manager (SOPS+age)  ·  kisa alias: cer\n"
+              "  init [--force] | passwd | recover | recovery | web [port] | mcp\n"
               "  list [term] [--type T --tenant .. --project .. --env .. --repo .. --tag X]\n"
-              "  search <term> | dims | audit [verify]\n"
+              "  search <term> | dims | audit [verify] | leaks\n"
+              "  scan <folder> [--import] [--history] [boyutlar]\n"
+              "  export [file] | import <bundle.age> | config [key [val]]\n"
+              "  deploy --target dotenv|export|docker|json|k8s|aws-secrets|aws-ssm|github [boyutlar]\n"
               "  set --name N [--type T --project P ..] <value|field=val ...> [--tags a,b]\n"
               "  get/rm/rotate --name N [boyutlar]\n"
               "  run [--project P --env E ..] <cmd...>\n"
@@ -356,8 +760,11 @@ def serve_web(port):
     def valid(tok):
         t = _SESSIONS.get(tok)
         if not t: return False
-        if time.time() - t > IDLE_SECONDS: _SESSIONS.pop(tok, None); return False
-        _SESSIONS[tok] = time.time(); return True
+        if time.time() - t > CFG["idle"]: _SESSIONS.pop(tok, None); return False
+        return True   # sabit yasam suresi: aktivite TTL'i uzatmaz (hard auto-lock)
+    def remaining(tok):
+        t = _SESSIONS.get(tok)
+        return max(0, int(CFG["idle"] - (time.time() - t))) if t else 0
 
     class H(http.server.BaseHTTPRequestHandler):
         server_version = "concealer"
@@ -383,19 +790,24 @@ def serve_web(port):
             u = urllib.parse.urlparse(self.path); path = u.path
             q = {k: v[0] for k, v in urllib.parse.parse_qs(u.query).items()}
             if path == "/" or path == "/index.html":
-                try: page = open(WEBUI, "rb").read().replace(b"__IDLE__", str(IDLE_SECONDS).encode())
+                try: page = open(WEBUI, "rb").read().replace(b"__IDLE__", str(CFG["idle"]).encode())
                 except FileNotFoundError: page = b"<h1>webui.html bulunamadi</h1>"
                 self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers(); self.wfile.write(page); return
             if path == "/api/session":
-                return self._json({"unlocked": bool(self._tok() and valid(self._tok())), "idle": IDLE_SECONDS})
+                tok = self._tok(); up = bool(tok and valid(tok))
+                return self._json({"unlocked": up, "idle": CFG["idle"], "remaining": remaining(tok or "")})
             if path == "/api/types":
                 return self._json({t: [{"name": f, "secret": k == "secret"} for f, k in fs] for t, fs in TYPES.items()})
             if not valid(self._tok() or ""): return self._json({"error": "locked"}, 401)
             if path == "/api/secrets":
                 d = load(); sel = {dim: q[dim] for dim in DIMS if q.get(dim)}
                 rows = filt(d, sel, q.get("tag"), q.get("q"), q.get("type"))
-                return self._json([entry_public(e) for e in rows])
+                acc = last_access()
+                out = []
+                for e in rows:
+                    pe = entry_public(e); pe["access"] = acc.get(e["name"]); out.append(pe)
+                return self._json(out)
             if path.startswith("/api/secret/"):
                 sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
                 if not e: return self._json({"error": "yok"}, 404)
@@ -413,6 +825,10 @@ def serve_web(port):
                 total = len(rows); s = (page - 1) * size
                 return self._json({"rows": rows[s:s + size], "total": total, "page": page,
                                    "pages": max(1, (total + size - 1) // size)})
+            if path == "/api/settings":
+                return self._json({"idle": CFG["idle"], "confirm_ops": CFG["confirm_ops"]})
+            if path == "/api/leaks":
+                audit("leak_scan", source="web"); return self._json(leak_scan())
             if path == "/api/audit/verify": return self._json(audit_verify())
             if path == "/api/audit/export":
                 rows = audit_rows()
@@ -450,6 +866,53 @@ def serve_web(port):
             if path == "/api/copy":        # clipboard kopyalama (audit)
                 b = self._body(); audit("copy", key=b.get("key", ""), source="web", detail=b.get("field", ""))
                 return self._json({"ok": True})
+            if path == "/api/scan":        # kuru tarama (deger vermez, mask)
+                b = self._body(); cands = scan_folder(b.get("path", ""), b.get("history", False))
+                audit("scan", source="web", detail=b.get("path", ""))
+                return self._json({"cands": [{"name": c["name"], "mask": c["mask"], "source": c["source"]} for c in cands]})
+            if path == "/api/settings":    # verify_master zorunlu (hassas)
+                b = self._body()
+                if not verify_master(b.get("pw", "")):
+                    audit("settings_fail", source="web"); return self._json({"error": "bad_pw"}, 403)
+                if "idle" in b:
+                    try: CFG["idle"] = max(30, min(86400, int(b["idle"])))
+                    except Exception: pass
+                if isinstance(b.get("confirm_ops"), list):
+                    CFG["confirm_ops"] = [x for x in b["confirm_ops"] if x in ("export", "delete", "settings", "create", "update")]
+                save_cfg({"idle": CFG["idle"], "confirm_ops": CFG["confirm_ops"]})
+                audit("settings", source="web", detail=f"idle={CFG['idle']}")
+                return self._json({"ok": True, "idle": CFG["idle"], "confirm_ops": CFG["confirm_ops"]})
+            if path == "/api/export":      # master parola ile age -p sifreli bundle
+                b = self._body()
+                if not verify_master(b.get("pw", "")):
+                    audit("export_fail", source="web"); return self._json({"error": "bad_pw"}, 403)
+                try: blob = export_bundle(b.get("pw", ""))
+                except Exception as ex: return self._json({"error": str(ex)}, 500)
+                audit("export", source="web", detail=f"{len(secs(load()))} secrets")
+                return self._json({"ok": True, "filename": f"concealer-export-{now_iso()[:10]}.age",
+                                   "b64": base64.b64encode(blob).decode()})
+            if path == "/api/import":      # pw = bundle'in parolasi (yerel master olmayabilir)
+                b = self._body()
+                try: blob = base64.b64decode(b.get("b64", ""))
+                except Exception: return self._json({"error": "bozuk dosya"}, 400)
+                try: nn, nu = import_bundle(b.get("pw", ""), blob)
+                except Exception as ex: return self._json({"error": str(ex)}, 400)
+                audit("import", source="web", detail=f"+{nn} ~{nu}")
+                return self._json({"ok": True, "imported": nn, "updated": nu})
+            if path == "/api/deploy":
+                b = self._body(); target = b.get("target", "dotenv")
+                scope = {dim: b.get(dim, "") for dim in DIMS if b.get(dim)}
+                audit("deploy", source="web", detail=f"{target} {label(scope)}")
+                return self._json({"text": deploy_render(scope, target), "targets": DEPLOY_TARGETS})
+            if path == "/api/scan/import":
+                b = self._body(); root = b.get("path", ""); names = set(b.get("names") or [])
+                cands = [c for c in scan_folder(root, b.get("history", False)) if c["name"] in names]
+                d = load(); scope = {dim: b.get(dim, "") for dim in DIMS}
+                if not scope["project"] and root:
+                    scope["project"] = os.path.basename(os.path.abspath(os.path.expanduser(root)))
+                n_new, n_skip = _import_cands(d, cands, scope); save(d)
+                audit("scan_import", key=f"{n_new} secrets", source="scan", detail=root)
+                return self._json({"imported": n_new, "skipped": n_skip})
             self._json({"error": "not found"}, 404)
 
         def do_PUT(self):
@@ -471,13 +934,15 @@ def serve_web(port):
             if path.startswith("/api/secret/"):
                 sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
                 if not e: return self._json({"error": "yok"}, 404)
+                if "delete" in CFG["confirm_ops"] and not verify_master(self._body().get("pw", "")):
+                    return self._json({"error": "bad_pw"}, 403)
                 secs(d).remove(e); save(d)
                 audit("delete", key=e["name"], source="web", detail=label(e))
                 return self._json({"ok": True})
             self._json({"error": "not found"}, 404)
 
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), H)
-    print(f"concealer web: http://127.0.0.1:{port}  (idle-lock {IDLE_SECONDS}s, Ctrl+C ile durdur)")
+    print(f"concealer web: http://127.0.0.1:{port}  (idle-lock {CFG['idle']}s, Ctrl+C ile durdur)")
     try: srv.serve_forever()
     except KeyboardInterrupt: pass
 
@@ -499,6 +964,14 @@ MCP_TOOLS = [
      "inputSchema": {"type": "object", "properties": {"term": {"type": "string"}}, "required": ["term"]}},
     {"name": "run_with_secrets", "description": "Komutu boyutlara uyan secret'lar env'e enjekte edilerek calistirir. Deger sizmaz; cikti maskelenir.",
      "inputSchema": {"type": "object", "properties": {"command": {"type": "string"}, **_DIMPROPS}, "required": ["command"]}},
+    {"name": "set_secret", "description": "Secret olustur/guncelle (deger YAZAR, geri vermez). Ayni name+boyut varsa gunceller. 'actor' ile kendini tanit; audit source=mcp olur.",
+     "inputSchema": {"type": "object", "properties": {
+        "name": {"type": "string"}, "type": {"type": "string", "description": "api_key|database|website|custom"},
+        "value": {"type": "string", "description": "api_key icin tek deger"},
+        "fields": {"type": "object", "description": "cok alanli tipler icin {field: value}"},
+        "tags": {"type": "array", "items": {"type": "string"}}, "url": {"type": "string"},
+        "notes": {"type": "string"}, "actor": {"type": "string", "description": "eylemi yapan agent kimligi"},
+        **_DIMPROPS}, "required": ["name"]}},
 ]
 def _fmt(rows): return "\n".join(f"{e['name']:22} {e['type']:9} {label(e):22} [{','.join(e['tags'])}]" for e in rows) or "(bos)"
 def _mcp_call(name, args):
@@ -515,6 +988,25 @@ def _mcp_call(name, args):
         env, d = inject_env(target, source="mcp")
         r = subprocess.run(["/bin/sh", "-c", args["command"]], env=env, capture_output=True, text=True)
         return redact(f"[{label(target)}]\n" + r.stdout + r.stderr, d) or "(cikti yok)"
+    if name == "set_secret":
+        actor = args.get("actor") or os.environ.get("CONCEALER_ACTOR", "")
+        d = load(); ident = {dim: args.get(dim, "") for dim in DIMS}; ident["name"] = args["name"]
+        hit = next((e for e in secs(d) if matches(e, ident)), None)
+        fields = dict(args.get("fields") or {})
+        if args.get("value") is not None and "value" not in fields: fields["value"] = args["value"]
+        if hit:
+            hit["fields"].update(fields); hit["updated"] = now_iso()
+            if "tags" in args: hit["tags"] = [t for t in (args["tags"] or []) if t]
+            if "url" in args: hit["url"] = args["url"]
+            if "notes" in args: hit["notes"] = args["notes"]
+            act = "update"
+        else:
+            e = dict(ident); e["type"] = args.get("type", "api_key"); e["fields"] = fields
+            e["tags"] = [t for t in (args.get("tags") or []) if t]
+            e["url"] = args.get("url", ""); e["notes"] = args.get("notes", "")
+            secs(d).append(norm(e)); act = "create"
+        save(d); audit(act, key=args["name"], source="mcp", detail=label(ident), actor=actor)
+        return f"{act}: {args['name']} @ {label(ident)}"
     return f"bilinmeyen arac: {name}"
 def mcp_stdio():
     def send(o): sys.stdout.write(json.dumps(o) + "\n"); sys.stdout.flush()

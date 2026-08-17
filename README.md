@@ -1,4 +1,8 @@
-# 🔐 conceal**er**
+<p align="center">
+  <img src="assets/hero.png" alt="concealer — local-only secret manager over SOPS + age" width="820">
+</p>
+
+# conceal**er**
 
 > **Local‑only, single‑file secret manager for the AI‑coding era.**
 > Encrypted with [SOPS](https://github.com/getsops/sops) + [age](https://github.com/FiloSottile/age).
@@ -73,9 +77,10 @@ brew install sops age            # macOS (or your package manager)
 git clone https://github.com/fxerkan/concealer.git
 cd concealer
 ln -sf "$PWD/concealer" ~/bin/concealer     # optional: put on PATH
+ln -sf "$PWD/concealer" ~/bin/cer           # optional: short alias — `cer web`, `cer add`, `cer run`
 
 # first-time setup — generates keys, asks for a master password
-concealer init
+concealer init      # or: cer init
 ```
 
 Requires Python 3 (stdlib only — no `pip install`), plus `sops`, `age`, and `expect` (ships with macOS/most Linux).

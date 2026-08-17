@@ -4,36 +4,55 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>concealer</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='116' fill='%230a0b0d'/><rect x='128' y='176' width='176' height='38' rx='19' fill='%23272c35'/><rect x='128' y='232' width='256' height='52' rx='26' fill='%23ffb020'/><rect x='128' y='302' width='136' height='38' rx='19' fill='%23272c35'/></svg>">
 <style>
 :root{
-  --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a; --line2:#353b48;
-  --txt:#e6e8ec; --mut:#9aa3b2; --acc:#4f8cff; --acc2:#3b6fd4; --ok:#3fb950; --warn:#e3b341; --bad:#f85149;
-  --chip:#243043;
+  /* Covert — near-black + amber signal. amber = redaction / classified marker. */
+  --bg:#0a0b0d; --panel:#101216; --panel2:#161a20; --line:#1c1f26; --line2:#2a2f38;
+  --txt:#e8e8e6; --mut:#8a909b; --acc:#ffb020; --acc2:#ffc247; --ok:#7ee787; --warn:#e3b341; --bad:#ff6b6b;
+  --chip:#161a20; --ink:#0a0b0d;
 }
 *{box-sizing:border-box}
+html{scrollbar-color:var(--line2) transparent;scrollbar-width:thin}
 body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+/* browser surfaces themed from the palette (selection, caret, focus, scrollbar) */
+::selection{background:rgba(255,176,32,.26);color:var(--txt)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:8px;border:3px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:#3a414c}
 button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--panel2);color:var(--txt);padding:7px 12px;border-radius:8px}
 button:hover{border-color:var(--acc)}
-button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button.primary{background:var(--acc);border-color:var(--acc);color:var(--ink);font-weight:700}
 button.primary:hover{background:var(--acc2)}
 button.ghost{background:transparent;border-color:transparent;color:var(--mut);padding:5px 8px}
 button.ghost:hover{color:var(--txt);background:var(--panel2)}
 button.danger:hover{border-color:var(--bad);color:var(--bad)}
-input,select,textarea{font:inherit;background:var(--panel);color:var(--txt);border:1px solid var(--line2);border-radius:8px;padding:9px 11px;width:100%}
+input,select,textarea{font:inherit;background:var(--panel);color:var(--txt);border:1px solid var(--line2);border-radius:8px;padding:9px 11px;width:100%;caret-color:var(--acc)}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc)}
 textarea{resize:vertical;min-height:64px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 a{color:var(--acc);text-decoration:none}
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .mut{color:var(--mut)}
 .hidden{display:none!important}
-/* marka: "er" son eki vurgulu */
-.brand{font-weight:700;letter-spacing:.5px}
-.brand .ac{color:var(--acc)}
+/* marka: "er" son eki = amber redaksiyon çubuğu (hem house-rule aksan, hem 'conceal' eylemi) */
+.brand{font-weight:700;letter-spacing:-.2px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.brand .ac{display:inline-block;color:var(--ink);background:var(--acc);border-radius:4px;padding:0 .2em;margin-left:.05em;box-shadow:0 2px 8px rgba(255,176,32,.22)}
 
-#login{min-height:100vh;display:flex;align-items:center;justify-content:center}
-#login .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:36px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
-#login h1{margin:0 0 4px;font-size:28px}
-#login p{margin:0 0 22px;color:var(--mut)}
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(900px 500px at 78% -12%,#14161c 0%,#0c0d11 46%,var(--bg) 100%)}
+#login .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:38px;width:392px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+#login h1{margin:0 0 14px;font-size:30px}
+/* tek authored moment: amber çubuk açılışta harflerin üstüne "redakte" olur */
+#login h1 .ac{transform-origin:left center;animation:redact .55s cubic-bezier(.2,.85,.25,1) .15s both}
+@keyframes redact{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@media(prefers-reduced-motion:reduce){#login h1 .ac{animation:none}}
+#login p{margin:0 0 8px;color:var(--mut)}
+/* CLI kimliği: kısa alias 'cer' — küçük terminal ipucu */
+#login .cli{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--mut);
+  margin:0 0 22px;padding:8px 11px;background:var(--bg);border:1px solid var(--line);border-radius:8px}
+#login .cli b{color:var(--acc);font-weight:600}
 .pwrow{display:flex;gap:8px}.pwrow input{flex:1}
 
 header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
@@ -41,10 +60,10 @@ header .brand{font-size:18px}
 header .grow{flex:1}
 .tabs{display:flex;gap:4px;background:var(--panel2);padding:4px;border-radius:10px}
 .tabs button{border:0;background:transparent;color:var(--mut);padding:6px 14px;border-radius:7px}
-.tabs button.active{background:var(--acc);color:#fff}
+.tabs button.active{background:var(--acc);color:var(--ink);font-weight:600}
 .lang{display:flex;gap:2px;background:var(--panel2);padding:3px;border-radius:8px}
 .lang button{border:0;background:transparent;color:var(--mut);padding:4px 9px;border-radius:6px;font-size:12px;font-weight:600}
-.lang button.active{background:var(--acc);color:#fff}
+.lang button.active{background:var(--acc);color:var(--ink)}
 #idle{font-variant-numeric:tabular-nums;color:var(--mut);font-size:12px}
 main{padding:20px;max-width:1400px;margin:0 auto}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
@@ -55,11 +74,16 @@ table{width:100%;border-collapse:collapse;background:var(--panel);border:1px sol
 th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
 th{background:var(--panel2);color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
 tbody tr:hover{background:var(--panel2)}
+th{position:relative;user-select:none}
+th.sortable{cursor:pointer}
+th .sarr{color:var(--acc);font-size:10px;margin-left:4px}
+th .rsz{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize}
+th .rsz:hover{background:var(--acc)}
 tr:last-child td{border-bottom:0}
 .chip{display:inline-block;background:var(--chip);color:#bcd;border-radius:20px;padding:2px 9px;font-size:11px;margin:1px 2px}
 .type-badge{font-size:11px;padding:3px 9px;border-radius:6px;font-weight:600}
-.t-api_key{background:#1d3a5f;color:#9cc4ff}.t-database{background:#3a2a5f;color:#c7aaff}
-.t-website{background:#1d4f3a;color:#8ff0c0}.t-custom{background:#4a3d1d;color:#f0d68f}
+.t-api_key{background:#132534;color:#8fd0ff}.t-database{background:#241d33;color:#c3a6ff}
+.t-website{background:#12301f;color:#86e6a8}.t-custom{background:#2e2612;color:#ffcf7a}
 .rowact{display:flex;gap:4px;justify-content:flex-end}
 .count{color:var(--mut);font-size:13px;margin-top:10px}
 
@@ -87,8 +111,9 @@ label.fld{display:block;margin-bottom:4px;color:var(--mut);font-size:12px;font-w
 <!-- LOGIN -->
 <div id="login">
   <div class="card">
-    <h1 class="brand">🔐 conceal<span class="ac">er</span></h1>
+    <h1 class="brand"><svg viewBox="0 0 512 512" width="34" height="34" style="vertical-align:-8px;margin-right:4px"><rect width="512" height="512" rx="116" fill="#0a0b0d"/><rect x="12" y="12" width="488" height="488" rx="104" fill="none" stroke="#20242c" stroke-width="2"/><rect x="128" y="176" width="176" height="38" rx="19" fill="#272c35"/><rect x="128" y="232" width="256" height="52" rx="26" fill="#ffb020"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#272c35"/></svg>conceal<span class="ac">er</span></h1>
     <p data-i18n="login_sub">Lokal secret vault — master password ile aç</p>
+    <p class="cli">$ <b>cer</b> web</p>
     <div class="pwrow">
       <input id="pw" type="password" data-i18n-ph="master_pw" placeholder="Master password" autofocus onkeydown="if(event.key==='Enter')unlock()">
       <button class="ghost" onclick="togglePw('pw',this)">👁</button>
@@ -101,18 +126,21 @@ label.fld{display:block;margin-bottom:4px;color:var(--mut);font-size:12px;font-w
 <!-- APP -->
 <div id="app" class="hidden">
   <header>
-    <span class="brand">🔐 conceal<span class="ac">er</span></span>
+    <span class="brand"><svg viewBox="0 0 512 512" width="24" height="24" style="vertical-align:-6px;margin-right:3px"><rect width="512" height="512" rx="116" fill="#0a0b0d"/><rect x="128" y="176" width="176" height="38" rx="19" fill="#2a2f38"/><rect x="128" y="232" width="256" height="52" rx="26" fill="#ffb020"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#2a2f38"/></svg>conceal<span class="ac">er</span></span>
     <div class="tabs">
       <button id="tab-secrets" class="active" data-i18n="secrets" onclick="showTab('secrets')">Secrets</button>
       <button id="tab-audit" data-i18n="audit_log" onclick="showTab('audit')">Audit Log</button>
+      <button id="tab-leaks" data-i18n="leaks" onclick="showTab('leaks')">Risk</button>
+      <button id="tab-settings" data-i18n="settings_tab" onclick="showTab('settings')">⚙ Settings</button>
     </div>
     <span class="grow"></span>
+    <button class="ghost" data-i18n="generate" onclick="openGen()">🎲 Generate</button>
     <span id="idle"></span>
+    <button class="ghost" data-i18n="lock" onclick="lock()">🔒 Kilitle</button>
     <div class="lang">
       <button id="lang-tr" onclick="setLang('tr')">TR</button>
       <button id="lang-en" onclick="setLang('en')">EN</button>
     </div>
-    <button class="ghost" data-i18n="lock" onclick="lock()">🔒 Kilitle</button>
   </header>
   <main>
     <section id="view-secrets">
@@ -123,13 +151,17 @@ label.fld{display:block;margin-bottom:4px;color:var(--mut);font-size:12px;font-w
         <select id="fproject" onchange="loadSecrets()"></select>
         <select id="fenvironment" onchange="loadSecrets()"></select>
         <select id="frepo" onchange="loadSecrets()"></select>
+        <button data-i18n="deploy_btn" onclick="openDeploy()">🚀 Deploy</button>
+        <button data-i18n="scan_folder" onclick="openScan()">🔎 Scan folder</button>
+        <button class="ghost" title="columns" onclick="gridColsMenu('secrets')">⋮</button>
         <button class="primary" data-i18n="new_secret" onclick="openEditor()">+ New Secret</button>
       </div>
       <table>
         <thead><tr>
           <th data-i18n="th_name">Name</th><th data-i18n="th_type">Type</th>
           <th data-i18n="th_scope">Scope</th><th data-i18n="th_tags">Tags</th>
-          <th data-i18n="th_updated">Updated</th><th style="text-align:right" data-i18n="th_actions">Actions</th>
+          <th data-i18n="th_updated">Updated</th><th data-i18n="th_access">Last access</th>
+          <th style="text-align:right" data-i18n="th_actions">Actions</th>
         </tr></thead>
         <tbody id="srows"></tbody>
       </table>
@@ -148,13 +180,48 @@ label.fld{display:block;margin-bottom:4px;color:var(--mut);font-size:12px;font-w
         <span class="grow"></span>
         <button class="ghost" onclick="location='/api/audit/export?format=csv'">⬇ CSV</button>
         <button class="ghost" onclick="location='/api/audit/export?format=json'">⬇ JSON</button>
+        <button class="ghost" title="columns" onclick="gridColsMenu('audit')">⋮</button>
       </div>
       <table>
         <thead><tr><th>#</th><th data-i18n="th_time">Time (UTC)</th><th data-i18n="th_source">Source</th>
-          <th data-i18n="th_action">Action</th><th data-i18n="th_key">Key</th><th data-i18n="th_detail">Detail</th></tr></thead>
+          <th data-i18n="th_actor">Actor</th><th data-i18n="th_action">Action</th><th data-i18n="th_key">Key</th><th data-i18n="th_detail">Detail</th></tr></thead>
         <tbody id="arows"></tbody>
       </table>
       <div class="pager" id="apager"></div>
+    </section>
+
+    <section id="view-leaks" class="hidden">
+      <div class="toolbar">
+        <span class="mut" data-i18n="leaks_hint">Aynı değeri paylaşan (yeniden kullanılan) secret'lar — sızma riski skorlanır.</span>
+        <span class="grow"></span>
+        <button class="ghost" title="columns" onclick="gridColsMenu('leaks')">⋮</button>
+        <button onclick="loadLeaks()">↻</button>
+      </div>
+      <table>
+        <thead><tr><th data-i18n="th_score">Score</th><th data-i18n="th_shared">Shared value</th>
+          <th data-i18n="th_uses">Uses</th><th data-i18n="th_projects">Projects</th>
+          <th data-i18n="th_envs">Envs</th><th data-i18n="th_records">Records</th></tr></thead>
+        <tbody id="lrows"></tbody>
+      </table>
+      <div class="count" id="lcount"></div>
+    </section>
+
+    <section id="view-settings" class="hidden">
+      <div class="grid" style="max-width:680px">
+        <div class="field"><label class="fld" data-i18n="set_idle">Auto-lock (seconds)</label>
+          <input id="set_idle" type="number" min="30" max="86400"></div>
+        <div class="field"><label class="fld" data-i18n="set_confirm">Ask master password before</label>
+          <div id="set_confirm" style="display:flex;flex-direction:column;gap:6px;padding-top:4px"></div></div>
+      </div>
+      <button class="primary" data-i18n="save" onclick="saveSettings()">Save</button>
+      <hr style="border-color:var(--line);margin:22px 0;max-width:680px">
+      <label class="fld" data-i18n="set_portability">Portability (move between machines)</label>
+      <div class="toolbar" style="margin-top:8px">
+        <button data-i18n="export_btn" onclick="doExport()">⬇ Export (.age)</button>
+        <input type="file" id="imp_file" accept=".age" style="width:auto">
+        <button data-i18n="import_btn" onclick="doImport()">⬆ Import</button>
+      </div>
+      <p class="mut" style="max-width:680px" data-i18n="set_export_hint">Export encrypts the whole vault with your master password (age). Import merges records into this vault.</p>
     </section>
   </main>
 </div>
@@ -181,6 +248,22 @@ const I18N={
   new_secret_title:"+ Yeni Secret",edit_title:"✏️ Düzenle",
   all_actions:"tüm eylemler",all_sources:"tüm kaynaklar",key_filter:"key filtre",verify_chain:"🔗 Zincir doğrula",
   th_time:"Zaman (UTC)",th_source:"Kaynak",th_action:"Eylem",th_key:"Key",th_detail:"Detay",
+  th_actor:"Aktör",th_access:"Son Erişim",actor:"aktör",all:"Tümü",never:"—",
+  leaks:"Risk",leaks_hint:"Aynı değeri paylaşan (yeniden kullanılan) secret'lar — sızma riski skorlanır.",
+  th_score:"Skor",th_shared:"Paylaşılan değer",th_uses:"Kullanım",th_projects:"Projeler",th_envs:"Ortamlar",th_records:"Kayıtlar",
+  no_leaks:"paylaşılan değer yok 🎉",leak_groups:"grup",
+  scan_folder:"Klasör Tara",scan_path:"Klasör yolu",scan_history:"shell history'yi de tara (~/.zsh_history, ~/.bash_history)",
+  scan_project_ph:"boş = klasör adı",scan_result_hint:"Bir yol gir ve 'Tara'ya bas.",scan_running:"taranıyor…",
+  scan_found:"aday bulundu",scan_none:"aday secret bulunamadı",scan_btn:"Tara",scan_import_sel:"Seçilenleri Al",
+  scan_path_req:"klasör yolu gerekli",scan_pick:"en az bir aday seç",scan_imported:(n,s)=>`${n} içeri aktarıldı, ${s} atlandı`,
+  generate:"🎲 Üret",generate_title:"Parola / Secret Üret",gen_format:"format",gen_password:"parola",gen_hex:"hex token",
+  gen_b64:"base64url token",gen_length:"uzunluk",gen_classes:"karakter sınıfları",gen_result:"üretilen değer",
+  gen_regen:"yeniden üret",gen_save:"concealer'a Kaydet",
+  settings:"Ayarlar",settings_tab:"⚙ Ayarlar",confirm:"Onayla",set_idle:"Auto-lock (saniye)",set_confirm:"Şu işlemlerden önce master parola sor",
+  set_portability:"Taşınabilirlik (makineler arası)",export_btn:"⬇ Export (.age)",import_btn:"⬆ Import",
+  set_export_hint:"Export tüm vault'u master parolayla (age) şifreler; başka makineye taşınabilir. Import kayıtları bu vault'a birleştirir.",
+  exported:"export indirildi",imp_pick:"önce .age dosyası seç",imp_fail:"import başarısız",imported_n:(n,u)=>`+${n} yeni, ~${u} güncellendi`,
+  columns:"Kolonlar",deploy_btn:"🚀 Deploy",deploy_title:"Deploy / Hedefe Gönder",deploy_target:"hedef",deploy_result:"çıktı (komut/manifest)",
   prev:"‹ önceki",next:"sonraki ›",page:(p,t,n)=>`sayfa ${p}/${t} · ${n} kayıt`,
   chain_ok:c=>`✓ bütünlük OK (${c})`,chain_bad:b=>`✗ kırık @ #${b}`,
   audit_rec:"Audit kaydı",time:"zaman",detail:"detay",hash:"hash (HMAC)"},
@@ -197,6 +280,22 @@ const I18N={
   new_secret_title:"+ New Secret",edit_title:"✏️ Edit",
   all_actions:"all actions",all_sources:"all sources",key_filter:"key filter",verify_chain:"🔗 Verify chain",
   th_time:"Time (UTC)",th_source:"Source",th_action:"Action",th_key:"Key",th_detail:"Detail",
+  th_actor:"Actor",th_access:"Last access",actor:"actor",all:"All",never:"—",
+  leaks:"Risk",leaks_hint:"Secrets that share the same value (reuse) — leak risk is scored.",
+  th_score:"Score",th_shared:"Shared value",th_uses:"Uses",th_projects:"Projects",th_envs:"Envs",th_records:"Records",
+  no_leaks:"no shared values 🎉",leak_groups:"groups",
+  scan_folder:"Scan folder",scan_path:"Folder path",scan_history:"also scan shell history (~/.zsh_history, ~/.bash_history)",
+  scan_project_ph:"empty = folder name",scan_result_hint:"Enter a path and press 'Scan'.",scan_running:"scanning…",
+  scan_found:"candidates found",scan_none:"no candidate secrets found",scan_btn:"Scan",scan_import_sel:"Import selected",
+  scan_path_req:"folder path required",scan_pick:"pick at least one candidate",scan_imported:(n,s)=>`${n} imported, ${s} skipped`,
+  generate:"🎲 Generate",generate_title:"Generate Password / Secret",gen_format:"format",gen_password:"password",gen_hex:"hex token",
+  gen_b64:"base64url token",gen_length:"length",gen_classes:"character classes",gen_result:"generated value",
+  gen_regen:"regenerate",gen_save:"Save to concealer",
+  settings:"Settings",settings_tab:"⚙ Settings",confirm:"Confirm",set_idle:"Auto-lock (seconds)",set_confirm:"Ask master password before",
+  set_portability:"Portability (move between machines)",export_btn:"⬇ Export (.age)",import_btn:"⬆ Import",
+  set_export_hint:"Export encrypts the whole vault with your master password (age); portable to another machine. Import merges records into this vault.",
+  exported:"export downloaded",imp_pick:"pick a .age file first",imp_fail:"import failed",imported_n:(n,u)=>`+${n} new, ~${u} updated`,
+  columns:"Columns",deploy_btn:"🚀 Deploy",deploy_title:"Deploy / Send to target",deploy_target:"target",deploy_result:"output (command/manifest)",
   prev:"‹ prev",next:"next ›",page:(p,t,n)=>`page ${p}/${t} · ${n} records`,
   chain_ok:c=>`✓ integrity OK (${c})`,chain_bad:b=>`✗ broken @ #${b}`,
   audit_rec:"Audit record",time:"time",detail:"detail",hash:"hash (HMAC)"}
@@ -222,6 +321,35 @@ function esc(s){ return (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<
 function togglePw(id,btn){ const el=typeof id==='string'?$('#'+id):id; el.type=el.type==='password'?'text':'password'; if(btn)btn.textContent=el.type==='password'?'👁':'🙈'; }
 function fmtTs(ts){ return ts?ts.replace('T',' ').replace('+00:00',''):''; }
 
+// parola-yoneticisi overlay'ini (LastPass/1Password/Bitwarden) secret input'larindan bastir
+const NOPM='autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other"';
+const SECRETY=/pass|secret|token|value|key|credential|apikey/i;
+function fieldIsSecretName(n){ return SECRETY.test(n); }
+function fieldRow(name,secret,val){
+  const tp=secret?'password':'text';
+  return `<div class="field"><label class="fld">${esc(name)}${secret?' 🔒':''}</label><div class="secretrow">
+    <input data-f="${esc(name)}" type="${tp}" value="${esc(val)}" ${NOPM}>
+    ${secret?`<button class="ghost" type="button" onclick="togglePw(this.previousElementSibling,this)">👁</button>`:''}</div></div>`;
+}
+// etiket renkleri: hyperscaler/marka renkleri + digerleri icin deterministik hash
+const TAG_BRAND={aws:'#FF9900',azure:'#0078D4',gcp:'#4285F4',google:'#4285F4','google-cloud':'#4285F4',
+  github:'#8957e5',gitlab:'#FC6D26',bitbucket:'#2684FF',openai:'#10a37f',anthropic:'#d97757',claude:'#d97757',
+  docker:'#2496ED',kubernetes:'#326CE5',k8s:'#326CE5',terraform:'#7B42BC',stripe:'#635BFF',
+  slack:'#4A154B',teams:'#6264A7',powerautomate:'#0066FF',cloudflare:'#F38020',vercel:'#eaeaea',
+  mongodb:'#47A248',postgres:'#4169E1',postgresql:'#4169E1',mysql:'#4479A1',redis:'#DC382D',
+  prod:'#f85149',production:'#f85149',staging:'#e3b341',dev:'#3fb950',test:'#3fb950'};
+function tagColor(name){
+  const key=(name||'').toLowerCase();
+  if(TAG_BRAND[key])return TAG_BRAND[key];
+  for(const b in TAG_BRAND){ if(key.includes(b))return TAG_BRAND[b]; }
+  let h=0; for(let i=0;i<name.length;i++)h=(h*31+name.charCodeAt(i))>>>0;
+  return `hsl(${h%360} 55% 55%)`;
+}
+function tagChip(name){
+  const c=tagColor(name);
+  return `<span class="chip" style="color:${c};background:color-mix(in srgb,${c} 16%,transparent);border:1px solid color-mix(in srgb,${c} 45%,transparent)">${esc(name)}</span>`;
+}
+
 // ---------- auth / idle ----------
 async function unlock(){
   const r=await fetch('/api/unlock',{method:'POST',body:JSON.stringify({pw:$('#pw').value})});
@@ -230,27 +358,241 @@ async function unlock(){
 }
 async function lock(){ await fetch('/api/lock',{method:'POST'}); showLogin(); }
 function showLogin(){ clearInterval(idleTimer); $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#pw').focus(); }
-async function showApp(){
+async function showApp(startSecs){
   $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
   TYPES=await (await api('/api/types')).json();
-  rebuildSelects(); resetIdle(); startIdle(); showTab('secrets');
+  window.CFG=await (await api('/api/settings')).json();
+  rebuildSelects(); idleLeft=(startSecs!=null?startSecs:IDLE); startIdle(); showTab('secrets');
 }
 function rebuildSelects(){
   $('#ftype').innerHTML=`<option value="">${t('all_types')}</option>`+Object.keys(TYPES).map(x=>`<option>${x}</option>`).join('');
   $('#a_action').innerHTML=`<option value="">${t('all_actions')}</option>`; $('#a_action').dataset.done='';
-  $('#a_source').innerHTML=`<option value="">${t('all_sources')}</option><option>web</option><option>cli</option><option>mcp</option>`;
+  $('#a_source').innerHTML=`<option value="">${t('all_sources')}</option><option>web</option><option>cli</option><option>mcp</option><option>scan</option>`;
 }
-function startIdle(){ clearInterval(idleTimer); idleTimer=setInterval(()=>{ idleLeft--; const m=String(Math.floor(idleLeft/60)).padStart(2,'0'),s=String(idleLeft%60).padStart(2,'0'); $('#idle').textContent=t('idle_lock')+' '+m+':'+s; if(idleLeft<=0){lock();toast(t('idle_locked'));} },1000); }
-function resetIdle(){ idleLeft=IDLE; }
-['mousemove','keydown','click','scroll'].forEach(ev=>document.addEventListener(ev,()=>{ if(!$('#app').classList.contains('hidden'))resetIdle(); }));
+// hard auto-lock: aktivite sayaci sifirlamaz; unlock'tan itibaren sabit geri sayim
+function startIdle(){ clearInterval(idleTimer); idleTimer=setInterval(()=>{ idleLeft--; const m=String(Math.floor(Math.max(0,idleLeft)/60)).padStart(2,'0'),s=String(Math.max(0,idleLeft)%60).padStart(2,'0'); $('#idle').textContent=t('idle_lock')+' '+m+':'+s; if(idleLeft<=0){clearInterval(idleTimer);lock();toast(t('idle_locked'));} },1000); }
 
 function showTab(tab){
-  $('#view-secrets').classList.toggle('hidden',tab!=='secrets');
-  $('#view-audit').classList.toggle('hidden',tab!=='audit');
-  $('#tab-secrets').classList.toggle('active',tab==='secrets');
-  $('#tab-audit').classList.toggle('active',tab==='audit');
-  if(tab==='secrets')loadSecrets(); else loadAudit(1);
+  ['secrets','audit','leaks','settings'].forEach(x=>{
+    $('#view-'+x).classList.toggle('hidden',tab!==x);
+    $('#tab-'+x).classList.toggle('active',tab===x);
+  });
+  if(tab==='secrets')loadSecrets(); else if(tab==='audit')loadAudit(1);
+  else if(tab==='leaks')loadLeaks(); else loadSettings();
 }
+
+// ---------- master-parola onay modali ----------
+function askPw(title, cb){
+  const body=`<div class="field"><label class="fld">${t('master_pw')}</label>
+    <input id="ap_pw" type="password" ${NOPM} onkeydown="if(event.key==='Enter')document.getElementById('ap_go').click()"></div>`;
+  modal('🔑 '+title, body, [{x:t('confirm'),p:1,f:()=>{const v=$('#ap_pw').value;closeModal();cb(v);}},{x:t('cancel'),f:closeModal}]);
+  window._ov.querySelector('.foot button.primary').id='ap_go';
+  setTimeout(()=>$('#ap_pw')&&$('#ap_pw').focus(),50);
+}
+
+// ---------- settings ----------
+async function loadSettings(){
+  const s=await (await api('/api/settings')).json(); window.CFG=s;
+  $('#set_idle').value=s.idle;
+  $('#set_confirm').innerHTML=['export','delete','settings','create','update'].map(o=>
+    `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="cop" value="${o}" ${s.confirm_ops.includes(o)?'checked':''} style="width:auto"> ${o}</label>`).join('');
+}
+function saveSettings(){
+  const idle=Math.max(30,Math.min(86400,parseInt($('#set_idle').value)||300));
+  const ops=[...document.querySelectorAll('.cop:checked')].map(c=>c.value);
+  askPw(t('settings'),async pw=>{
+    const r=await api('/api/settings',{method:'POST',body:JSON.stringify({pw,idle,confirm_ops:ops})});
+    if(r.status===403){toast(t('wrong_pw'));return;}
+    window.CFG=await r.json(); idleLeft=window.CFG.idle; toast(t('saved'));
+  });
+}
+function doExport(){
+  askPw(t('export_btn'),async pw=>{
+    const r=await api('/api/export',{method:'POST',body:JSON.stringify({pw})});
+    if(r.status===403){toast(t('wrong_pw'));return;}
+    const d=await r.json(); if(!d.ok){toast(d.error||'error');return;}
+    const bin=Uint8Array.from(atob(d.b64),c=>c.charCodeAt(0));
+    const url=URL.createObjectURL(new Blob([bin],{type:'application/octet-stream'}));
+    const a=document.createElement('a'); a.href=url; a.download=d.filename; a.click(); URL.revokeObjectURL(url);
+    toast(t('exported'));
+  });
+}
+function doImport(){
+  const f=$('#imp_file').files[0]; if(!f){toast(t('imp_pick'));return;}
+  const rd=new FileReader();
+  rd.onload=()=>{ const b64=btoa(String.fromCharCode(...new Uint8Array(rd.result)));
+    askPw(t('import_btn'),async pw=>{
+      const r=await api('/api/import',{method:'POST',body:JSON.stringify({pw,b64})});
+      const d=await r.json();
+      if(!r.ok){toast(d.error||t('imp_fail'));return;}
+      toast(t('imported_n',d.imported,d.updated)); loadSecrets();
+    });
+  };
+  rd.readAsArrayBuffer(f);
+}
+
+// ---------- leaks / risk ----------
+const SEV_COLOR={high:'#f85149',med:'#e3b341',low:'#3fb950'};
+async function loadLeaks(){
+  const g=await (await api('/api/leaks')).json();
+  $('#lrows').innerHTML=g.map(x=>{const c=SEV_COLOR[x.severity]||'#9aa3b2';
+    return `<tr>
+      <td><span class="pill" style="color:${c};background:color-mix(in srgb,${c} 18%,transparent)">${x.severity} · ${x.score}</span></td>
+      <td class="mono">${esc(x.mask)}</td><td><b>${x.count}</b></td>
+      <td>${x.projects.map(tagChip).join('')||'<span class="mut">—</span>'}</td>
+      <td>${x.envs.map(tagChip).join('')||'<span class="mut">—</span>'}</td>
+      <td class="mut mono" style="font-size:12px">${x.uses.map(u=>esc(u.name)+' @ '+esc(u.scope)).join('<br>')}</td>
+    </tr>`;}).join('') || `<tr><td colspan="6" class="mut" style="text-align:center;padding:30px">${t('no_leaks')}</td></tr>`;
+  $('#lcount').textContent=g.length+' '+t('leak_groups');
+  regrid('leaks');
+}
+
+// ---------- scan folder ----------
+function openScan(){
+  const body=`<div class="field"><label class="fld">${t('scan_path')}</label>
+      <input id="sc_path" placeholder="/Users/…/project" ${NOPM}></div>
+    <label style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><input type="checkbox" id="sc_hist" style="width:auto"> ${t('scan_history')}</label>
+    <div class="grid">
+      <div class="field"><label class="fld">project</label><input id="sc_project" placeholder="${t('scan_project_ph')}" ${NOPM}></div>
+      <div class="field"><label class="fld">environment</label><input id="sc_environment" ${NOPM}></div>
+    </div>
+    <div id="sc_result" class="mut">${t('scan_result_hint')}</div>`;
+  modal('🔎 '+t('scan_folder'),body,[{x:t('scan_btn'),f:doScan},{x:t('scan_import_sel'),p:1,f:doScanImport},{x:t('close'),f:closeModal}]);
+}
+async function doScan(){
+  const path=$('#sc_path').value.trim(); if(!path){toast(t('scan_path_req'));return;}
+  $('#sc_result').innerHTML=t('scan_running');
+  const r=await (await api('/api/scan',{method:'POST',body:JSON.stringify({path,history:$('#sc_hist').checked})})).json();
+  const cs=r.cands||[];
+  $('#sc_result').innerHTML=cs.length?`<label class="fld">${cs.length} ${t('scan_found')}</label>`+cs.map(c=>
+    `<label class="kv" style="align-items:center"><input type="checkbox" class="sc-c" value="${esc(c.name)}" checked style="width:auto">
+      <span class="mono" style="flex:1">${esc(c.name)}</span><span class="mut mono">${esc(c.mask)}</span>
+      <span class="mut" style="font-size:11px">${esc(c.source)}</span></label>`).join('')
+    :`<span class="mut">${t('scan_none')}</span>`;
+}
+async function doScanImport(){
+  const path=$('#sc_path').value.trim(); if(!path){toast(t('scan_path_req'));return;}
+  const names=[...document.querySelectorAll('.sc-c:checked')].map(c=>c.value);
+  if(!names.length){toast(t('scan_pick'));return;}
+  const r=await (await api('/api/scan/import',{method:'POST',body:JSON.stringify({
+    path,history:$('#sc_hist').checked,names,
+    project:$('#sc_project').value.trim(),environment:$('#sc_environment').value.trim()})})).json();
+  closeModal(); toast(t('scan_imported',r.imported,r.skipped)); loadSecrets();
+}
+
+// ---------- password/secret uretici (runtime, tarayicida crypto) ----------
+function genValue(){
+  const fmt=$('#g_fmt').value;
+  if(fmt==='uuid') return crypto.randomUUID();
+  const n=Math.max(1,Math.min(512,parseInt($('#g_len').value)||24));
+  if(fmt==='hex'||fmt==='base64url'){
+    const bytes=new Uint8Array(fmt==='hex'?Math.ceil(n/2):n); crypto.getRandomValues(bytes);
+    if(fmt==='hex') return [...bytes].map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,n);
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'').slice(0,n);
+  }
+  let set=''; if($('#g_lower').checked)set+='abcdefghijklmnopqrstuvwxyz';
+  if($('#g_upper').checked)set+='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  if($('#g_digit').checked)set+='0123456789';
+  if($('#g_sym').checked)set+='!@#$%^&*()-_=+[]{};:,.<>?';
+  if(!set)set='abcdefghijklmnopqrstuvwxyz';
+  const out=new Uint8Array(n); crypto.getRandomValues(out);
+  // ponytail: mod-bias ihmal edilebilir (set≤95, 24+ karakter); tam duzgunluk icin rejection-sampling
+  return [...out].map(b=>set[b%set.length]).join('');
+}
+function genOpts(){ const f=$('#g_fmt').value; $('#g_lenwrap').style.display=(f==='uuid')?'none':''; $('#g_classes').style.display=(f==='password')?'':'none'; }
+function regen(){ $('#g_out').value=genValue(); }
+function openGen(){
+  const cb=(id,l)=>`<label style="display:flex;gap:5px;align-items:center"><input type="checkbox" id="${id}" checked onchange="regen()" style="width:auto"> ${l}</label>`;
+  const body=`<div class="grid">
+    <div class="field"><label class="fld">${t('gen_format')}</label>
+      <select id="g_fmt" onchange="genOpts();regen()">
+        <option value="password">${t('gen_password')}</option><option value="hex">${t('gen_hex')}</option>
+        <option value="base64url">${t('gen_b64')}</option><option value="uuid">UUID</option></select></div>
+    <div class="field" id="g_lenwrap"><label class="fld">${t('gen_length')}</label>
+      <input id="g_len" type="number" value="24" min="1" max="512" oninput="regen()"></div>
+    </div>
+    <div class="field" id="g_classes"><label class="fld">${t('gen_classes')}</label>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">${cb('g_lower','a-z')}${cb('g_upper','A-Z')}${cb('g_digit','0-9')}${cb('g_sym','!@#')}</div></div>
+    <div class="field"><label class="fld">${t('gen_result')}</label><div class="secretrow">
+      <input id="g_out" class="mono" readonly ${NOPM}>
+      <button class="ghost" onclick="regen()" title="${t('gen_regen')}">🎲</button>
+      <button class="ghost" onclick="doCopy($('#g_out').value)" title="copy">📋</button></div></div>`;
+  modal('🎲 '+t('generate_title'),body,[
+    {x:t('gen_save'),p:1,f:()=>{const v=$('#g_out').value;closeModal();openEditor(null,{type:'api_key',fields:{value:v},tags:['generated']});}},
+    {x:t('close'),f:closeModal}]);
+  genOpts(); regen();
+}
+
+// ---------- deploy: secret'ları hedef formatına render et (env / AWS / k8s / ...) ----------
+const DEPLOY_TARGETS=['dotenv','export','docker','json','k8s','aws-secrets','aws-ssm','github'];
+function openDeploy(){
+  const cur=n=>$('#f'+n)?$('#f'+n).value:'';
+  const body=`<div class="grid">
+    <div class="field"><label class="fld">${t('deploy_target')}</label>
+      <select id="dp_target" onchange="doDeploy()">${DEPLOY_TARGETS.map(x=>`<option>${x}</option>`).join('')}</select></div>
+    <div class="field"><label class="fld">project</label><input id="dp_project" value="${esc(cur('project'))}" oninput="doDeploy()" ${NOPM}></div>
+    <div class="field"><label class="fld">environment</label><input id="dp_environment" value="${esc(cur('environment'))}" oninput="doDeploy()" ${NOPM}></div>
+    <div class="field"><label class="fld">tenant</label><input id="dp_tenant" value="${esc(cur('tenant'))}" oninput="doDeploy()" ${NOPM}></div>
+    <div class="field"><label class="fld">repo</label><input id="dp_repo" value="${esc(cur('repo'))}" oninput="doDeploy()" ${NOPM}></div>
+    </div>
+    <div class="field"><label class="fld">${t('deploy_result')}</label>
+      <textarea id="dp_out" readonly style="min-height:190px"></textarea>
+      <button class="ghost" style="margin-top:6px" onclick="doCopy($('#dp_out').value)">📋</button></div>`;
+  modal('🚀 '+t('deploy_title'),body,[{x:t('close'),p:1,f:closeModal}]);
+  doDeploy();
+}
+let _dpSeq=0;
+async function doDeploy(){
+  const seq=++_dpSeq;
+  const b={target:$('#dp_target').value,tenant:$('#dp_tenant').value.trim(),project:$('#dp_project').value.trim(),
+    environment:$('#dp_environment').value.trim(),repo:$('#dp_repo').value.trim()};
+  const r=await (await api('/api/deploy',{method:'POST',body:JSON.stringify(b)})).json();
+  if(seq!==_dpSeq)return;   // eski (yaris) yaniti yoksay
+  const out=$('#dp_out'); if(out)out.value=r.text||'(no match)';
+}
+
+// ---------- grid: sort / resize / kolon gizle-göster (tüm tablolar) ----------
+const GRID={};
+function gridState(id){ return GRID[id] || (GRID[id]={sort:null,dir:1,hidden:new Set(JSON.parse(localStorage.getItem('gh_'+id)||'[]'))}); }
+function gridHeads(id){ return [...document.querySelectorAll('#view-'+id+' thead th')]; }
+function regrid(id){   // her render sonrası çağrılır: başlıkları kur + durumu uygula
+  gridHeads(id).forEach((h,i)=>{
+    if(h.dataset.g)return; h.dataset.g=1; h.classList.add('sortable');
+    h.addEventListener('click',e=>{ if(!e.target.classList.contains('rsz'))gridSort(id,i); });
+    const g=document.createElement('span'); g.className='rsz';
+    g.addEventListener('mousedown',e=>gridRz(e,h)); h.appendChild(g);
+  });
+  gridApply(id);
+}
+function gridSort(id,i){ const st=gridState(id); st.dir=(st.sort===i)?-st.dir:1; st.sort=i; gridApply(id); }
+function gridApply(id){
+  const st=gridState(id), heads=gridHeads(id);
+  heads.forEach((h,i)=>{ h.style.display=st.hidden.has(i)?'none':'';
+    let a=h.querySelector('.sarr'); if(!a){a=document.createElement('span');a.className='sarr';h.insertBefore(a,h.querySelector('.rsz'));}
+    a.textContent = st.sort===i ? (st.dir>0?'▲':'▼') : ''; });
+  const tb=document.querySelector('#view-'+id+' tbody'); if(!tb)return;
+  let rows=[...tb.children];
+  rows.forEach(tr=>[...tr.children].forEach((td,i)=>td.style.display=st.hidden.has(i)?'none':''));
+  if(st.sort!=null && rows.length>1 && !rows[0].querySelector('[colspan]')){
+    rows.sort((a,b)=>gridCmp(gCell(a,st.sort),gCell(b,st.sort))*st.dir).forEach(r=>tb.appendChild(r));
+  }
+}
+function gCell(tr,i){ const c=tr.children[i]; return c?c.textContent.trim():''; }
+function gridCmp(a,b){ const na=parseFloat(a.replace(/[^\d.\-]/g,'')),nb=parseFloat(b.replace(/[^\d.\-]/g,''));
+  if(!isNaN(na)&&!isNaN(nb)&&/\d/.test(a)&&/\d/.test(b))return na-nb; return a.localeCompare(b,undefined,{numeric:true}); }
+function gridRz(e,h){ e.preventDefault(); e.stopPropagation(); const sx=e.pageX, sw=h.offsetWidth;
+  const mv=ev=>h.style.width=Math.max(50,sw+ev.pageX-sx)+'px';
+  const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);};
+  document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); }
+function gridColsMenu(id){
+  const st=gridState(id);
+  const body=gridHeads(id).map((h,i)=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0">
+    <input type="checkbox" ${st.hidden.has(i)?'':'checked'} onchange="gridToggle('${id}',${i},this.checked)" style="width:auto">
+    ${esc(h.textContent.replace(/[▲▼]/g,'').trim())||'#'+ (i+1)}</label>`).join('');
+  modal('⋮ '+t('columns'),body,[{x:t('close'),p:1,f:closeModal}]);
+}
+function gridToggle(id,i,show){ const st=gridState(id); show?st.hidden.delete(i):st.hidden.add(i);
+  localStorage.setItem('gh_'+id,JSON.stringify([...st.hidden])); gridApply(id); }
 
 // ---------- secrets ----------
 let _dt=null; function debouncedLoad(){ clearTimeout(_dt); _dt=setTimeout(loadSecrets,250); }
@@ -265,28 +607,35 @@ async function loadSecrets(){
       <td class="mono"><b>${esc(e.name)}</b>${e.url?` <a href="${esc(e.url)}" target="_blank">↗</a>`:''}</td>
       <td><span class="type-badge t-${e.type}">${e.type}</span></td>
       <td class="mut mono">${DIMS.map(d=>esc(e[d]||'*')).join(' / ')}</td>
-      <td>${(e.tags||[]).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}</td>
+      <td>${(e.tags||[]).map(tagChip).join('')}</td>
       <td class="mut">${fmtTs(e.updated)}</td>
+      <td class="mut" style="font-size:12px">${e.access?fmtTs(e.access.ts)+' '+tagChip(e.access.source)+(e.access.actor?' '+esc(e.access.actor):''):t('never')}</td>
       <td><div class="rowact">
         <button class="ghost" title="${t('view')}" onclick="viewSecret('${e.id}')">👁</button>
         <button class="ghost" title="${t('edit')}" onclick="openEditor('${e.id}')">✏️</button>
         <button class="ghost" title="${t('del')}" onclick="delSecret('${e.id}','${esc(e.name)}')">🗑</button>
-      </div></td></tr>`).join('') || `<tr><td colspan="6" class="mut" style="text-align:center;padding:30px">${t('no_records')}</td></tr>`;
+      </div></td></tr>`).join('') || `<tr><td colspan="7" class="mut" style="text-align:center;padding:30px">${t('no_records')}</td></tr>`;
   $('#scount').textContent=rows.length+' '+t('records');
+  regrid('secrets');
 }
 function fillDim(rows,dim){
   const sel=$('#f'+dim),cur=sel.value;
   const vals=[...new Set(rows.map(e=>e[dim]).filter(Boolean))].sort();
-  sel.innerHTML=`<option value="">${dim}</option>`+vals.map(v=>`<option ${v===cur?'selected':''}>${esc(v)}</option>`).join('');
+  sel.innerHTML=`<option value="">${t('all')} · ${dim}</option>`+vals.map(v=>`<option ${v===cur?'selected':''}>${esc(v)}</option>`).join('');
 }
-async function delSecret(id,name){ if(!confirm(t('del_confirm',name)))return; await api('/api/secret/'+id,{method:'DELETE'}); toast(t('deleted')); loadSecrets(); }
+async function delSecret(id,name){
+  if(!confirm(t('del_confirm',name)))return;
+  const send=async pw=>{ const r=await api('/api/secret/'+id,{method:'DELETE',body:JSON.stringify(pw?{pw}:{})});
+    if(r.status===403){toast(t('wrong_pw'));return;} toast(t('deleted')); loadSecrets(); };
+  if((window.CFG&&window.CFG.confirm_ops||[]).includes('delete')) askPw(t('del'),send); else send();
+}
 
 async function viewSecret(id){
   const e=await (await api('/api/secret/'+id+'?reveal=1&intent=view')).json();
   const fh=Object.entries(e.fields).map(([fn,f])=>{
     const v=f.value??'';
     if(f.secret) return `<div class="field"><label class="fld">${esc(fn)}</label><div class="secretrow">
-      <input type="password" value="${esc(v)}" readonly id="rv_${esc(fn)}">
+      <input type="password" value="${esc(v)}" readonly id="rv_${esc(fn)}" ${NOPM}>
       <button class="ghost" onclick="togglePw('rv_${esc(fn)}',this)">👁</button>
       <button class="ghost" onclick="copyVal('${e.id}','${esc(e.name)}','${esc(fn)}')">📋</button></div></div>`;
     return `<div class="field"><label class="fld">${esc(fn)}</label><div class="secretrow">
@@ -296,7 +645,7 @@ async function viewSecret(id){
   const meta=`<div class="grid"><div><label class="fld">${t('type')}</label><div class="mono">${e.type}</div></div>
     <div><label class="fld">${t('scope')}</label><div class="mono mut">${DIMS.map(d=>esc(e[d]||'*')).join(' / ')}</div></div>
     ${e.url?`<div class="full"><label class="fld">${t('url')}</label><a href="${esc(e.url)}" target="_blank">${esc(e.url)}</a></div>`:''}
-    ${(e.tags||[]).length?`<div class="full"><label class="fld">${t('tags')}</label>${e.tags.map(x=>`<span class="chip">${esc(x)}</span>`).join('')}</div>`:''}
+    ${(e.tags||[]).length?`<div class="full"><label class="fld">${t('tags')}</label>${e.tags.map(tagChip).join('')}</div>`:''}
     ${e.notes?`<div class="full"><label class="fld">${t('notes')}</label><div>${esc(e.notes)}</div></div>`:''}</div><hr style="border-color:var(--line);margin:16px 0">`;
   modal(`👁 ${esc(e.name)}`,meta+fh,[{x:t('edit'),f:()=>{closeModal();openEditor(e.id);}},{x:t('close'),p:1,f:closeModal}]);
 }
@@ -304,9 +653,10 @@ async function copyVal(id,name,field){ const e=await (await api('/api/secret/'+i
 function copyText(v,name,field){ doCopy(v); fetch('/api/copy',{method:'POST',body:JSON.stringify({key:name,field})}); }
 function doCopy(v){ navigator.clipboard.writeText(v).then(()=>{ toast(t('copied')); setTimeout(()=>navigator.clipboard.writeText('').catch(()=>{}),CLIP_CLEAR*1000); }).catch(()=>toast(t('copy_fail'))); }
 
-async function openEditor(id){
+async function openEditor(id, preset){
   let e={name:'',type:'api_key',tenant:'',project:'',environment:'',repo:'',tags:[],url:'',notes:'',fields:{}};
   if(id){ e=await (await api('/api/secret/'+id+'?reveal=1&intent=edit')).json(); const fv={}; Object.entries(e.fields).forEach(([k,f])=>fv[k]=f.value??''); e.fields=fv; }
+  else if(preset){ Object.assign(e, preset); }
   const body=`<div class="grid">
     <div class="field"><label class="fld">name *</label><input id="e_name" value="${esc(e.name)}" placeholder="OPENAI_API_KEY"></div>
     <div class="field"><label class="fld">${t('type')}</label><select id="e_type" onchange="renderFields()">${Object.keys(TYPES).map(x=>`<option ${x===e.type?'selected':''}>${x}</option>`).join('')}</select></div>
@@ -327,10 +677,11 @@ function renderFields(){
     const en=Object.entries(cur); if(!en.length)en.push(['','']);
     cont.innerHTML=en.map(([k,v])=>kvRow(k,v)).join('')+`<button class="ghost" onclick="addKv()">${t('add_field')}</button>`;
   }else{
-    cont.innerHTML=TYPES[type].map(f=>{ const v=cur[f.name]??'',tp=f.secret?'password':'text';
-      return `<div class="field"><label class="fld">${f.name}${f.secret?' 🔒':''}</label><div class="secretrow">
-        <input data-f="${f.name}" type="${tp}" value="${esc(v)}">
-        ${f.secret?`<button class="ghost" onclick="togglePw(this.previousElementSibling,this)">👁</button>`:''}</div></div>`; }).join('');
+    const tmpl=TYPES[type].map(f=>f.name);
+    let html=TYPES[type].map(f=>fieldRow(f.name,f.secret,cur[f.name]??'')).join('');
+    // sablon disi mevcut alanlar (orn. CLI ile 'value' disi adla eklenmis) de gorunsun/kaydedilsin
+    Object.keys(cur).filter(k=>!tmpl.includes(k)).forEach(k=>{ html+=fieldRow(k,fieldIsSecretName(k),cur[k]); });
+    cont.innerHTML=html;
   }
 }
 function kvRow(k,v){ return `<div class="kv"><input class="kv-k" placeholder="${t('field')}" value="${esc(k)}"><input class="kv-v" placeholder="${t('value')}" value="${esc(v)}"><button class="ghost danger" onclick="this.parentElement.remove()">✕</button></div>`; }
@@ -360,13 +711,13 @@ async function loadAudit(page){
   $('#arows').innerHTML=d.rows.map(r=>`
     <tr style="cursor:pointer" onclick='auditDetail(${JSON.stringify(r).replace(/'/g,"&#39;")})'>
       <td class="mut">${r.n}</td><td class="mono mut">${fmtTs(r.ts)}</td>
-      <td><span class="chip">${esc(r.source)}</span></td><td><b>${esc(r.action)}</b></td>
+      <td>${tagChip(r.source)}</td><td class="mono mut">${esc(r.actor||'')}</td><td><b>${esc(r.action)}</b></td>
       <td class="mono">${esc(r.key)}</td><td class="mut">${esc(r.detail||'')}</td></tr>`).join('')
-      || `<tr><td colspan="6" class="mut" style="text-align:center;padding:30px">${t('no_records')}</td></tr>`;
+      || `<tr><td colspan="7" class="mut" style="text-align:center;padding:30px">${t('no_records')}</td></tr>`;
   $('#apager').innerHTML=`<button ${d.page<=1?'disabled':''} onclick="loadAudit(${d.page-1})">${t('prev')}</button>
     <span class="mut">${t('page',d.page,d.pages,d.total)}</span>
     <button ${d.page>=d.pages?'disabled':''} onclick="loadAudit(${d.page+1})">${t('next')}</button>`;
-  populateActionFilter();
+  populateActionFilter(); regrid('audit');
 }
 async function populateActionFilter(){
   const as=$('#a_action'); if(as.dataset.done)return;
@@ -378,6 +729,7 @@ function auditDetail(r){
   modal('🧾 '+t('audit_rec')+' #'+r.n,`<div class="grid">
     <div><label class="fld">${t('time')}</label><div class="mono">${fmtTs(r.ts)} UTC</div></div>
     <div><label class="fld">${t('th_source')}</label><div>${esc(r.source)}</div></div>
+    <div><label class="fld">${t('th_actor')}</label><div>${esc(r.actor||'—')}</div></div>
     <div><label class="fld">${t('th_action')}</label><div><b>${esc(r.action)}</b></div></div>
     <div><label class="fld">${t('th_key')}</label><div class="mono">${esc(r.key||'—')}</div></div>
     <div class="full"><label class="fld">${t('detail')}</label><div>${esc(r.detail||'—')}</div></div>
@@ -407,7 +759,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeModal(); });
 (async()=>{
   setLang(localStorage.getItem('concealer_lang')||'tr');
   const s=await (await fetch('/api/session')).json();
-  if(s.unlocked)showApp(); else showLogin();
+  if(s.unlocked)showApp(s.remaining); else showLogin();
 })();
 </script>
 </body>
