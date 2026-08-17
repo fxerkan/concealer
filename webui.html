@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>concealer</title>
+<style>
+:root{
+  --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a; --line2:#353b48;
+  --txt:#e6e8ec; --mut:#9aa3b2; --acc:#4f8cff; --acc2:#3b6fd4; --ok:#3fb950; --warn:#e3b341; --bad:#f85149;
+  --chip:#243043;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--panel2);color:var(--txt);padding:7px 12px;border-radius:8px}
+button:hover{border-color:var(--acc)}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button.primary:hover{background:var(--acc2)}
+button.ghost{background:transparent;border-color:transparent;color:var(--mut);padding:5px 8px}
+button.ghost:hover{color:var(--txt);background:var(--panel2)}
+button.danger:hover{border-color:var(--bad);color:var(--bad)}
+input,select,textarea{font:inherit;background:var(--panel);color:var(--txt);border:1px solid var(--line2);border-radius:8px;padding:9px 11px;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc)}
+textarea{resize:vertical;min-height:64px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+a{color:var(--acc);text-decoration:none}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.mut{color:var(--mut)}
+.hidden{display:none!important}
+/* marka: "er" son eki vurgulu */
+.brand{font-weight:700;letter-spacing:.5px}
+.brand .ac{color:var(--acc)}
+
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center}
+#login .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:36px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+#login h1{margin:0 0 4px;font-size:28px}
+#login p{margin:0 0 22px;color:var(--mut)}
+.pwrow{display:flex;gap:8px}.pwrow input{flex:1}
+
+header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+header .brand{font-size:18px}
+header .grow{flex:1}
+.tabs{display:flex;gap:4px;background:var(--panel2);padding:4px;border-radius:10px}
+.tabs button{border:0;background:transparent;color:var(--mut);padding:6px 14px;border-radius:7px}
+.tabs button.active{background:var(--acc);color:#fff}
+.lang{display:flex;gap:2px;background:var(--panel2);padding:3px;border-radius:8px}
+.lang button{border:0;background:transparent;color:var(--mut);padding:4px 9px;border-radius:6px;font-size:12px;font-weight:600}
+.lang button.active{background:var(--acc);color:#fff}
+#idle{font-variant-numeric:tabular-nums;color:var(--mut);font-size:12px}
+main{padding:20px;max-width:1400px;margin:0 auto}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.toolbar input,.toolbar select{width:auto}
+.toolbar .search{min-width:280px;flex:1}
+
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{background:var(--panel2);color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+tbody tr:hover{background:var(--panel2)}
+tr:last-child td{border-bottom:0}
+.chip{display:inline-block;background:var(--chip);color:#bcd;border-radius:20px;padding:2px 9px;font-size:11px;margin:1px 2px}
+.type-badge{font-size:11px;padding:3px 9px;border-radius:6px;font-weight:600}
+.t-api_key{background:#1d3a5f;color:#9cc4ff}.t-database{background:#3a2a5f;color:#c7aaff}
+.t-website{background:#1d4f3a;color:#8ff0c0}.t-custom{background:#4a3d1d;color:#f0d68f}
+.rowact{display:flex;gap:4px;justify-content:flex-end}
+.count{color:var(--mut);font-size:13px;margin-top:10px}
+
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:720px;max-width:100%;box-shadow:0 24px 70px rgba(0,0,0,.5)}
+.modal .head{display:flex;align-items:center;padding:18px 22px;border-bottom:1px solid var(--line)}
+.modal .head h2{margin:0;font-size:18px}
+.modal .body{padding:20px 22px;max-height:70vh;overflow:auto}
+.modal .foot{display:flex;gap:10px;justify-content:flex-end;padding:16px 22px;border-top:1px solid var(--line)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.grid .full{grid-column:1/-1}
+label.fld{display:block;margin-bottom:4px;color:var(--mut);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.field{margin-bottom:14px}
+.secretrow{display:flex;gap:6px}.secretrow input{flex:1}
+.kv{display:flex;gap:8px;margin-bottom:8px}.kv input:first-child{max-width:200px}
+
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line2);padding:11px 18px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.4);z-index:80;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.show{opacity:1}
+.pill{padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600}
+.pill.ok{background:#12331d;color:var(--ok)}.pill.bad{background:#3a1518;color:var(--bad)}
+.pager{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:14px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="card">
+    <h1 class="brand">🔐 conceal<span class="ac">er</span></h1>
+    <p data-i18n="login_sub">Lokal secret vault — master password ile aç</p>
+    <div class="pwrow">
+      <input id="pw" type="password" data-i18n-ph="master_pw" placeholder="Master password" autofocus onkeydown="if(event.key==='Enter')unlock()">
+      <button class="ghost" onclick="togglePw('pw',this)">👁</button>
+    </div>
+    <div id="loginerr" style="color:var(--bad);margin-top:10px;min-height:18px"></div>
+    <button class="primary" style="width:100%;margin-top:8px" data-i18n="unlock" onclick="unlock()">Aç</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <header>
+    <span class="brand">🔐 conceal<span class="ac">er</span></span>
+    <div class="tabs">
+      <button id="tab-secrets" class="active" data-i18n="secrets" onclick="showTab('secrets')">Secrets</button>
+      <button id="tab-audit" data-i18n="audit_log" onclick="showTab('audit')">Audit Log</button>
+    </div>
+    <span class="grow"></span>
+    <span id="idle"></span>
+    <div class="lang">
+      <button id="lang-tr" onclick="setLang('tr')">TR</button>
+      <button id="lang-en" onclick="setLang('en')">EN</button>
+    </div>
+    <button class="ghost" data-i18n="lock" onclick="lock()">🔒 Kilitle</button>
+  </header>
+  <main>
+    <section id="view-secrets">
+      <div class="toolbar">
+        <input class="search" id="q" data-i18n-ph="search_secrets" placeholder="ara…" oninput="debouncedLoad()">
+        <select id="ftype" onchange="loadSecrets()"></select>
+        <select id="ftenant" onchange="loadSecrets()"></select>
+        <select id="fproject" onchange="loadSecrets()"></select>
+        <select id="fenvironment" onchange="loadSecrets()"></select>
+        <select id="frepo" onchange="loadSecrets()"></select>
+        <button class="primary" data-i18n="new_secret" onclick="openEditor()">+ New Secret</button>
+      </div>
+      <table>
+        <thead><tr>
+          <th data-i18n="th_name">Name</th><th data-i18n="th_type">Type</th>
+          <th data-i18n="th_scope">Scope</th><th data-i18n="th_tags">Tags</th>
+          <th data-i18n="th_updated">Updated</th><th style="text-align:right" data-i18n="th_actions">Actions</th>
+        </tr></thead>
+        <tbody id="srows"></tbody>
+      </table>
+      <div class="count" id="scount"></div>
+    </section>
+
+    <section id="view-audit" class="hidden">
+      <div class="toolbar">
+        <select id="a_action" onchange="loadAudit(1)"></select>
+        <select id="a_source" onchange="loadAudit(1)"></select>
+        <input id="a_key" data-i18n-ph="key_filter" placeholder="key" style="width:150px" oninput="debouncedAudit()">
+        <input id="a_from" type="datetime-local" onchange="loadAudit(1)">
+        <input id="a_to" type="datetime-local" onchange="loadAudit(1)">
+        <button data-i18n="verify_chain" onclick="verifyChain()">🔗 Verify chain</button>
+        <span id="chainres"></span>
+        <span class="grow"></span>
+        <button class="ghost" onclick="location='/api/audit/export?format=csv'">⬇ CSV</button>
+        <button class="ghost" onclick="location='/api/audit/export?format=json'">⬇ JSON</button>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th data-i18n="th_time">Time (UTC)</th><th data-i18n="th_source">Source</th>
+          <th data-i18n="th_action">Action</th><th data-i18n="th_key">Key</th><th data-i18n="th_detail">Detail</th></tr></thead>
+        <tbody id="arows"></tbody>
+      </table>
+      <div class="pager" id="apager"></div>
+    </section>
+  </main>
+</div>
+<div id="toast"></div>
+
+<script>
+const IDLE = parseInt("__IDLE__") || 300;
+const CLIP_CLEAR = 20;
+const DIMS=['tenant','project','environment','repo'];
+let TYPES={}, idleLeft=IDLE, idleTimer=null, LANG='tr';
+
+// ---------- i18n ----------
+const I18N={
+ tr:{login_sub:"Lokal secret vault — master password ile aç",master_pw:"Master password",unlock:"Aç",
+  wrong_pw:"Yanlış master password.",secrets:"Secrets",audit_log:"Audit Log",lock:"🔒 Kilitle",
+  search_secrets:"🔎 ara: name, url, tag, notes…",all_types:"tüm tipler",new_secret:"+ Yeni Secret",
+  th_name:"Name",th_type:"Type",th_scope:"Kapsam (tenant/project/env/repo)",th_tags:"Etiketler",th_updated:"Güncellendi",th_actions:"İşlemler",
+  no_records:"kayıt yok",records:"kayıt",view:"Görüntüle",edit:"Düzenle",del:"Sil",
+  del_confirm:s=>`"${s}" silinsin mi?`,deleted:"silindi",saved:"kaydedildi",created:"oluşturuldu",updated:"güncellendi",
+  copied:`kopyalandı — ${CLIP_CLEAR}s sonra pano temizlenecek`,copy_fail:"kopyalanamadı (izin?)",
+  idle_lock:"⏱ auto-lock",idle_locked:"Boşta kalma — kilitlendi",
+  name_req:"name gerekli",save:"Kaydet",cancel:"İptal",close:"Kapat",fields:"alanlar",notes:"notlar",
+  add_field:"+ alan ekle",field:"alan",value:"değer",type:"tip",scope:"kapsam",tags:"etiketler",url:"url",
+  new_secret_title:"+ Yeni Secret",edit_title:"✏️ Düzenle",
+  all_actions:"tüm eylemler",all_sources:"tüm kaynaklar",key_filter:"key filtre",verify_chain:"🔗 Zincir doğrula",
+  th_time:"Zaman (UTC)",th_source:"Kaynak",th_action:"Eylem",th_key:"Key",th_detail:"Detay",
+  prev:"‹ önceki",next:"sonraki ›",page:(p,t,n)=>`sayfa ${p}/${t} · ${n} kayıt`,
+  chain_ok:c=>`✓ bütünlük OK (${c})`,chain_bad:b=>`✗ kırık @ #${b}`,
+  audit_rec:"Audit kaydı",time:"zaman",detail:"detay",hash:"hash (HMAC)"},
+ en:{login_sub:"Local secret vault — unlock with master password",master_pw:"Master password",unlock:"Unlock",
+  wrong_pw:"Wrong master password.",secrets:"Secrets",audit_log:"Audit Log",lock:"🔒 Lock",
+  search_secrets:"🔎 search: name, url, tag, notes…",all_types:"all types",new_secret:"+ New Secret",
+  th_name:"Name",th_type:"Type",th_scope:"Scope (tenant/project/env/repo)",th_tags:"Tags",th_updated:"Updated",th_actions:"Actions",
+  no_records:"no records",records:"records",view:"View",edit:"Edit",del:"Delete",
+  del_confirm:s=>`Delete "${s}"?`,deleted:"deleted",saved:"saved",created:"created",updated:"updated",
+  copied:`copied — clipboard clears in ${CLIP_CLEAR}s`,copy_fail:"copy failed (permission?)",
+  idle_lock:"⏱ auto-lock",idle_locked:"Idle — locked",
+  name_req:"name required",save:"Save",cancel:"Cancel",close:"Close",fields:"fields",notes:"notes",
+  add_field:"+ add field",field:"field",value:"value",type:"type",scope:"scope",tags:"tags",url:"url",
+  new_secret_title:"+ New Secret",edit_title:"✏️ Edit",
+  all_actions:"all actions",all_sources:"all sources",key_filter:"key filter",verify_chain:"🔗 Verify chain",
+  th_time:"Time (UTC)",th_source:"Source",th_action:"Action",th_key:"Key",th_detail:"Detail",
+  prev:"‹ prev",next:"next ›",page:(p,t,n)=>`page ${p}/${t} · ${n} records`,
+  chain_ok:c=>`✓ integrity OK (${c})`,chain_bad:b=>`✗ broken @ #${b}`,
+  audit_rec:"Audit record",time:"time",detail:"detail",hash:"hash (HMAC)"}
+};
+function t(k,...a){ const v=I18N[LANG][k]; return typeof v==='function'?v(...a):(v??k); }
+function setLang(l){
+  LANG=l; localStorage.setItem('concealer_lang',l); document.documentElement.lang=l;
+  document.getElementById('lang-tr').classList.toggle('active',l==='tr');
+  document.getElementById('lang-en').classList.toggle('active',l==='en');
+  applyStatic();
+  if(!$('#app').classList.contains('hidden')){ rebuildSelects(); loadSecrets(); if(!$('#view-audit').classList.contains('hidden'))loadAudit(1); }
+}
+function applyStatic(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>el.placeholder=t(el.dataset.i18nPh));
+}
+
+// ---------- util ----------
+const $ = s => document.querySelector(s);
+async function api(path,opts){ const r=await fetch(path,opts); if(r.status===401){showLogin();throw 'locked';} return r; }
+function toast(m){ const el=$('#toast'); el.textContent=m; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2600); }
+function esc(s){ return (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function togglePw(id,btn){ const el=typeof id==='string'?$('#'+id):id; el.type=el.type==='password'?'text':'password'; if(btn)btn.textContent=el.type==='password'?'👁':'🙈'; }
+function fmtTs(ts){ return ts?ts.replace('T',' ').replace('+00:00',''):''; }
+
+// ---------- auth / idle ----------
+async function unlock(){
+  const r=await fetch('/api/unlock',{method:'POST',body:JSON.stringify({pw:$('#pw').value})});
+  if(r.ok){ $('#pw').value=''; $('#loginerr').textContent=''; showApp(); }
+  else $('#loginerr').textContent=t('wrong_pw');
+}
+async function lock(){ await fetch('/api/lock',{method:'POST'}); showLogin(); }
+function showLogin(){ clearInterval(idleTimer); $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#pw').focus(); }
+async function showApp(){
+  $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
+  TYPES=await (await api('/api/types')).json();
+  rebuildSelects(); resetIdle(); startIdle(); showTab('secrets');
+}
+function rebuildSelects(){
+  $('#ftype').innerHTML=`<option value="">${t('all_types')}</option>`+Object.keys(TYPES).map(x=>`<option>${x}</option>`).join('');
+  $('#a_action').innerHTML=`<option value="">${t('all_actions')}</option>`; $('#a_action').dataset.done='';
+  $('#a_source').innerHTML=`<option value="">${t('all_sources')}</option><option>web</option><option>cli</option><option>mcp</option>`;
+}
+function startIdle(){ clearInterval(idleTimer); idleTimer=setInterval(()=>{ idleLeft--; const m=String(Math.floor(idleLeft/60)).padStart(2,'0'),s=String(idleLeft%60).padStart(2,'0'); $('#idle').textContent=t('idle_lock')+' '+m+':'+s; if(idleLeft<=0){lock();toast(t('idle_locked'));} },1000); }
+function resetIdle(){ idleLeft=IDLE; }
+['mousemove','keydown','click','scroll'].forEach(ev=>document.addEventListener(ev,()=>{ if(!$('#app').classList.contains('hidden'))resetIdle(); }));
+
+function showTab(tab){
+  $('#view-secrets').classList.toggle('hidden',tab!=='secrets');
+  $('#view-audit').classList.toggle('hidden',tab!=='audit');
+  $('#tab-secrets').classList.toggle('active',tab==='secrets');
+  $('#tab-audit').classList.toggle('active',tab==='audit');
+  if(tab==='secrets')loadSecrets(); else loadAudit(1);
+}
+
+// ---------- secrets ----------
+let _dt=null; function debouncedLoad(){ clearTimeout(_dt); _dt=setTimeout(loadSecrets,250); }
+async function loadSecrets(){
+  const p=new URLSearchParams();
+  if($('#q').value)p.set('q',$('#q').value);
+  ['type','tenant','project','environment','repo'].forEach(k=>{const v=$('#f'+k).value;if(v)p.set(k,v);});
+  const rows=await (await api('/api/secrets?'+p)).json();
+  DIMS.forEach(d=>fillDim(rows,d));
+  $('#srows').innerHTML=rows.map(e=>`
+    <tr>
+      <td class="mono"><b>${esc(e.name)}</b>${e.url?` <a href="${esc(e.url)}" target="_blank">↗</a>`:''}</td>
+      <td><span class="type-badge t-${e.type}">${e.type}</span></td>
+      <td class="mut mono">${DIMS.map(d=>esc(e[d]||'*')).join(' / ')}</td>
+      <td>${(e.tags||[]).map(x=>`<span class="chip">${esc(x)}</span>`).join('')}</td>
+      <td class="mut">${fmtTs(e.updated)}</td>
+      <td><div class="rowact">
+        <button class="ghost" title="${t('view')}" onclick="viewSecret('${e.id}')">👁</button>
+        <button class="ghost" title="${t('edit')}" onclick="openEditor('${e.id}')">✏️</button>
+        <button class="ghost" title="${t('del')}" onclick="delSecret('${e.id}','${esc(e.name)}')">🗑</button>
+      </div></td></tr>`).join('') || `<tr><td colspan="6" class="mut" style="text-align:center;padding:30px">${t('no_records')}</td></tr>`;
+  $('#scount').textContent=rows.length+' '+t('records');
+}
+function fillDim(rows,dim){
+  const sel=$('#f'+dim),cur=sel.value;
+  const vals=[...new Set(rows.map(e=>e[dim]).filter(Boolean))].sort();
+  sel.innerHTML=`<option value="">${dim}</option>`+vals.map(v=>`<option ${v===cur?'selected':''}>${esc(v)}</option>`).join('');
+}
+async function delSecret(id,name){ if(!confirm(t('del_confirm',name)))return; await api('/api/secret/'+id,{method:'DELETE'}); toast(t('deleted')); loadSecrets(); }
+
+async function viewSecret(id){
+  const e=await (await api('/api/secret/'+id+'?reveal=1&intent=view')).json();
+  const fh=Object.entries(e.fields).map(([fn,f])=>{
+    const v=f.value??'';
+    if(f.secret) return `<div class="field"><label class="fld">${esc(fn)}</label><div class="secretrow">
+      <input type="password" value="${esc(v)}" readonly id="rv_${esc(fn)}">
+      <button class="ghost" onclick="togglePw('rv_${esc(fn)}',this)">👁</button>
+      <button class="ghost" onclick="copyVal('${e.id}','${esc(e.name)}','${esc(fn)}')">📋</button></div></div>`;
+    return `<div class="field"><label class="fld">${esc(fn)}</label><div class="secretrow">
+      <input value="${esc(v)}" readonly>
+      <button class="ghost" onclick="copyText('${esc(v).replace(/'/g,"\\'")}','${esc(e.name)}','${esc(fn)}')">📋</button></div></div>`;
+  }).join('');
+  const meta=`<div class="grid"><div><label class="fld">${t('type')}</label><div class="mono">${e.type}</div></div>
+    <div><label class="fld">${t('scope')}</label><div class="mono mut">${DIMS.map(d=>esc(e[d]||'*')).join(' / ')}</div></div>
+    ${e.url?`<div class="full"><label class="fld">${t('url')}</label><a href="${esc(e.url)}" target="_blank">${esc(e.url)}</a></div>`:''}
+    ${(e.tags||[]).length?`<div class="full"><label class="fld">${t('tags')}</label>${e.tags.map(x=>`<span class="chip">${esc(x)}</span>`).join('')}</div>`:''}
+    ${e.notes?`<div class="full"><label class="fld">${t('notes')}</label><div>${esc(e.notes)}</div></div>`:''}</div><hr style="border-color:var(--line);margin:16px 0">`;
+  modal(`👁 ${esc(e.name)}`,meta+fh,[{x:t('edit'),f:()=>{closeModal();openEditor(e.id);}},{x:t('close'),p:1,f:closeModal}]);
+}
+async function copyVal(id,name,field){ const e=await (await api('/api/secret/'+id+'?reveal=1&intent=copy')).json(); doCopy(e.fields[field]?.value??''); fetch('/api/copy',{method:'POST',body:JSON.stringify({key:name,field})}); }
+function copyText(v,name,field){ doCopy(v); fetch('/api/copy',{method:'POST',body:JSON.stringify({key:name,field})}); }
+function doCopy(v){ navigator.clipboard.writeText(v).then(()=>{ toast(t('copied')); setTimeout(()=>navigator.clipboard.writeText('').catch(()=>{}),CLIP_CLEAR*1000); }).catch(()=>toast(t('copy_fail'))); }
+
+async function openEditor(id){
+  let e={name:'',type:'api_key',tenant:'',project:'',environment:'',repo:'',tags:[],url:'',notes:'',fields:{}};
+  if(id){ e=await (await api('/api/secret/'+id+'?reveal=1&intent=edit')).json(); const fv={}; Object.entries(e.fields).forEach(([k,f])=>fv[k]=f.value??''); e.fields=fv; }
+  const body=`<div class="grid">
+    <div class="field"><label class="fld">name *</label><input id="e_name" value="${esc(e.name)}" placeholder="OPENAI_API_KEY"></div>
+    <div class="field"><label class="fld">${t('type')}</label><select id="e_type" onchange="renderFields()">${Object.keys(TYPES).map(x=>`<option ${x===e.type?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="field"><label class="fld">tenant</label><input id="e_tenant" value="${esc(e.tenant)}"></div>
+    <div class="field"><label class="fld">project</label><input id="e_project" value="${esc(e.project)}"></div>
+    <div class="field"><label class="fld">environment</label><input id="e_environment" value="${esc(e.environment)}"></div>
+    <div class="field"><label class="fld">repo</label><input id="e_repo" value="${esc(e.repo)}"></div>
+    <div class="field full"><label class="fld">${t('url')}</label><input id="e_url" value="${esc(e.url)}" placeholder="https://…"></div>
+    <div class="field full"><label class="fld">${t('tags')}</label><input id="e_tags" value="${esc((e.tags||[]).join(', '))}" placeholder="ai, prod"></div>
+    </div><label class="fld">${t('fields')}</label><div id="e_fields"></div>
+    <div class="field"><label class="fld">${t('notes')}</label><textarea id="e_notes">${esc(e.notes)}</textarea></div>`;
+  modal(id?t('edit_title'):t('new_secret_title'),body,[{x:t('save'),p:1,f:()=>saveSecret(id)},{x:t('cancel'),f:closeModal}]);
+  window._editFields=e.fields; renderFields();
+}
+function renderFields(){
+  const type=$('#e_type').value,cont=$('#e_fields'),cur=window._editFields||{};
+  if(type==='custom'){
+    const en=Object.entries(cur); if(!en.length)en.push(['','']);
+    cont.innerHTML=en.map(([k,v])=>kvRow(k,v)).join('')+`<button class="ghost" onclick="addKv()">${t('add_field')}</button>`;
+  }else{
+    cont.innerHTML=TYPES[type].map(f=>{ const v=cur[f.name]??'',tp=f.secret?'password':'text';
+      return `<div class="field"><label class="fld">${f.name}${f.secret?' 🔒':''}</label><div class="secretrow">
+        <input data-f="${f.name}" type="${tp}" value="${esc(v)}">
+        ${f.secret?`<button class="ghost" onclick="togglePw(this.previousElementSibling,this)">👁</button>`:''}</div></div>`; }).join('');
+  }
+}
+function kvRow(k,v){ return `<div class="kv"><input class="kv-k" placeholder="${t('field')}" value="${esc(k)}"><input class="kv-v" placeholder="${t('value')}" value="${esc(v)}"><button class="ghost danger" onclick="this.parentElement.remove()">✕</button></div>`; }
+function addKv(){ const d=document.createElement('div'); d.innerHTML=kvRow('',''); $('#e_fields').insertBefore(d.firstChild,$('#e_fields').lastElementChild); }
+async function saveSecret(id){
+  const type=$('#e_type').value; let fields={};
+  if(type==='custom')document.querySelectorAll('#e_fields .kv').forEach(r=>{const k=r.querySelector('.kv-k').value.trim();if(k)fields[k]=r.querySelector('.kv-v').value;});
+  else document.querySelectorAll('#e_fields input[data-f]').forEach(i=>fields[i.dataset.f]=i.value);
+  const b={name:$('#e_name').value.trim(),type,tenant:$('#e_tenant').value.trim(),project:$('#e_project').value.trim(),
+    environment:$('#e_environment').value.trim(),repo:$('#e_repo').value.trim(),url:$('#e_url').value.trim(),
+    notes:$('#e_notes').value,tags:$('#e_tags').value.split(',').map(s=>s.trim()).filter(Boolean),fields};
+  if(!b.name){toast(t('name_req'));return;}
+  if(id)await api('/api/secret/'+id,{method:'PUT',body:JSON.stringify(b)}); else await api('/api/secrets',{method:'POST',body:JSON.stringify(b)});
+  closeModal(); toast(id?t('updated'):t('created')); loadSecrets();
+}
+
+// ---------- audit ----------
+let _at=null; function debouncedAudit(){ clearTimeout(_at); _at=setTimeout(()=>loadAudit(1),300); }
+async function loadAudit(page){
+  const p=new URLSearchParams({page,size:25});
+  if($('#a_action').value)p.set('action',$('#a_action').value);
+  if($('#a_source').value)p.set('source',$('#a_source').value);
+  if($('#a_key').value)p.set('key',$('#a_key').value);
+  if($('#a_from').value)p.set('from',new Date($('#a_from').value).toISOString().slice(0,19)+'+00:00');
+  if($('#a_to').value)p.set('to',new Date($('#a_to').value).toISOString().slice(0,19)+'+00:00');
+  const d=await (await api('/api/audit?'+p)).json();
+  $('#arows').innerHTML=d.rows.map(r=>`
+    <tr style="cursor:pointer" onclick='auditDetail(${JSON.stringify(r).replace(/'/g,"&#39;")})'>
+      <td class="mut">${r.n}</td><td class="mono mut">${fmtTs(r.ts)}</td>
+      <td><span class="chip">${esc(r.source)}</span></td><td><b>${esc(r.action)}</b></td>
+      <td class="mono">${esc(r.key)}</td><td class="mut">${esc(r.detail||'')}</td></tr>`).join('')
+      || `<tr><td colspan="6" class="mut" style="text-align:center;padding:30px">${t('no_records')}</td></tr>`;
+  $('#apager').innerHTML=`<button ${d.page<=1?'disabled':''} onclick="loadAudit(${d.page-1})">${t('prev')}</button>
+    <span class="mut">${t('page',d.page,d.pages,d.total)}</span>
+    <button ${d.page>=d.pages?'disabled':''} onclick="loadAudit(${d.page+1})">${t('next')}</button>`;
+  populateActionFilter();
+}
+async function populateActionFilter(){
+  const as=$('#a_action'); if(as.dataset.done)return;
+  const d=await (await api('/api/audit?size=1000&page=1')).json();
+  const acts=[...new Set(d.rows.map(r=>r.action))].sort();
+  as.innerHTML=`<option value="">${t('all_actions')}</option>`+acts.map(a=>`<option>${a}</option>`).join(''); as.dataset.done=1;
+}
+function auditDetail(r){
+  modal('🧾 '+t('audit_rec')+' #'+r.n,`<div class="grid">
+    <div><label class="fld">${t('time')}</label><div class="mono">${fmtTs(r.ts)} UTC</div></div>
+    <div><label class="fld">${t('th_source')}</label><div>${esc(r.source)}</div></div>
+    <div><label class="fld">${t('th_action')}</label><div><b>${esc(r.action)}</b></div></div>
+    <div><label class="fld">${t('th_key')}</label><div class="mono">${esc(r.key||'—')}</div></div>
+    <div class="full"><label class="fld">${t('detail')}</label><div>${esc(r.detail||'—')}</div></div>
+    <div class="full"><label class="fld">${t('hash')}</label><div class="mono" style="word-break:break-all;font-size:12px">${esc(r.hash)}</div></div>
+    <div class="full"><label class="fld">prev</label><div class="mono mut" style="word-break:break-all;font-size:12px">${esc(r.prev)}</div></div>
+    </div>`,[{x:t('close'),p:1,f:closeModal}]);
+}
+async function verifyChain(){
+  const r=await (await api('/api/audit/verify')).json();
+  $('#chainres').innerHTML=r.ok?`<span class="pill ok">${t('chain_ok',r.count)}</span>`:`<span class="pill bad">${t('chain_bad',r.broken_at)}</span>`;
+}
+
+// ---------- modal ----------
+function modal(title,bodyHtml,actions){
+  closeModal();
+  const ov=document.createElement('div'); ov.className='overlay'; ov.onclick=e=>{if(e.target===ov)closeModal();};
+  ov.innerHTML=`<div class="modal"><div class="head"><h2>${title}</h2><span style="flex:1"></span><button class="ghost" onclick="closeModal()">✕</button></div><div class="body">${bodyHtml}</div><div class="foot"></div></div>`;
+  document.body.appendChild(ov);
+  const foot=ov.querySelector('.foot');
+  (actions||[]).forEach(a=>{ const b=document.createElement('button'); b.textContent=a.x; if(a.p)b.className='primary'; b.onclick=a.f; foot.appendChild(b); });
+  window._ov=ov;
+}
+function closeModal(){ if(window._ov){window._ov.remove();window._ov=null;} }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeModal(); });
+
+// ---------- boot ----------
+(async()=>{
+  setLang(localStorage.getItem('concealer_lang')||'tr');
+  const s=await (await fetch('/api/session')).json();
+  if(s.unlocked)showApp(); else showLogin();
+})();
+</script>
+</body>
+</html>

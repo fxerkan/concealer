@@ -1,0 +1,6 @@
+# concealer, kurulum sirasinda bunu OTOMATIK olusturur (concealer init).
+# Ornek: *.enc.yaml/json dosyalari senin age public key'inle sifrelenir.
+# Gercek .sops.yaml git-ignore'dur (vault'a ozel public key icerir).
+creation_rules:
+  - path_regex: \.enc\.(yaml|yml|json)$
+    age: "age1EXAMPLEreplace_with_your_public_key_from_keys_pubkey_txt"
