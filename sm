@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# sm — SOPS+age lokal secret manager wrapper
+# Secret'lari SADECE komut suresince env'e enjekte eder; diske duz metin dusmez.
+set -euo pipefail
+
+BASE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+KEY="${SM_KEY:-$BASE/keys/age-key.txt}"
+FILE="${SM_FILE:-$BASE/secrets.enc.yaml}"
+export SOPS_AGE_KEY_FILE="$KEY"
+
+usage() {
+  cat <<USAGE
+sm — lokal secret manager (SOPS+age)
+  sm run <cmd> [args...]   Secret'lari env'e enjekte edip komutu calistirir
+  sm env                   Cozulmus env'i stdout'a yazar (dikkat: ekrana duser)
+  sm edit                  Secret'lari sifreli dosyada duzenler (in-place)
+  sm cat                   Cozulmus YAML'i gosterir
+  sm restore-key <bak.age> <cikti>  Parolali yedegi acar (baska makine kurulumu)
+Ortam: SM_FILE=<baska .enc.yaml>  SM_KEY=<baska age key>
+USAGE
+}
+
+cmd="${1:-}"; shift || true
+case "$cmd" in
+  run)   exec sops exec-env "$FILE" "$*";;
+  env)   sops exec-env "$FILE" 'env | grep -E "API_KEY|TOKEN|PASSWORD|SECRET"';;
+  cat)   sops --decrypt "$FILE";;
+  edit)  exec sops "$FILE";;
+  restore-key)
+         [ $# -eq 2 ] || { echo "kullanim: sm restore-key <yedek.age> <cikti-key>"; exit 1; }
+         age --decrypt -o "$2" "$1" && chmod 600 "$2"
+         echo "Anahtar geri yuklendi: $2";;
+  *) usage;;
+esac

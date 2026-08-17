@@ -1,0 +1,14 @@
+# ============================================================
+# VAULT VERISI - ASLA COMMIT ETME (public repo)
+# age private key, master.json, audit.key/log, pubkey:
+keys/
+# kullanicinin gercek sifreli secret'lari:
+secrets.enc.yaml
+secrets.enc.json
+# vault'a ozel age recipient (public key):
+.sops.yaml
+# ============================================================
+# Gecici / uretilen
+__pycache__/
+*.pyc
+*.age.new
