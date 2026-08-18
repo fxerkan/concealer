@@ -7,11 +7,24 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='116' fill='%230a0b0d'/><rect x='128' y='176' width='176' height='38' rx='19' fill='%23272c35'/><rect x='128' y='232' width='256' height='52' rx='26' fill='%23ffb020'/><rect x='128' y='302' width='136' height='38' rx='19' fill='%23272c35'/></svg>">
 <style>
 :root{
-  /* Covert — near-black + amber signal. amber = redaction / classified marker. */
+  /* Covert (Dark) — near-black + amber signal. amber = redaction / classified marker. */
   --bg:#0a0b0d; --panel:#101216; --panel2:#161a20; --line:#1c1f26; --line2:#2a2f38;
   --txt:#e8e8e6; --mut:#8a909b; --acc:#ffb020; --acc2:#ffc247; --ok:#7ee787; --warn:#e3b341; --bad:#ff6b6b;
-  --chip:#161a20; --ink:#0a0b0d;
+  --chip:#161a20; --ink:#0a0b0d; --th-bg:#232833; --th-fg:#cfd4de; --zebra:rgba(255,255,255,.022);
 }
+/* White — light surfaces, amber signal darkened for contrast on white */
+:root[data-theme="light"]{
+  --bg:#f4f5f7; --panel:#ffffff; --panel2:#eef0f3; --line:#e2e6eb; --line2:#c8ced7;
+  --txt:#1a1d23; --mut:#5b6472; --acc:#c47a00; --acc2:#a86800; --ok:#1a7f37; --warn:#9a6700; --bad:#d1242f;
+  --chip:#eef0f3; --ink:#ffffff; --th-bg:#e7eaef; --th-fg:#39414f; --zebra:rgba(0,0,0,.025);
+}
+/* Matrix — black + phosphor green, mono everywhere */
+:root[data-theme="matrix"]{
+  --bg:#000600; --panel:#02120a; --panel2:#041c0f; --line:#0a3a1e; --line2:#0f5c2e;
+  --txt:#39ff6a; --mut:#1f9c4d; --acc:#39ff14; --acc2:#9dff5a; --ok:#39ff14; --warn:#c8ff00; --bad:#ff4141;
+  --chip:#041c0f; --ink:#000600; --th-bg:#04220f; --th-fg:#5cff8a; --zebra:rgba(57,255,20,.04);
+}
+:root[data-theme="matrix"] body{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-shadow:0 0 2px rgba(57,255,20,.25)}
 *{box-sizing:border-box}
 html{scrollbar-color:var(--line2) transparent;scrollbar-width:thin}
 body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
@@ -59,7 +72,7 @@ a{color:var(--acc);text-decoration:none}
 .pwrow{display:flex;gap:8px}.pwrow input{flex:1}
 
 header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
-header .brand{font-size:18px}
+header .brand{font-size:20px;display:inline-flex;align-items:center}
 header .grow{flex:1}
 .tabs{display:flex;gap:4px;background:var(--panel2);padding:4px;border-radius:10px}
 .tabs button{border:0;background:transparent;color:var(--mut);padding:6px 14px;border-radius:7px}
@@ -76,8 +89,8 @@ main{padding:20px;max-width:none;margin:0 auto}
 table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px}
 /* not: table'da overflow:hidden YOK — sticky thead'i kirar (scroll-container olusturur) */
 th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
-th{background:#232833;color:#cfd4de;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid var(--line2)}
-tbody tr:nth-child(even){background:rgba(255,255,255,.022)}   /* zebra */
+th{background:var(--th-bg);color:var(--th-fg);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid var(--line2)}
+tbody tr:nth-child(even){background:var(--zebra)}   /* zebra */
 tbody tr:hover{background:var(--panel2)}
 th{position:relative;user-select:none}
 th.sortable{cursor:pointer}
@@ -94,8 +107,7 @@ tr:last-child td{border-bottom:0}
 .t-access_token,.t-jwt,.t-oauth{background:#132534;color:#8fd0ff}
 .t-ssh_key,.t-certificate,.t-server{background:#1a2432;color:#9ec5ff}
 .t-pin,.t-wifi{background:#2a1b2e;color:#f0a6d6}
-.t-credit_card,.t-bank_account{background:#122b28;color:#7fe0c7}
-.t-passport,.t-id_card,.t-membership{background:#2e2612;color:#ffcf7a}
+.t-membership{background:#2e2612;color:#ffcf7a}
 .t-secure_note{background:#22262e;color:#c6ccd6}
 .rowact{display:flex;gap:4px;justify-content:flex-end;align-items:center}
 .count{color:var(--mut);font-size:13px;margin-top:10px}
@@ -104,6 +116,10 @@ tr:last-child td{border-bottom:0}
 .rowmenu button{display:flex;gap:8px;width:100%;border:0;background:transparent;text-align:left;padding:8px 10px;border-radius:7px;color:var(--txt)}
 .rowmenu button:hover{background:var(--panel)}
 .rowmenu button.danger:hover{color:var(--bad)}
+/* column picker rows */
+.colrow{display:flex;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)}
+.colrow:last-child{border-bottom:0}
+.colrow button{padding:4px 9px;line-height:1}
 
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
 .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:720px;max-width:100%;box-shadow:0 24px 70px rgba(0,0,0,.5)}
@@ -147,11 +163,15 @@ button.b-scan{background:#12262e;border-color:#2b7d8f;color:#8fe0f0}
 button.b-scan:hover{background:#173038}
 button.b-new{background:var(--acc);border-color:var(--acc);color:var(--ink);font-weight:700}
 button.b-new:hover{background:var(--acc2)}
+button.b-import{background:#12301f;border-color:#2f9e57;color:#86e6a8;font-weight:600}
+button.b-import:hover{background:#173d28}
+button.b-import:disabled{opacity:.45;cursor:not-allowed;border-color:var(--line2);color:var(--mut);background:var(--panel2)}
 /* idle countdown — turns red in the last 10s; #idle desktop (next to lock), #idle-m mobile */
 #idle.warn,#idle-m.warn{color:var(--bad);font-weight:700}
 #idle-m{display:none;font-variant-numeric:tabular-nums;color:var(--mut);font-size:12px}
-/* header logo chip so it stands out from the dark bar */
-header .brand .logo{background:#1c2029;border-radius:7px;padding:3px;vertical-align:-8px;margin-right:5px}
+/* header logo chip + amber glow/halo (feature-graphic ile ayni) — user-requested */
+header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-right:8px;flex:0 0 auto;
+  box-shadow:0 0 0 1px rgba(255,176,32,.4),0 0 16px 3px rgba(255,176,32,.5)}
 
 /* --- filter panel (collapsible) with labelled multi-selects --- */
 .filterpanel{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:10px}
@@ -171,6 +191,17 @@ header .brand .logo{background:#1c2029;border-radius:7px;padding:3px;vertical-al
 .msel-empty{color:var(--mut);padding:8px;font-size:12px}
 .msel-all{border-bottom:1px solid var(--line);margin-bottom:4px;padding-bottom:8px}
 
+/* --- scan: folder browser + indeterminate progress bar --- */
+.browse{border:1px solid var(--line2);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.browse-head{display:flex;gap:10px;align-items:center;padding:8px 10px;background:var(--panel2);border-bottom:1px solid var(--line)}
+.browse-list{max-height:220px;overflow:auto;padding:4px}
+.browse-row{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--txt);padding:7px 10px;border-radius:7px}
+.browse-row:hover{background:var(--panel2)}
+.scanbar{height:5px;border-radius:4px;background:var(--panel2);overflow:hidden}
+.scanbar>div{height:100%;width:38%;border-radius:4px;background:var(--acc);animation:scanslide 1.05s ease-in-out infinite}
+@keyframes scanslide{0%{margin-left:-40%}100%{margin-left:100%}}
+@media(prefers-reduced-motion:reduce){.scanbar>div{animation:none;width:100%}}
+
 /* --- hamburger menu (mobile) --- */
 .hamb{display:none}
 .menu{display:contents}
@@ -187,6 +218,67 @@ header .brand .logo{background:#1c2029;border-radius:7px;padding:3px;vertical-al
   .actionrow{justify-content:stretch}
   .actionrow button{flex:1}
 }
+/* --- theme switcher (header) --- */
+.theme{display:flex;gap:2px;background:var(--panel2);padding:3px;border-radius:8px}
+.theme button{border:0;background:transparent;color:var(--mut);padding:4px 8px;border-radius:6px;font-size:13px;line-height:1}
+.theme button.active{background:var(--acc);color:var(--ink)}
+
+/* --- login: redaction animation background (dummy secrets get "concealed") --- */
+#login .card{position:relative;z-index:2}
+/* tum ekrana dagilmis kod parcalari (JS uretir); her biri kendi konum/zaman/suresiyle redakte olur */
+.loginbg{position:absolute;inset:0;overflow:hidden;z-index:1;pointer-events:none;user-select:none;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--mut);opacity:.26}
+/* her parça bir yaşam döngüsü sürer: yüksel-belir → açık değer → redakte → sönerek kaybol → yeni yerde tekrar.
+   süre/gecikme parça başına --dur/--del (rx pseudo'larına custom-prop olarak miras geçer, aynı fazda) */
+.loginbg .frag{position:absolute;white-space:nowrap;opacity:0;will-change:transform,opacity;
+  animation:fraglife var(--dur,10s) ease-in-out var(--del,0s) infinite}
+.loginbg .k{color:var(--acc2)}          /* keyword/type */
+.loginbg .s{color:var(--mut)}            /* string/quote */
+.rx{position:relative;color:var(--txt);border-radius:3px}
+.rx::after{content:"";position:absolute;inset:-1px -3px;background:var(--acc);border-radius:3px;will-change:transform;
+  transform:scaleX(0);transform-origin:left center;animation:rxwipe var(--dur,10s) ease var(--del,0s) infinite}
+.rx::before{content:"";position:absolute;left:-3px;right:-3px;top:50%;height:2px;background:var(--ink);
+  transform:scaleX(0);transform-origin:left center;z-index:1;opacity:0;will-change:transform;animation:rxstrike var(--dur,10s) linear var(--del,0s) infinite}
+/* opacity 0'da başlar/biter → yeniden konumlandırma (JS animationiteration) görünmez sınırda gerçekleşir */
+@keyframes fraglife{0%{opacity:0;transform:translateY(7px)}9%{opacity:1;transform:translateY(0)}55%{opacity:1;transform:translateY(0)}70%{opacity:0;transform:translateY(-7px)}100%{opacity:0;transform:translateY(-7px)}}
+@keyframes rxwipe{0%,27%{transform:scaleX(0)}40%,100%{transform:scaleX(1)}}
+@keyframes rxstrike{0%,29%{transform:scaleX(0);opacity:0}34%{opacity:.9}40%,100%{transform:scaleX(1);opacity:.9}}
+/* azaltılmış-hareket: konum/ölçek hareketini bırak, yalnız opaklık cross-fade ile akışı sürdür (vestibüler-dostu) */
+@keyframes fraglife-soft{0%{opacity:0}12%{opacity:1}56%{opacity:1}72%{opacity:0}100%{opacity:0}}
+@keyframes rxfade{0%,30%{opacity:0}42%,100%{opacity:1}}
+@media(prefers-reduced-motion:reduce){
+  .loginbg .frag{animation-name:fraglife-soft;transform:none}
+  .rx::after{transform:scaleX(1);animation-name:rxfade}
+  .rx::before{display:none}
+}
+
+/* --- period quick-select (audit + stats) --- */
+.periods{display:flex;gap:4px;flex-wrap:wrap;background:var(--panel2);padding:3px;border-radius:9px}
+.periods button{border:0;background:transparent;color:var(--mut);padding:5px 9px;border-radius:6px;font-size:12px;font-weight:600}
+.periods button.active{background:var(--acc);color:var(--ink)}
+
+/* --- stats / dashboard --- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpi .n{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--acc)}
+.kpi .l{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-top:2px}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.chartcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.chartcard.wide{grid-column:1/-1}
+.chartcard h3{margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);font-weight:700}
+.bars{display:flex;flex-direction:column;gap:7px}
+.bar{display:grid;grid-template-columns:minmax(80px,34%) 1fr;gap:10px;align-items:center;font-size:13px}
+.bar .cat{color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .track{position:relative;height:22px;background:var(--panel2);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;border-radius:6px;min-width:2px;transition:filter .12s;background:var(--acc)}
+.bar:hover .fill{filter:brightness(1.15)}
+.bar .val{position:absolute;top:50%;transform:translateY(-50%);right:8px;font-size:11px;font-weight:700;color:var(--txt);font-variant-numeric:tabular-nums}
+.chartempty{color:var(--mut);padding:18px;text-align:center;font-size:13px}
+.trend text{fill:var(--mut);font-size:10px}
+.trend .dot{fill:var(--acc);cursor:pointer}
+.trend .dot:hover{r:5}
+.chartcard.hidden{display:none}
+
 /* --- responsive card layout for the secrets table --- */
 @media(max-width:720px){
   main{padding:12px}
@@ -205,6 +297,7 @@ header .brand .logo{background:#1c2029;border-radius:7px;padding:3px;vertical-al
 
 <!-- LOGIN -->
 <div id="login">
+  <div class="loginbg" id="loginbg" aria-hidden="true"></div>
   <div class="card">
     <h1 class="brand"><svg viewBox="0 0 512 512" width="34" height="34" style="vertical-align:-8px;margin-right:4px"><rect width="512" height="512" rx="116" fill="#0a0b0d"/><rect x="12" y="12" width="488" height="488" rx="104" fill="none" stroke="#20242c" stroke-width="2"/><rect x="128" y="176" width="176" height="38" rx="19" fill="#272c35"/><rect x="128" y="232" width="256" height="52" rx="26" fill="#ffb020"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#272c35"/></svg>conceal<span class="ac">er</span></h1>
     <p data-i18n="login_sub">Lokal secret vault — master password ile aç</p>
@@ -222,17 +315,23 @@ header .brand .logo{background:#1c2029;border-radius:7px;padding:3px;vertical-al
 <!-- APP -->
 <div id="app" class="hidden">
   <header>
-    <span class="brand"><svg class="logo" viewBox="0 0 512 512" width="22" height="22"><rect x="128" y="176" width="176" height="38" rx="19" fill="#8a909b"/><rect x="128" y="232" width="256" height="52" rx="26" fill="#ffb020"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#8a909b"/></svg>conceal<span class="ac">er</span></span>
+    <span class="brand"><svg class="logo" viewBox="0 0 512 512" width="32" height="32"><rect x="128" y="176" width="176" height="38" rx="19" fill="#8a909b"/><rect x="128" y="232" width="256" height="52" rx="26" fill="#ffb020"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#8a909b"/></svg>conceal<span class="ac">er</span></span>
     <div class="menu">
       <div class="tabs">
         <button id="tab-secrets" class="active" data-i18n="secrets" onclick="showTab('secrets')">Secrets</button>
         <button id="tab-audit" data-i18n="audit_log" onclick="showTab('audit')">Audit Logs</button>
+        <button id="tab-stats" data-i18n="stats" onclick="showTab('stats')">Stats</button>
         <button id="tab-leaks" data-i18n="leaks" onclick="showTab('leaks')">Risks</button>
         <button id="tab-settings" data-i18n="settings_tab" onclick="showTab('settings')">Settings</button>
       </div>
       <span class="grow"></span>
       <span id="idle"></span>
       <button class="ghost" data-i18n="lock" onclick="lock()">🔒 Kilitle</button>
+      <div class="theme">
+        <button id="theme-dark" onclick="setTheme('dark')" title="Dark">🌙</button>
+        <button id="theme-light" onclick="setTheme('light')" title="Light">☀️</button>
+        <button id="theme-matrix" onclick="setTheme('matrix')" title="Matrix">🟩</button>
+      </div>
       <div class="lang">
         <button id="lang-tr" onclick="setLang('tr')">TR</button>
         <button id="lang-en" onclick="setLang('en')">EN</button>
@@ -254,6 +353,7 @@ header .brand .logo{background:#1c2029;border-radius:7px;padding:3px;vertical-al
           <div class="msel" id="ms-project"></div>
           <div class="msel" id="ms-environment"></div>
           <div class="msel" id="ms-repo"></div>
+          <div class="msel" id="ms-tags"></div>
         </div>
         <div class="actionrow">
           <button class="b-new" data-i18n="new_secret" onclick="openEditor()">+ New Secret</button>
@@ -262,13 +362,8 @@ header .brand .logo{background:#1c2029;border-radius:7px;padding:3px;vertical-al
         </div>
       </div>
       <div class="tablewrap">
-      <table class="cards">
-        <thead><tr>
-          <th data-i18n="th_name">Name</th><th data-i18n="th_type">Type</th>
-          <th data-i18n="th_scope">Scope</th><th data-i18n="th_tags">Tags</th>
-          <th data-i18n="th_updated">Updated</th><th data-i18n="th_access">Last access</th>
-          <th style="text-align:right"><span data-i18n="th_actions">Actions</span><span class="colbtn" title="columns" onclick="event.stopPropagation();gridColsMenu('secrets')">⚙</span></th>
-        </tr></thead>
+      <table class="cards" id="stable">
+        <thead id="shead"></thead>
         <tbody id="srows"></tbody>
       </table>
       </div>
@@ -277,25 +372,55 @@ header .brand .logo{background:#1c2029;border-radius:7px;padding:3px;vertical-al
     </section>
 
     <section id="view-audit" class="hidden">
-      <div class="toolbar">
-        <select id="a_action" onchange="loadAudit(1)"></select>
-        <select id="a_source" onchange="loadAudit(1)"></select>
-        <input id="a_key" data-i18n-ph="key_filter" placeholder="key" style="width:150px" oninput="debouncedAudit()">
-        <input id="a_from" type="datetime-local" onchange="loadAudit(1)">
-        <input id="a_to" type="datetime-local" onchange="loadAudit(1)">
-        <button data-i18n="verify_chain" onclick="verifyChain()">🔗 Verify chain</button>
-        <span id="chainres"></span>
-        <span class="grow"></span>
-        <button class="ghost" onclick="location='/api/audit/export?format=csv'">⬇ CSV</button>
-        <button class="ghost" onclick="location='/api/audit/export?format=json'">⬇ JSON</button>
-        <button class="ghost" title="columns" onclick="gridColsMenu('audit')">⋮</button>
+      <div class="subbar">
+        <div class="subrow">
+          <input class="search" id="aq" data-i18n-ph="search_audit" placeholder="ara…" oninput="debouncedAudit()">
+          <div class="periods" id="aperiods"></div>
+          <button class="btn-filter" id="afilterbtn" onclick="toggleAuditFilters()"><span>⧩</span><span data-i18n="filters">Filters</span><span id="afiltcount" class="mut"></span></button>
+        </div>
+        <div class="filterpanel" id="afilterpanel">
+          <div class="msel" id="ms-a_source"></div>
+          <div class="msel" id="ms-a_action"></div>
+          <div class="msel" id="ms-a_actor"></div>
+          <div class="msel" id="ms-a_key"></div>
+          <div><label class="fld" data-i18n="from_lbl">From</label><input id="a_from" type="datetime-local" onchange="setAuditRange()"></div>
+          <div><label class="fld" data-i18n="to_lbl">To</label><input id="a_to" type="datetime-local" onchange="setAuditRange()"></div>
+        </div>
+        <div class="actionrow">
+          <button data-i18n="verify_chain" onclick="verifyChain()">🔗 Verify chain</button>
+          <span id="chainres"></span>
+          <span class="grow"></span>
+          <button class="ghost" onclick="location='/api/audit/export?format=csv'">⬇ CSV</button>
+          <button class="ghost" onclick="location='/api/audit/export?format=json'">⬇ JSON</button>
+        </div>
       </div>
-      <table>
-        <thead><tr><th>#</th><th data-i18n="th_time">Time (UTC)</th><th data-i18n="th_source">Source</th>
-          <th data-i18n="th_actor">Actor</th><th data-i18n="th_action">Action</th><th data-i18n="th_key">Key</th><th data-i18n="th_detail">Detail</th></tr></thead>
+      <div class="tablewrap">
+      <table class="cards" id="atable">
+        <thead id="ahead"></thead>
         <tbody id="arows"></tbody>
       </table>
+      </div>
       <div class="pager" id="apager"></div>
+      <div class="count" id="acount"></div>
+    </section>
+
+    <section id="view-stats" class="hidden">
+      <div class="subbar">
+        <div class="subrow">
+          <div class="periods" id="stperiods"></div>
+          <button class="btn-filter" id="stfilterbtn" onclick="toggleStatsFilters()"><span>⧩</span><span data-i18n="filters">Filters</span><span id="stfiltcount" class="mut"></span></button>
+          <span class="grow"></span>
+          <button class="ghost" onclick="loadStats()">↻</button>
+        </div>
+        <div class="filterpanel" id="stfilterpanel">
+          <div class="msel" id="ms-st_source"></div>
+          <div class="msel" id="ms-st_actor"></div>
+          <div class="msel" id="ms-st_type"></div>
+          <div class="msel" id="ms-st_project"></div>
+        </div>
+      </div>
+      <div class="kpis" id="stkpis"></div>
+      <div class="charts" id="stcharts"></div>
     </section>
 
     <section id="view-leaks" class="hidden">
@@ -339,47 +464,54 @@ header .brand .logo{background:#1c2029;border-radius:7px;padding:3px;vertical-al
 const IDLE = parseInt("__IDLE__") || 300;
 const CLIP_CLEAR = 20;
 const DIMS=['tenant','project','environment','repo'];
-const FDIMS=['type','tenant','project','environment','repo'];   // filter dropdown alanlari
+const FDIMS=['type','tenant','project','environment','repo','tags'];   // filter dropdown alanlari
 let TYPES={}, idleLeft=IDLE, idleTimer=null, LANG='tr';
 // coklu-secim filtre durumu + secenekler + istemci-tarafi sayfalama
-const FILT={type:new Set(),tenant:new Set(),project:new Set(),environment:new Set(),repo:new Set()};
-const FOPTS={type:[],tenant:[],project:[],environment:[],repo:[]};
+const FILT={type:new Set(),tenant:new Set(),project:new Set(),environment:new Set(),repo:new Set(),tags:new Set()};
+const FOPTS={type:[],tenant:[],project:[],environment:[],repo:[],tags:[]};
 let SPAGE=1; let SPAGE_SIZE=parseInt(localStorage.getItem('concealer_psize'))||25; let SROWS=[];
 
 // ---------- i18n ----------
 const I18N={
  tr:{login_sub:"Lokal secret vault — master password ile aç",master_pw:"Master password",unlock:"Aç",
-  wrong_pw:"Yanlış master password.",secrets:"Secrets",audit_log:"Audit Logs",lock:"🔒 Kilitle",filters:"Filtreler",search:"ara",
-  search_secrets:"🔎 ara: name, url, tag, notes…",all_types:"tüm tipler",new_secret:"+ Yeni Secret",
-  th_name:"Name",th_type:"Type",th_scope:"Kapsam (tenant/project/env/repo)",th_tags:"Etiketler",th_updated:"Güncellendi",th_actions:"İşlemler",
+  wrong_pw:"Yanlış master password.",secrets:"Sırlar",audit_log:"Denetim Kayıtları",lock:"🔒 Kilitle",filters:"Filtreler",search:"ara",
+  search_secrets:"🔎 ara: ad, url, etiket, not…",all_types:"tüm tipler",new_secret:"+ Yeni Sır",
+  th_name:"Ad",th_type:"Tip",th_scope:"Kapsam (tenant/proje/ortam/repo)",th_tags:"Etiketler",th_updated:"Güncellendi",th_actions:"İşlemler",
   no_records:"kayıt yok",records:"kayıt",view:"Görüntüle",edit:"Düzenle",del:"Sil",more:"Daha fazla",per_page:"sayfa başına",
   del_confirm:s=>`"${s}" silinsin mi?`,deleted:"silindi",saved:"kaydedildi",created:"oluşturuldu",updated:"güncellendi",
   copied:`kopyalandı — ${CLIP_CLEAR}s sonra pano temizlenecek`,copy_fail:"kopyalanamadı (izin?)",
-  idle_lock:"⏱ auto-lock",idle_locked:"Boşta kalma — kilitlendi",
-  name_req:"name gerekli",save:"Kaydet",cancel:"İptal",close:"Kapat",fields:"alanlar",notes:"notlar",
+  idle_lock:"⏱ oto-kilit",idle_locked:"Boşta kalma — kilitlendi",
+  name_req:"ad gerekli",save:"Kaydet",cancel:"İptal",close:"Kapat",fields:"alanlar",notes:"notlar",
   add_field:"+ alan ekle",field:"alan",value:"değer",type:"tip",scope:"kapsam",tags:"etiketler",url:"url",
-  new_secret_title:"+ Yeni Secret",edit_title:"✏️ Düzenle",
-  all_actions:"tüm eylemler",all_sources:"tüm kaynaklar",key_filter:"key filtre",verify_chain:"🔗 Zincir doğrula",
-  th_time:"Zaman (UTC)",th_source:"Kaynak",th_action:"Eylem",th_key:"Key",th_detail:"Detay",
+  new_secret_title:"+ Yeni Sır",edit_title:"✏️ Düzenle",
+  all_actions:"tüm eylemler",all_sources:"tüm kaynaklar",key_filter:"anahtar filtre",verify_chain:"🔗 Zincir doğrula",
+  th_time:"Zaman (UTC)",th_source:"Kaynak",th_action:"Eylem",th_key:"Anahtar",th_detail:"Detay",
   th_actor:"Aktör",th_access:"Son Erişim",actor:"aktör",all:"Tümü",never:"—",
-  leaks:"Risks",leaks_hint:"Aynı değeri paylaşan (yeniden kullanılan) secret'lar — sızma riski skorlanır.",
+  ften:"Tenant",fproj:"Proje",fenv:"Ortam",frepo:"Repo",fname:"Ad",
+  leaks:"Riskler",leaks_hint:"Aynı değeri paylaşan (yeniden kullanılan) secret'lar — sızma riski skorlanır.",
   th_score:"Skor",th_shared:"Paylaşılan değer",th_uses:"Kullanım",th_projects:"Projeler",th_envs:"Ortamlar",th_records:"Kayıtlar",
   no_leaks:"paylaşılan değer yok 🎉",leak_groups:"grup",
-  scan_folder:"Klasör Tara",scan_path:"Klasör yolu",scan_history:"shell history'yi de tara (~/.zsh_history, ~/.bash_history)",
+  scan_folder:"Klasör Tara",scan_path:"Klasör yolu",browse:"Gözat",browse_use:"Bu klasörü seç",scan_history:"shell history'yi de tara (~/.zsh_history, ~/.bash_history)",
   scan_project_ph:"boş = klasör adı",scan_result_hint:"Bir yol gir ve 'Tara'ya bas.",scan_running:"taranıyor…",
-  scan_found:"aday bulundu",scan_none:"aday secret bulunamadı",scan_btn:"Tara",scan_import_sel:"Seçilenleri Al",
+  scan_found:"aday bulundu",scan_none:"aday sır bulunamadı",scan_btn:"Tara",scan_import_sel:"Seçilenleri Al",
   scan_path_req:"klasör yolu gerekli",scan_pick:"en az bir aday seç",scan_imported:(n,s)=>`${n} içeri aktarıldı, ${s} atlandı`,
-  generate:"🎲 Üret",generate_title:"Parola / Secret Üret",gen_format:"format",gen_password:"parola",gen_hex:"hex token",
+  generate:"🎲 Üret",generate_title:"Parola / Sır Üret",gen_format:"format",gen_password:"parola",gen_hex:"hex token",
   gen_b64:"base64url token",gen_length:"uzunluk",gen_classes:"karakter sınıfları",gen_result:"üretilen değer",
   gen_regen:"yeniden üret",gen_save:"concealer'a Kaydet",
-  settings:"Ayarlar",settings_tab:"Ayarlar",confirm:"Onayla",set_idle:"Auto-lock (saniye)",set_confirm:"Şu işlemlerden önce master parola sor",
-  set_portability:"Taşınabilirlik (makineler arası)",export_btn:"⬇ Export (.age)",import_btn:"⬆ Import",
-  set_export_hint:"Export tüm vault'u master parolayla (age) şifreler; başka makineye taşınabilir. Import kayıtları bu vault'a birleştirir.",
-  exported:"export indirildi",imp_pick:"önce .age dosyası seç",imp_fail:"import başarısız",imported_n:(n,u)=>`+${n} yeni, ~${u} güncellendi`,
+  settings:"Ayarlar",settings_tab:"Ayarlar",confirm:"Onayla",set_idle:"Otomatik kilit (saniye)",set_confirm:"Şu işlemlerden önce master parola sor",
+  set_portability:"Taşınabilirlik (makineler arası)",export_btn:"⬇ Dışa Aktar (.age)",import_btn:"⬆ İçe Aktar",
+  set_export_hint:"Dışa aktarma tüm vault'u master parolayla (age) şifreler; başka makineye taşınabilir. İçe aktarma kayıtları bu vault'a birleştirir.",
+  exported:"dışa aktarma indirildi",imp_pick:"önce .age dosyası seç",imp_fail:"içe aktarma başarısız",imported_n:(n,u)=>`+${n} yeni, ~${u} güncellendi`,
   columns:"Kolonlar",deploy_btn:"🚀 Deploy",deploy_title:"Deploy / Hedefe Gönder",deploy_target:"hedef",deploy_result:"çıktı (komut/manifest)",
   prev:"‹ önceki",next:"sonraki ›",page:(p,t,n)=>`sayfa ${p}/${t} · ${n} kayıt`,
   chain_ok:c=>`✓ bütünlük OK (${c})`,chain_bad:b=>`✗ kırık @ #${b}`,
-  audit_rec:"Audit kaydı",time:"zaman",detail:"detay",hash:"hash (HMAC)"},
+  audit_rec:"Denetim kaydı",time:"zaman",detail:"detay",hash:"hash (HMAC)",
+  stats:"İstatistik",search_audit:"🔎 ara: eylem, anahtar, aktör, detay…",from_lbl:"Başlangıç",to_lbl:"Bitiş",
+  per_30m:"30 dk",per_1h:"1 sa",per_6h:"6 sa",per_24h:"1 gün",per_7d:"1 hafta",per_30d:"30 gün",per_all:"Tümü",no_data:"veri yok",
+  kpi_secrets:"Sır",kpi_events:"Olay",kpi_access:"Erişim",kpi_actors:"Aktör",kpi_types:"Tip",
+  ch_trend:"Etkinlik Trendi",ch_type:"Tipe göre",ch_platform:"Platform / Etiket",ch_project:"Projeye göre",
+  ch_interface:"Arayüz (kaynak)",ch_action:"Eyleme göre",ch_actor:"Aktöre göre",ch_accessed:"En çok erişilen secret",
+  ch_tenant:"Tenant'a göre",ch_env:"Ortama göre",ch_repo:"Repo'ya göre"},
  en:{login_sub:"Local secret vault — unlock with master password",master_pw:"Master password",unlock:"Unlock",
   wrong_pw:"Wrong master password.",secrets:"Secrets",audit_log:"Audit Logs",lock:"🔒 Lock",filters:"Filters",search:"search",
   search_secrets:"🔎 search: name, url, tag, notes…",all_types:"all types",new_secret:"+ New Secret",
@@ -394,10 +526,11 @@ const I18N={
   all_actions:"all actions",all_sources:"all sources",key_filter:"key filter",verify_chain:"🔗 Verify chain",
   th_time:"Time (UTC)",th_source:"Source",th_action:"Action",th_key:"Key",th_detail:"Detail",
   th_actor:"Actor",th_access:"Last access",actor:"actor",all:"All",never:"—",
+  ften:"Tenant",fproj:"Project",fenv:"Environment",frepo:"Repo",fname:"Name",
   leaks:"Risks",leaks_hint:"Secrets that share the same value (reuse) — leak risk is scored.",
   th_score:"Score",th_shared:"Shared value",th_uses:"Uses",th_projects:"Projects",th_envs:"Envs",th_records:"Records",
   no_leaks:"no shared values 🎉",leak_groups:"groups",
-  scan_folder:"Scan folder",scan_path:"Folder path",scan_history:"also scan shell history (~/.zsh_history, ~/.bash_history)",
+  scan_folder:"Scan folder",scan_path:"Folder path",browse:"Browse",browse_use:"Use this folder",scan_history:"also scan shell history (~/.zsh_history, ~/.bash_history)",
   scan_project_ph:"empty = folder name",scan_result_hint:"Enter a path and press 'Scan'.",scan_running:"scanning…",
   scan_found:"candidates found",scan_none:"no candidate secrets found",scan_btn:"Scan",scan_import_sel:"Import selected",
   scan_path_req:"folder path required",scan_pick:"pick at least one candidate",scan_imported:(n,s)=>`${n} imported, ${s} skipped`,
@@ -411,15 +544,41 @@ const I18N={
   columns:"Columns",deploy_btn:"🚀 Deploy",deploy_title:"Deploy / Send to target",deploy_target:"target",deploy_result:"output (command/manifest)",
   prev:"‹ prev",next:"next ›",page:(p,t,n)=>`page ${p}/${t} · ${n} records`,
   chain_ok:c=>`✓ integrity OK (${c})`,chain_bad:b=>`✗ broken @ #${b}`,
-  audit_rec:"Audit record",time:"time",detail:"detail",hash:"hash (HMAC)"}
+  audit_rec:"Audit record",time:"time",detail:"detail",hash:"hash (HMAC)",
+  stats:"Stats",search_audit:"🔎 search: action, key, actor, detail…",from_lbl:"From",to_lbl:"To",
+  per_30m:"30 min",per_1h:"1 h",per_6h:"6 h",per_24h:"1 day",per_7d:"1 week",per_30d:"30 days",per_all:"All",no_data:"no data",
+  kpi_secrets:"Secrets",kpi_events:"Events",kpi_access:"Access",kpi_actors:"Actors",kpi_types:"Types",
+  ch_trend:"Activity Trend",ch_type:"By type",ch_platform:"Platform / Tags",ch_project:"By project",
+  ch_interface:"Interface (source)",ch_action:"By action",ch_actor:"By actor",ch_accessed:"Most accessed secrets",
+  ch_tenant:"By tenant",ch_env:"By environment",ch_repo:"By repo"}
 };
 function t(k,...a){ const v=I18N[LANG][k]; return typeof v==='function'?v(...a):(v??k); }
+// eylem/islem adlari icin GORUNUM cevirisi (audit tablosu + confirm-ops + stats + action filtresi).
+// Ham deger degismez (filtre/veri icin); yalnizca ekranda gosterilen etiket cevrilir.
+const ACTL={
+ tr:{create:"oluştur",update:"güncelle",delete:"sil",reveal:"göster",copy:"kopyala",inject:"enjekte et",deploy:"dağıt",
+   export:"dışa aktar",export_fail:"dışa aktarma başarısız",import:"içe aktar",lock:"kilitle",unlock:"kilidi aç",
+   unlock_fail:"kilit açma başarısız",get:"getir",list:"listele",search:"ara",rotate:"döndür",scan:"tara",
+   scan_import:"tarama içe aktarımı",leak_scan:"risk taraması",settings:"ayarlar",settings_fail:"ayar başarısız",
+   init:"ilklendir",harden:"sıkılaştır",recover:"kurtar",recovery_regen:"kurtarma yenile",passwd:"parola değiştir",
+   agent_register:"ajan kaydı",agent_revoke:"ajan iptali"},
+ en:{leak_scan:"leak scan",export_fail:"export failed",unlock_fail:"unlock failed",settings_fail:"settings failed",
+   scan_import:"scan import",recovery_regen:"recovery regen",agent_register:"agent register",agent_revoke:"agent revoke"}
+};
+function actLabel(a){ return (ACTL[LANG] && ACTL[LANG][a]) || a; }
 function setLang(l){
   LANG=l; localStorage.setItem('concealer_lang',l); document.documentElement.lang=l;
   document.getElementById('lang-tr').classList.toggle('active',l==='tr');
   document.getElementById('lang-en').classList.toggle('active',l==='en');
   applyStatic();
-  if(!$('#app').classList.contains('hidden')){ rebuildSelects(); FDIMS.forEach(renderMsel); loadSecrets(); if(!$('#view-audit').classList.contains('hidden'))loadAudit(1); }
+  if(!$('#app').classList.contains('hidden')){
+    rebuildSelects(); FDIMS.forEach(renderMsel);
+    ['a_source','a_action','a_actor','a_key','st_source','st_actor','st_type','st_project'].forEach(renderMsel);
+    renderPeriods('#aperiods',APERIOD.k,'aPickPeriod'); renderPeriods('#stperiods',STPERIOD.k,'stPickPeriod');
+    loadSecrets();
+    if(!$('#view-audit').classList.contains('hidden'))loadAudit();
+    else if(!$('#view-stats').classList.contains('hidden'))loadStats();
+  }
 }
 function applyStatic(){
   document.querySelectorAll('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));
@@ -476,15 +635,14 @@ async function showApp(startSecs){
   TYPES=await (await api('/api/types')).json();
   window.CFG=await (await api('/api/settings')).json();
   rebuildSelects(); FOPTS.type=Object.keys(TYPES); FDIMS.forEach(renderMsel);
-  $('#filterpanel').classList.toggle('hidden', window.innerWidth<=820);   // masaustunde acik, mobilde kapali
-  $('#filterbtn').classList.toggle('on',!$('#filterpanel').classList.contains('hidden'));
+  ['a_source','a_action','a_actor','a_key','st_source','st_actor','st_type','st_project'].forEach(renderMsel);
+  renderPeriods('#aperiods',APERIOD.k,'aPickPeriod'); renderPeriods('#stperiods',STPERIOD.k,'stPickPeriod');
+  const wide=window.innerWidth>820;
+  ['filter','afilter','stfilter'].forEach(p=>{ $('#'+p+'panel').classList.toggle('hidden',!wide); $('#'+p+'btn').classList.toggle('on',wide); });
   measureSticky();
   idleLeft=(startSecs!=null?startSecs:IDLE); startIdle(); showTab('secrets');
 }
-function rebuildSelects(){
-  $('#a_action').innerHTML=`<option value="">${t('all_actions')}</option>`; $('#a_action').dataset.done='';
-  $('#a_source').innerHTML=`<option value="">${t('all_sources')}</option><option>web</option><option>cli</option><option>mcp</option><option>scan</option>`;
-}
+function rebuildSelects(){ /* audit filtreleri artik veri-gudumlu coklu-secim (loadAudit) — onceden doldurma yok */ }
 // hard auto-lock: aktivite sayaci sifirlamaz; unlock'tan itibaren sabit geri sayim
 function startIdle(){ clearInterval(idleTimer); idleTimer=setInterval(()=>{ idleLeft--; const m=String(Math.floor(Math.max(0,idleLeft)/60)).padStart(2,'0'),s=String(Math.max(0,idleLeft)%60).padStart(2,'0'); const txt=t('idle_lock')+' '+m+':'+s;
   [$('#idle'),$('#idle-m')].forEach(el=>{ if(el){ el.textContent=txt; el.classList.toggle('warn',idleLeft<=10); } });
@@ -500,11 +658,16 @@ new ResizeObserver(measureSticky).observe(document.documentElement);
 
 // ---------- coklu-secim, aranabilir filtre dropdown'lari ----------
 function toggleFilters(){ const p=$('#filterpanel'); p.classList.toggle('hidden'); $('#filterbtn').classList.toggle('on',!p.classList.contains('hidden')); measureSticky(); }
+// coklu-secim dropdown'lari artik birden fazla tablo tarafindan paylasilir (secrets + audit + stats).
+// MSEL_ON: dim -> secim degisince cagrilacak callback (varsayilan = secrets). MSEL_LABEL: dim -> i18n etiketi.
+const MSEL_ON={}, MSEL_LABEL={}, MSEL_VLABEL={};   // MSEL_VLABEL: dim -> deger gorunum cevirisi (ham deger korunur)
+function mselVlabel(dim,v){ return MSEL_VLABEL[dim]?MSEL_VLABEL[dim](v):v; }
+function mselChanged(dim){ (MSEL_ON[dim] || (()=>{updateFilterCount();SPAGE=1;loadSecrets();}))(); }
 function renderMsel(dim){
   const box=$('#ms-'+dim); if(!box)return;
   const sel=FILT[dim], n=sel.size;
-  const btnlabel = n===0 ? t('all') : (n===1 ? [...sel][0] : n+' ✓');
-  box.innerHTML=`<label class="fld">${dim}</label>
+  const btnlabel = n===0 ? t('all') : (n===1 ? mselVlabel(dim,[...sel][0]) : n+' ✓');
+  box.innerHTML=`<label class="fld">${esc(MSEL_LABEL[dim]?t(MSEL_LABEL[dim]):dim)}</label>
     <button class="msel-btn ${n?'has':''}" onclick="mselOpen('${dim}',event)">
       <span>${esc(btnlabel)}</span><span class="arr">▾</span></button>
     <div class="msel-pop hidden" id="pop-${dim}">
@@ -519,15 +682,15 @@ function mselFilter(dim){
   const allRow=`<label class="msel-opt msel-all"><input type="checkbox" ${n===0?'checked':''} onchange="mselAll('${dim}')"><span><b>${t('all')}</b></span></label>`;
   list.innerHTML=allRow+(opts.length?opts.map(v=>`<label class="msel-opt">
     <input type="checkbox" ${FILT[dim].has(v)?'checked':''} onchange="mselPick('${dim}',this,${JSON.stringify(v).replace(/"/g,'&quot;')})">
-    <span>${esc(v)}</span></label>`).join(''):`<div class="msel-empty">—</div>`);
+    <span>${esc(mselVlabel(dim,v))}</span></label>`).join(''):`<div class="msel-empty">—</div>`);
 }
-function mselAll(dim){ FILT[dim].clear(); renderMsel(dim); updateFilterCount(); SPAGE=1; loadSecrets(); }
+function mselAll(dim){ FILT[dim].clear(); renderMsel(dim); mselChanged(dim); }
 function mselOpen(dim,ev){
   ev.stopPropagation();
   document.querySelectorAll('.msel-pop').forEach(p=>{ if(p.id!=='pop-'+dim)p.classList.add('hidden'); });
   $('#pop-'+dim).classList.toggle('hidden'); measureSticky();
 }
-function mselPick(dim,cb,val){ cb.checked?FILT[dim].add(val):FILT[dim].delete(val); renderMsel(dim); updateFilterCount(); SPAGE=1; loadSecrets(); }
+function mselPick(dim,cb,val){ cb.checked?FILT[dim].add(val):FILT[dim].delete(val); renderMsel(dim); mselChanged(dim); }
 function updateFilterCount(){ const n=FDIMS.reduce((a,d)=>a+FILT[d].size,0); $('#filtcount').textContent=n?'('+n+')':''; }
 document.addEventListener('click',()=>document.querySelectorAll('.msel-pop').forEach(p=>p.classList.add('hidden')));
 // secenek listelerini (filtrelenmemis tum kayitlardan) tazele, secimi koru
@@ -535,18 +698,19 @@ async function refreshFilterOptions(){
   const rows=await (await api('/api/secrets')).json();
   DIMS.forEach(d=>FOPTS[d]=[...new Set(rows.map(e=>e[d]).filter(Boolean))].sort());
   FOPTS.type=[...new Set(rows.map(e=>e.type).filter(Boolean))].sort();
+  FOPTS.tags=[...new Set(rows.flatMap(e=>e.tags||[]))].sort();
   FDIMS.forEach(d=>{ [...FILT[d]].forEach(v=>{ if(!FOPTS[d].includes(v))FILT[d].delete(v); }); renderMsel(d); });
   updateFilterCount();
 }
 
 function showTab(tab){
   $('.menu').classList.remove('open');
-  ['secrets','audit','leaks','settings'].forEach(x=>{
+  ['secrets','audit','stats','leaks','settings'].forEach(x=>{
     $('#view-'+x).classList.toggle('hidden',tab!==x);
     $('#tab-'+x).classList.toggle('active',tab===x);
   });
-  if(tab==='secrets'){ refreshFilterOptions(); loadSecrets(); } else if(tab==='audit')loadAudit(1);
-  else if(tab==='leaks')loadLeaks(); else loadSettings();
+  if(tab==='secrets'){ refreshFilterOptions(); loadSecrets(); } else if(tab==='audit')loadAudit();
+  else if(tab==='stats')loadStats(); else if(tab==='leaks')loadLeaks(); else loadSettings();
 }
 
 // ---------- master-parola onay modali ----------
@@ -563,7 +727,7 @@ async function loadSettings(){
   const s=await (await api('/api/settings')).json(); window.CFG=s;
   $('#set_idle').value=s.idle;
   $('#set_confirm').innerHTML=['export','delete','settings','create','update'].map(o=>
-    `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="cop" value="${o}" ${s.confirm_ops.includes(o)?'checked':''} style="width:auto"> ${o}</label>`).join('');
+    `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="cop" value="${o}" ${s.confirm_ops.includes(o)?'checked':''} style="width:auto"> ${esc(actLabel(o))}</label>`).join('');
 }
 function saveSettings(){
   const idle=Math.max(30,Math.min(86400,parseInt($('#set_idle').value)||300));
@@ -618,25 +782,50 @@ async function loadLeaks(){
 // ---------- scan folder ----------
 function openScan(){
   const body=`<div class="field"><label class="fld">${t('scan_path')}</label>
-      <input id="sc_path" placeholder="/Users/…/project" ${NOPM}></div>
+      <div class="secretrow"><input id="sc_path" placeholder="/Users/…/project" ${NOPM}>
+        <button class="ghost" type="button" onclick="browseNative()">📁 ${t('browse')}</button></div></div>
+    <div id="sc_browse" class="hidden"></div>
     <label style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><input type="checkbox" id="sc_hist" style="width:auto"> ${t('scan_history')}</label>
     <div class="grid">
-      <div class="field"><label class="fld">project</label><input id="sc_project" placeholder="${t('scan_project_ph')}" ${NOPM}></div>
-      <div class="field"><label class="fld">environment</label><input id="sc_environment" ${NOPM}></div>
+      <div class="field"><label class="fld">${t('fproj')}</label><input id="sc_project" placeholder="${t('scan_project_ph')}" ${NOPM}></div>
+      <div class="field"><label class="fld">${t('fenv')}</label><input id="sc_environment" ${NOPM}></div>
     </div>
     <div id="sc_result" class="mut">${t('scan_result_hint')}</div>`;
-  modal('🔎 '+t('scan_folder'),body,[{x:t('scan_btn'),f:doScan},{x:t('scan_import_sel'),p:1,f:doScanImport},{x:t('close'),f:closeModal}]);
+  modal('🔎 '+t('scan_folder'),body,[
+    {x:t('scan_btn'),p:1,f:doScan},                                    // Tara = sari dolgu
+    {x:t('scan_import_sel'),c:'b-import',id:'sc_import_btn',dis:true,f:doScanImport},  // scan bitince aktif
+    {x:t('close'),f:closeModal}]);
 }
+// OS-native klasor secme diyalogu (Finder/Explorer); yoksa uygulama-ici gezgine dus
+async function browseNative(){
+  const d=await (await api('/api/pickdir')).json();
+  if(d.path){ $('#sc_path').value=d.path.replace(/\/$/,''); $('#sc_browse').classList.add('hidden'); }
+  else if(!d.supported){ browseOpen(); }   // native arac yoksa uygulama-ici gezgine dus (iptal ise dokunma)
+}
+// sunucu-tarafi klasor gezgini (yerel app fallback): dizinlerde gez, secilen yolu sc_path'e yaz
+async function browseOpen(){ const b=$('#sc_browse'); b.classList.remove('hidden'); browseLoad($('#sc_path').value.trim()||''); }
+async function browseLoad(path){
+  const b=$('#sc_browse'); b.innerHTML=`<div class="mut" style="padding:10px">${t('scan_running')}</div>`;
+  const d=await (await api('/api/browse?path='+encodeURIComponent(path))).json();
+  const rows=(d.parent!=null?[{n:'..',p:d.parent}]:[]).concat(d.dirs.map(n=>({n,p:d.path.replace(/\/?$/,'/')+n})));
+  b.innerHTML=`<div class="browse">
+    <div class="browse-head"><span class="mono mut" style="flex:1;word-break:break-all">${esc(d.path)}</span>
+      <button class="primary" type="button" onclick="browsePick(${JSON.stringify(d.path).replace(/"/g,'&quot;')})">✓ ${t('browse_use')}</button></div>
+    <div class="browse-list">${rows.map(r=>`<button type="button" class="browse-row" onclick="browseLoad(${JSON.stringify(r.p).replace(/"/g,'&quot;')})">${r.n==='..'?'⬆':'📁'} ${esc(r.n)}</button>`).join('')||`<div class="msel-empty">—</div>`}</div></div>`;
+}
+function browsePick(path){ $('#sc_path').value=path; $('#sc_browse').classList.add('hidden'); }
 async function doScan(){
   const path=$('#sc_path').value.trim(); if(!path){toast(t('scan_path_req'));return;}
-  $('#sc_result').innerHTML=t('scan_running');
+  $('#sc_browse').classList.add('hidden');
+  $('#sc_result').innerHTML=`<div class="scanbar"><div></div></div><div class="mut" style="margin-top:8px">${t('scan_running')}</div>`;
   const r=await (await api('/api/scan',{method:'POST',body:JSON.stringify({path,history:$('#sc_hist').checked})})).json();
   const cs=r.cands||[];
   $('#sc_result').innerHTML=cs.length?`<label class="fld">${cs.length} ${t('scan_found')}</label>`+cs.map(c=>
     `<label class="kv" style="align-items:center"><input type="checkbox" class="sc-c" value="${esc(c.name)}" checked style="width:auto">
       <span class="mono" style="flex:1">${esc(c.name)}</span><span class="mut mono">${esc(c.mask)}</span>
-      <span class="mut" style="font-size:11px">${esc(c.source)}</span></label>`).join('')
+      <span class="chip">${/history$/.test(c.source)?'📜 history':'📁 '+esc(c.source)}</span></label>`).join('')
     :`<span class="mut">${t('scan_none')}</span>`;
+  const ib=$('#sc_import_btn'); if(ib)ib.disabled=cs.length===0;   // Import selected sadece aday varsa aktif
 }
 async function doScanImport(){
   const path=$('#sc_path').value.trim(); if(!path){toast(t('scan_path_req'));return;}
@@ -755,36 +944,82 @@ function gridColsMenu(id){
 function gridToggle(id,i,show){ const st=gridState(id); show?st.hidden.delete(i):st.hidden.add(i);
   localStorage.setItem('gh_'+id,JSON.stringify([...st.hidden])); gridApply(id); }
 
-// ---------- secrets ----------
+// ---------- secrets (model-driven grid: base + custom-field kolonlari, gizle/goster + sirala) ----------
 let _dt=null; function debouncedLoad(){ clearTimeout(_dt); SPAGE=1; _dt=setTimeout(loadSecrets,250); }
+let SROWS_SORTED=[], SC_SORT={k:null,dir:1};
 async function loadSecrets(){
   const p=new URLSearchParams();
   if($('#q').value)p.set('q',$('#q').value);
-  FDIMS.forEach(k=>{ if(FILT[k].size)p.set(k,[...FILT[k]].join(',')); });   // coklu secim -> virgullu
+  FDIMS.forEach(k=>{ if(FILT[k].size)p.set(k==='tags'?'tag':k,[...FILT[k]].join(',')); });   // coklu secim -> virgullu (tags -> tag)
   SROWS=await (await api('/api/secrets?'+p)).json();
-  renderSecretsPage();
+  scRender();
 }
-function renderSecretsPage(){
-  const rows=SROWS, total=rows.length, pages=Math.max(1,Math.ceil(total/SPAGE_SIZE));
+// --- kolon modeli ---
+function scBaseCols(){ return [
+  {k:'name',    l:t('th_name'),    cls:'mono', v:e=>e.name, r:e=>`<b>${esc(e.name)}</b>${e.url?` <a href="${esc(e.url)}" target="_blank">↗</a>`:''}`},
+  {k:'type',    l:t('th_type'),    v:e=>e.type, r:e=>`<span class="type-badge t-${e.type}">${esc(e.type)}</span>`},
+  {k:'scope',   l:t('th_scope'),   cls:'mut mono', v:e=>DIMS.map(d=>e[d]||'*').join('/'), r:e=>DIMS.map(d=>esc(e[d]||'*')).join(' / ')},
+  {k:'tags',    l:t('th_tags'),    v:e=>(e.tags||[]).join(','), r:e=>(e.tags||[]).map(tagChip).join('')},
+  {k:'updated', l:t('th_updated'), cls:'mut', v:e=>e.updated||'', r:e=>fmtTs(e.updated)},
+  {k:'access',  l:t('th_access'),  cls:'mut', st:'font-size:12px', v:e=>e.access?e.access.ts:'', r:e=>e.access?fmtTs(e.access.ts)+' '+tagChip(e.access.source)+(e.access.actor?' '+esc(e.access.actor):''):t('never')},
+]; }
+function scFieldCols(){   // kayitlardaki tum field adlari (custom dahil: web_url, host, username…)
+  const names=[...new Set(SROWS.flatMap(e=>Object.keys(e.fields||{})))].sort();
+  return names.map(n=>({k:'f:'+n, l:n, cls:'mono', field:n,
+    v:e=>{const f=(e.fields||{})[n]; return f?(f.value??f.mask??''):'';},
+    r:e=>{const f=(e.fields||{})[n]; if(!f)return '<span class="mut">—</span>';
+      return f.secret?`<span class="mut mono">${esc(f.mask||'••••')}</span>`:`<span class="mono">${esc(f.value??'')}</span>`;}}));
+}
+function scAllCols(){ return scBaseCols().concat(scFieldCols()); }
+function scHiddenSet(){
+  const raw=localStorage.getItem('sc_col_hidden');
+  if(raw!=null)return new Set(JSON.parse(raw));
+  return new Set(scFieldCols().map(c=>c.k));   // varsayilan: field kolonlari gizli
+}
+function scCols(){
+  const all=scAllCols(), byk=Object.fromEntries(all.map(c=>[c.k,c]));
+  const order=JSON.parse(localStorage.getItem('sc_col_order')||'[]'), hidden=scHiddenSet();
+  const out=[]; order.forEach(k=>{ if(byk[k]){out.push(byk[k]);delete byk[k];} });
+  all.forEach(c=>{ if(byk[c.k])out.push(c); });   // yeni/kaydedilmemis kolonlar dogal sirada
+  out.forEach(c=>c.hidden=hidden.has(c.k));
+  return out;
+}
+function scRender(){
+  const cols=scCols(), vis=cols.filter(c=>!c.hidden);
+  $('#shead').innerHTML='<tr>'+vis.map(c=>`<th class="sortable" onclick="scSort('${c.k}')">${esc(c.l)}<span class="sarr">${SC_SORT.k===c.k?(SC_SORT.dir>0?' ▲':' ▼'):''}</span></th>`).join('')
+    +`<th style="text-align:right"><span>${t('th_actions')}</span><span class="colbtn" title="${t('columns')}" onclick="event.stopPropagation();scColsMenu()">⚙</span></th></tr>`;
+  let rows=SROWS.slice();
+  if(SC_SORT.k){ const col=cols.find(c=>c.k===SC_SORT.k); if(col)rows.sort((a,b)=>gridCmp(col.v(a)+'',col.v(b)+'')*SC_SORT.dir); }
+  SROWS_SORTED=rows; renderSecretsPage(vis);
+}
+function scSort(k){ SC_SORT.dir=(SC_SORT.k===k)?-SC_SORT.dir:1; SC_SORT.k=k; scRender(); }
+function renderSecretsPage(vis){
+  vis=vis||scCols().filter(c=>!c.hidden);
+  const rows=SROWS_SORTED.length||SROWS.length?SROWS_SORTED:SROWS, total=rows.length, pages=Math.max(1,Math.ceil(total/SPAGE_SIZE));
   if(SPAGE>pages)SPAGE=pages;
   const slice=rows.slice((SPAGE-1)*SPAGE_SIZE,SPAGE*SPAGE_SIZE);
-  const L=t; // kisalt
-  $('#srows').innerHTML=slice.map(e=>`
-    <tr>
-      <td class="mono" data-label="${L('th_name')}"><b>${esc(e.name)}</b>${e.url?` <a href="${esc(e.url)}" target="_blank">↗</a>`:''}</td>
-      <td data-label="${L('th_type')}"><span class="type-badge t-${e.type}">${e.type}</span></td>
-      <td class="mut mono" data-label="${L('th_scope')}">${DIMS.map(d=>esc(e[d]||'*')).join(' / ')}</td>
-      <td data-label="${L('th_tags')}">${(e.tags||[]).map(tagChip).join('')}</td>
-      <td class="mut" data-label="${L('th_updated')}">${fmtTs(e.updated)}</td>
-      <td class="mut" style="font-size:12px" data-label="${L('th_access')}">${e.access?fmtTs(e.access.ts)+' '+tagChip(e.access.source)+(e.access.actor?' '+esc(e.access.actor):''):L('never')}</td>
-      <td data-label=""><div class="rowact">
-        <button class="ghost" title="${L('view')}" onclick="viewSecret('${e.id}')">👁</button>
-        <button class="ghost" title="${L('more')}" onclick="rowMenu(event,'${e.id}','${esc(e.name)}')">⋮</button>
-      </div></td></tr>`).join('') || `<tr><td colspan="7" class="mut" style="text-align:center;padding:30px">${L('no_records')}</td></tr>`;
-  $('#scount').textContent=total+' '+L('records');
-  renderPager('#spager_bot',pages,total);
-  regrid('secrets'); measureSticky();
+  $('#srows').innerHTML=slice.map(e=>'<tr>'+vis.map(c=>`<td class="${c.cls||''}" ${c.st?`style="${c.st}"`:''} data-label="${esc(c.l)}">${c.r(e)}</td>`).join('')
+    +`<td data-label=""><div class="rowact">
+        <button class="ghost" title="${t('view')}" onclick="viewSecret('${e.id}')">👁</button>
+        <button class="ghost" title="${t('more')}" onclick="rowMenu(event,'${e.id}','${esc(e.name)}')">⋮</button>
+      </div></td></tr>`).join('') || `<tr><td colspan="${vis.length+1}" class="mut" style="text-align:center;padding:30px">${t('no_records')}</td></tr>`;
+  $('#scount').textContent=total+' '+t('records');
+  renderPager('#spager_bot',pages,total); measureSticky();
 }
+// --- kolon secici: gizle/goster + yeniden sirala ---
+function scColsMenu(){
+  const cols=scCols();
+  modal('⚙ '+t('columns'),`<div id="colpick">${cols.map((c,i)=>scColRow(c,i,cols.length)).join('')}</div>`,[{x:t('close'),p:1,f:closeModal}]);
+}
+function scColRow(c,i,n){ return `<div class="colrow">
+  <label style="flex:1;display:flex;gap:8px;align-items:center"><input type="checkbox" ${c.hidden?'':'checked'} onchange="scColToggle('${c.k}',this.checked)" style="width:auto"> ${esc(c.l)}</label>
+  <button class="ghost" ${i===0?'disabled':''} onclick="scColMove('${c.k}',-1)">▲</button>
+  <button class="ghost" ${i===n-1?'disabled':''} onclick="scColMove('${c.k}',1)">▼</button></div>`; }
+function refreshColPick(){ const el=$('#colpick'); if(!el)return; const cols=scCols(); el.innerHTML=cols.map((c,i)=>scColRow(c,i,cols.length)).join(''); }
+function scColToggle(k,show){ const h=scHiddenSet(); show?h.delete(k):h.add(k); localStorage.setItem('sc_col_hidden',JSON.stringify([...h])); scRender(); refreshColPick(); }
+function scColMove(k,dir){ const keys=scCols().map(c=>c.k), i=keys.indexOf(k), j=i+dir;
+  if(j<0||j>=keys.length)return; keys.splice(i,1); keys.splice(j,0,k);
+  localStorage.setItem('sc_col_order',JSON.stringify(keys)); scRender(); refreshColPick(); }
 function rowMenu(ev,id,name){
   ev.stopPropagation(); closeRowMenu();
   const m=document.createElement('div'); m.className='rowmenu'; m.id='rowmenu';
@@ -849,12 +1084,12 @@ async function openEditor(id, preset){
   if(id){ e=await (await api('/api/secret/'+id+'?reveal=1&intent=edit')).json(); const fv={}; Object.entries(e.fields).forEach(([k,f])=>fv[k]=f.value??''); e.fields=fv; }
   else if(preset){ Object.assign(e, preset); }
   const body=`<div class="grid">
-    <div class="field"><label class="fld">name *</label><input id="e_name" value="${esc(e.name)}" placeholder="OPENAI_API_KEY"></div>
+    <div class="field"><label class="fld">${t('fname')} *</label><input id="e_name" value="${esc(e.name)}" placeholder="OPENAI_API_KEY"></div>
     <div class="field"><label class="fld">${t('type')}</label><select id="e_type" onchange="renderFields()">${Object.keys(TYPES).map(x=>`<option ${x===e.type?'selected':''}>${x}</option>`).join('')}</select></div>
-    <div class="field"><label class="fld">tenant</label><input id="e_tenant" value="${esc(e.tenant)}"></div>
-    <div class="field"><label class="fld">project</label><input id="e_project" value="${esc(e.project)}"></div>
-    <div class="field"><label class="fld">environment</label><input id="e_environment" value="${esc(e.environment)}"></div>
-    <div class="field"><label class="fld">repo</label><input id="e_repo" value="${esc(e.repo)}"></div>
+    <div class="field"><label class="fld">${t('ften')}</label><input id="e_tenant" value="${esc(e.tenant)}"></div>
+    <div class="field"><label class="fld">${t('fproj')}</label><input id="e_project" value="${esc(e.project)}"></div>
+    <div class="field"><label class="fld">${t('fenv')}</label><input id="e_environment" value="${esc(e.environment)}"></div>
+    <div class="field"><label class="fld">${t('frepo')}</label><input id="e_repo" value="${esc(e.repo)}"></div>
     <div class="field full"><label class="fld">${t('url')}</label><input id="e_url" value="${esc(e.url)}" placeholder="https://…"></div>
     <div class="field full"><label class="fld">${t('tags')}</label><input id="e_tags" value="${esc((e.tags||[]).join(', '))}" placeholder="ai, prod"></div>
     </div><label class="fld">${t('fields')}</label><div id="e_fields"></div>
@@ -889,39 +1124,211 @@ async function saveSecret(id){
   closeModal(); toast(id?t('updated'):t('created')); refreshFilterOptions(); loadSecrets();
 }
 
-// ---------- audit ----------
-let _at=null; function debouncedAudit(){ clearTimeout(_at); _at=setTimeout(()=>loadAudit(1),300); }
-async function loadAudit(page){
-  const p=new URLSearchParams({page,size:25});
-  if($('#a_action').value)p.set('action',$('#a_action').value);
-  if($('#a_source').value)p.set('source',$('#a_source').value);
-  if($('#a_key').value)p.set('key',$('#a_key').value);
-  if($('#a_from').value)p.set('from',new Date($('#a_from').value).toISOString().slice(0,19)+'+00:00');
-  if($('#a_to').value)p.set('to',new Date($('#a_to').value).toISOString().slice(0,19)+'+00:00');
-  const d=await (await api('/api/audit?'+p)).json();
-  $('#arows').innerHTML=d.rows.map(r=>`
-    <tr style="cursor:pointer" onclick='auditDetail(${JSON.stringify(r).replace(/'/g,"&#39;")})'>
-      <td class="mut">${r.n}</td><td class="mono mut">${fmtTs(r.ts)}</td>
-      <td>${tagChip(r.source)}</td><td class="mono mut">${esc(r.actor||'')}</td><td><b>${esc(r.action)}</b></td>
-      <td class="mono">${esc(r.key)}</td><td class="mut">${esc(r.detail||'')}</td></tr>`).join('')
-      || `<tr><td colspan="7" class="mut" style="text-align:center;padding:30px">${t('no_records')}</td></tr>`;
-  $('#apager').innerHTML=`<button ${d.page<=1?'disabled':''} onclick="loadAudit(${d.page-1})">${t('prev')}</button>
-    <span class="mut">${t('page',d.page,d.pages,d.total)}</span>
-    <button ${d.page>=d.pages?'disabled':''} onclick="loadAudit(${d.page+1})">${t('next')}</button>`;
-  populateActionFilter(); regrid('audit');
+// ================= shared: theme / periods / generic pager =================
+function setTheme(name){
+  if(name==='dark')document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme',name);
+  localStorage.setItem('concealer_theme',name);
+  ['dark','light','matrix'].forEach(n=>{const b=$('#theme-'+n);if(b)b.classList.toggle('active',n===name);});
 }
-async function populateActionFilter(){
-  const as=$('#a_action'); if(as.dataset.done)return;
-  const d=await (await api('/api/audit?size=1000&page=1')).json();
-  const acts=[...new Set(d.rows.map(r=>r.action))].sort();
-  as.innerHTML=`<option value="">${t('all_actions')}</option>`+acts.map(a=>`<option>${a}</option>`).join(''); as.dataset.done=1;
+// hizli donem secimi (audit + stats). ms=null => tumu.
+const PERIODS=[{k:'30m',ms:1800000},{k:'1h',ms:3600000},{k:'6h',ms:21600000},{k:'24h',ms:86400000},
+  {k:'7d',ms:604800000},{k:'30d',ms:2592000000},{k:'all',ms:null}];
+function renderPeriods(sel,curKey,pickName){ const el=$(sel); if(el)el.innerHTML=PERIODS.map(p=>`<button class="${p.k===curKey?'active':''}" onclick="${pickName}('${p.k}')">${t('per_'+p.k)}</button>`).join(''); }
+function isoAgo(ms){ return new Date(Date.now()-ms).toISOString().slice(0,19)+'+00:00'; }
+function dtLocal(v){ return new Date(v).toISOString().slice(0,19)+'+00:00'; }
+// paylasilan sayfalayici html (secrets kendi renderPager'ini korur; audit bunu kullanir)
+function pagerHTML(page,pages,total,size,gotoName,sizeName){
+  const sizesel=`<span class="pagesize">${t('per_page')} <select onchange="${sizeName}(this.value)">${PAGE_SIZES.map(n=>`<option ${n===size?'selected':''}>${n}</option>`).join('')}</select></span>`;
+  const win=[]; for(let i=Math.max(1,page-2);i<=Math.min(pages,page+2);i++)win.push(i);
+  const nav = pages<=1 ? '' :
+    `<button ${page<=1?'disabled':''} onclick="${gotoName}(${page-1})">${t('prev')}</button>`
+    +(win[0]>1?`<button class="pg" onclick="${gotoName}(1)">1</button><span class="mut">…</span>`:'')
+    +win.map(i=>`<button class="pg ${i===page?'active':''}" onclick="${gotoName}(${i})">${i}</button>`).join('')
+    +(win[win.length-1]<pages?`<span class="mut">…</span><button class="pg" onclick="${gotoName}(${pages})">${pages}</button>`:'')
+    +`<button ${page>=pages?'disabled':''} onclick="${gotoName}(${page+1})">${t('next')}</button>`;
+  return nav+sizesel;
+}
+
+// ================= audit (client-side grid: sort/page/reorder/resize/hide + coklu-secim filtre) =================
+// ponytail: audit gridi secrets gridini (scRender ailesi) yansitir; 3. tablo gelirse tek jenerik gride cikar.
+// ponytail: tum satirlar client'a cekilir (yerel arac); log cok buyurse server-side sayfalamaya don.
+let AROWS=[], AC_SORT={k:null,dir:1}, APAGE=1, APAGE_SIZE=parseInt(localStorage.getItem('concealer_apsize'))||25;
+let APERIOD=PERIODS.find(p=>p.k==='all');
+Object.assign(FILT,{a_source:new Set(),a_action:new Set(),a_actor:new Set(),a_key:new Set(),
+  st_source:new Set(),st_actor:new Set(),st_type:new Set(),st_project:new Set()});
+Object.assign(FOPTS,{a_source:[],a_action:[],a_actor:[],a_key:[],st_source:[],st_actor:[],st_type:[],st_project:[]});
+Object.assign(MSEL_LABEL,{a_source:'th_source',a_action:'th_action',a_actor:'th_actor',a_key:'th_key',
+  st_source:'ch_interface',st_actor:'th_actor',st_type:'type',st_project:'ch_project',
+  type:'type',tags:'tags',tenant:'ften',project:'fproj',environment:'fenv',repo:'frepo'});   // secrets filtre etiketleri
+MSEL_VLABEL.a_action=actLabel;   // action filtresi tablo/stats ile ayni cevrili etiketleri gosterir
+['a_source','a_action','a_actor','a_key'].forEach(d=>MSEL_ON[d]=()=>{updateAuditFilterCount();APAGE=1;aRender();});
+['st_source','st_actor','st_type','st_project'].forEach(d=>MSEL_ON[d]=()=>{updateStatsFilterCount();loadStats();});
+
+let _at=null; function debouncedAudit(){ clearTimeout(_at); _at=setTimeout(()=>{APAGE=1;aRender();},250); }
+function toggleAuditFilters(){ const p=$('#afilterpanel'); p.classList.toggle('hidden'); $('#afilterbtn').classList.toggle('on',!p.classList.contains('hidden')); }
+function updateAuditFilterCount(){ const n=['a_source','a_action','a_actor','a_key'].reduce((a,d)=>a+FILT[d].size,0); $('#afiltcount').textContent=n?'('+n+')':''; }
+function aPickPeriod(k){ APERIOD=PERIODS.find(p=>p.k===k); $('#a_from').value=''; $('#a_to').value=''; renderPeriods('#aperiods',k,'aPickPeriod'); APAGE=1; aRender(); }
+function setAuditRange(){ APERIOD=PERIODS.find(p=>p.k==='all'); renderPeriods('#aperiods','all','aPickPeriod'); APAGE=1; aRender(); }
+function auditFrom(){ if(APERIOD&&APERIOD.ms)return isoAgo(APERIOD.ms); if($('#a_from').value)return dtLocal($('#a_from').value); return null; }
+function auditTo(){ if($('#a_to').value)return dtLocal($('#a_to').value); return null; }
+async function loadAudit(){
+  const d=await (await api('/api/audit?size=1000000&page=1')).json();
+  AROWS=d.rows||[];
+  FOPTS.a_source=[...new Set(AROWS.map(r=>r.source).filter(Boolean))].sort();
+  FOPTS.a_action=[...new Set(AROWS.map(r=>r.action).filter(Boolean))].sort();
+  FOPTS.a_actor=[...new Set(AROWS.map(r=>r.actor).filter(Boolean))].sort();
+  FOPTS.a_key=[...new Set(AROWS.map(r=>r.key).filter(Boolean))].sort();
+  ['a_source','a_action','a_actor','a_key'].forEach(dm=>{ [...FILT[dm]].forEach(v=>{ if(!FOPTS[dm].includes(v))FILT[dm].delete(v); }); renderMsel(dm); });
+  updateAuditFilterCount(); aRender();
+}
+function aColDefs(){ return [
+  {k:'n',      l:'#',            cls:'mut',      v:r=>r.n,          r:r=>r.n},
+  {k:'ts',     l:t('th_time'),   cls:'mono mut', v:r=>r.ts||'',     r:r=>fmtTs(r.ts)},
+  {k:'source', l:t('th_source'),                 v:r=>r.source||'', r:r=>tagChip(r.source)},
+  {k:'actor',  l:t('th_actor'),  cls:'mono mut', v:r=>r.actor||'',  r:r=>esc(r.actor||'')},
+  {k:'action', l:t('th_action'),                 v:r=>r.action||'', r:r=>`<b>${esc(actLabel(r.action))}</b>`},
+  {k:'key',    l:t('th_key'),    cls:'mono',     v:r=>r.key||'',    r:r=>esc(r.key||'')},
+  {k:'detail', l:t('th_detail'), cls:'mut',      v:r=>r.detail||'', r:r=>esc(r.detail||'')},
+]; }
+function aCols(){
+  const all=aColDefs(), byk=Object.fromEntries(all.map(c=>[c.k,c]));
+  const order=JSON.parse(localStorage.getItem('a_col_order')||'[]'), hidden=new Set(JSON.parse(localStorage.getItem('a_col_hidden')||'[]'));
+  const out=[]; order.forEach(k=>{ if(byk[k]){out.push(byk[k]);delete byk[k];} });
+  all.forEach(c=>{ if(byk[c.k])out.push(c); });
+  out.forEach(c=>c.hidden=hidden.has(c.k)); return out;
+}
+function auditFiltered(){
+  let rows=AROWS.slice();
+  const q=($('#aq').value||'').toLowerCase();
+  if(q)rows=rows.filter(r=>[r.source,r.actor,r.action,r.key,r.detail].some(x=>String(x||'').toLowerCase().includes(q)));
+  const fk={a_source:'source',a_action:'action',a_actor:'actor',a_key:'key'};
+  ['a_source','a_action','a_actor','a_key'].forEach(dm=>{ const s=FILT[dm]; if(s.size)rows=rows.filter(r=>s.has(String(r[fk[dm]]||''))); });
+  const from=auditFrom(), to=auditTo();
+  if(from)rows=rows.filter(r=>r.ts>=from);
+  if(to)rows=rows.filter(r=>r.ts<=to);
+  return rows;
+}
+function aSort(k,ev){ if(ev&&(ev.target.classList.contains('rsz')||ev.target.classList.contains('colbtn')))return;
+  AC_SORT.dir=(AC_SORT.k===k)?-AC_SORT.dir:1; AC_SORT.k=k; aRender(); }
+function aRender(){
+  const cols=aCols(), vis=cols.filter(c=>!c.hidden);
+  $('#ahead').innerHTML='<tr>'+vis.map(c=>`<th onclick="aSort('${c.k}',event)">${esc(c.l)}<span class="sarr">${AC_SORT.k===c.k?(AC_SORT.dir>0?' ▲':' ▼'):''}</span><span class="rsz" onmousedown="gridRz(event,this.parentElement)"></span></th>`).join('')
+    +`<th style="width:38px;text-align:right"><span class="colbtn" title="${t('columns')}" onclick="event.stopPropagation();aColsMenu()">⚙</span></th></tr>`;
+  let rows=auditFiltered();
+  if(AC_SORT.k){ const col=cols.find(c=>c.k===AC_SORT.k); if(col)rows.sort((a,b)=>gridCmp(col.v(a)+'',col.v(b)+'')*AC_SORT.dir); }
+  const total=rows.length, pages=Math.max(1,Math.ceil(total/APAGE_SIZE));
+  if(APAGE>pages)APAGE=pages;
+  const slice=rows.slice((APAGE-1)*APAGE_SIZE,APAGE*APAGE_SIZE);
+  $('#arows').innerHTML=slice.map(r=>`<tr style="cursor:pointer" onclick='auditDetail(${JSON.stringify(r).replace(/'/g,"&#39;")})'>`
+    +vis.map(c=>`<td class="${c.cls||''}" data-label="${esc(c.l)}">${c.r(r)}</td>`).join('')
+    +`<td data-label=""></td></tr>`).join('') || `<tr><td colspan="${vis.length+1}" class="mut" style="text-align:center;padding:30px">${t('no_records')}</td></tr>`;
+  $('#acount').textContent=total+' '+t('records');
+  $('#apager').innerHTML=pagerHTML(APAGE,pages,total,APAGE_SIZE,'aGoto','aSetSize');
+}
+function aGoto(p){ APAGE=p; aRender(); document.querySelector('#view-audit').scrollIntoView({block:'start'}); }
+function aSetSize(v){ APAGE_SIZE=parseInt(v)||25; localStorage.setItem('concealer_apsize',APAGE_SIZE); APAGE=1; aRender(); }
+function aColsMenu(){ const cols=aCols(); modal('⚙ '+t('columns'),`<div id="acolpick">${cols.map((c,i)=>aColRow(c,i,cols.length)).join('')}</div>`,[{x:t('close'),p:1,f:closeModal}]); }
+function aColRow(c,i,n){ return `<div class="colrow">
+  <label style="flex:1;display:flex;gap:8px;align-items:center"><input type="checkbox" ${c.hidden?'':'checked'} onchange="aColToggle('${c.k}',this.checked)" style="width:auto"> ${esc(c.l)}</label>
+  <button class="ghost" ${i===0?'disabled':''} onclick="aColMove('${c.k}',-1)">▲</button>
+  <button class="ghost" ${i===n-1?'disabled':''} onclick="aColMove('${c.k}',1)">▼</button></div>`; }
+function aRefreshColPick(){ const el=$('#acolpick'); if(!el)return; const cols=aCols(); el.innerHTML=cols.map((c,i)=>aColRow(c,i,cols.length)).join(''); }
+function aColToggle(k,show){ const h=new Set(JSON.parse(localStorage.getItem('a_col_hidden')||'[]')); show?h.delete(k):h.add(k); localStorage.setItem('a_col_hidden',JSON.stringify([...h])); aRender(); aRefreshColPick(); }
+function aColMove(k,dir){ const keys=aCols().map(c=>c.k), i=keys.indexOf(k), j=i+dir; if(j<0||j>=keys.length)return; keys.splice(i,1); keys.splice(j,0,k); localStorage.setItem('a_col_order',JSON.stringify(keys)); aRender(); aRefreshColPick(); }
+
+// ================= stats / dashboard (interaktif SVG/HTML chart'lar, dep yok) =================
+const ACCESS_ACTS=new Set(['reveal','copy','get','inject','create','update','rotate','set_secret']);
+let STPERIOD=PERIODS.find(p=>p.k==='30d');
+function toggleStatsFilters(){ const p=$('#stfilterpanel'); p.classList.toggle('hidden'); $('#stfilterbtn').classList.toggle('on',!p.classList.contains('hidden')); }
+function updateStatsFilterCount(){ const n=['st_source','st_actor','st_type','st_project'].reduce((a,d)=>a+FILT[d].size,0); $('#stfiltcount').textContent=n?'('+n+')':''; }
+function stPickPeriod(k){ STPERIOD=PERIODS.find(p=>p.k===k); renderPeriods('#stperiods',k,'stPickPeriod'); loadStats(); }
+function countBy(arr,fn){ const m=new Map(); arr.forEach(x=>{const k=fn(x); if(k)m.set(k,(m.get(k)||0)+1);}); return [...m].map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value); }
+function countFlat(arr,fn){ const m=new Map(); arr.forEach(x=>{(fn(x)||[]).forEach(k=>{ k=(''+k).trim(); if(k)m.set(k,(m.get(k)||0)+1); });}); return [...m].map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value); }
+function barsHTML(rows,opt){
+  opt=opt||{}; rows=rows.slice(0,opt.top||8);
+  if(!rows.length)return `<div class="chartempty">${t('no_data')}</div>`;
+  const max=Math.max(1,...rows.map(r=>r.value));
+  return `<div class="bars">`+rows.map(r=>{
+    const pct=Math.max(3,r.value/max*100), col=opt.color?opt.color(r.label):'var(--acc)';
+    const disp=opt.label?opt.label(r.label):r.label;
+    return `<div class="bar" title="${esc(disp)}: ${r.value}"><span class="cat">${esc(disp)}</span>
+      <div class="track"><div class="fill" style="width:${pct.toFixed(1)}%;background:${col}"></div><span class="val">${r.value}</span></div></div>`;
+  }).join('')+`</div>`;
+}
+function trendData(A,period){
+  const times=A.map(r=>Date.parse(r.ts)).filter(t=>!isNaN(t));
+  if(!times.length)return [];
+  const now=Date.now(), day=86400000, hour=3600000, week=7*day;
+  const start=period&&period.ms?now-period.ms:Math.min(...times);
+  let step=(now-start)<=2*day?hour:(now-start)<=120*day?day:week;
+  const b=t=>Math.floor(t/step)*step, m=new Map();
+  for(let t=b(start);t<=now;t+=step)m.set(t,0);
+  times.forEach(t=>{ if(t>=b(start))m.set(b(t),(m.get(b(t))||0)+1); });
+  const fmt=step===hour?(t=>new Date(t).toISOString().slice(5,13).replace('T',' ')):(t=>new Date(t).toISOString().slice(5,10));
+  return [...m.keys()].sort((a,b2)=>a-b2).map(k=>({label:fmt(k),value:m.get(k)}));
+}
+function trendSVG(points){
+  if(points.length<2)return `<div class="chartempty">${t('no_data')}</div>`;
+  const W=640,H=180,pl=30,pr=12,pt=12,pb=26, iw=W-pl-pr, ih=H-pt-pb;
+  const max=Math.max(1,...points.map(p=>p.value)), n=points.length;
+  const x=i=>pl+i/(n-1)*iw, y=v=>pt+ih-(v/max*ih);
+  const line=points.map((p,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+  const area=`M${x(0).toFixed(1)},${pt+ih} `+points.map((p,i)=>`L${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ')+` L${x(n-1).toFixed(1)},${pt+ih} Z`;
+  const stepL=Math.max(1,Math.ceil(n/6));
+  const xl=points.map((p,i)=> i%stepL===0?`<text x="${x(i).toFixed(1)}" y="${H-8}" text-anchor="middle">${esc(p.label)}</text>`:'').join('');
+  const dots=points.map((p,i)=>`<circle class="dot" cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3"><title>${esc(p.label)}: ${p.value}</title></circle>`).join('');
+  return `<svg class="trend" viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">
+    <line x1="${pl}" y1="${pt+ih}" x2="${W-pr}" y2="${pt+ih}" stroke="var(--line2)"/>
+    <text x="2" y="${pt+6}">${max}</text><text x="2" y="${pt+ih}">0</text>
+    <path d="${area}" fill="var(--acc)" opacity=".14"/>
+    <path d="${line}" fill="none" stroke="var(--acc)" stroke-width="2"/>${dots}${xl}</svg>`;
+}
+async function loadStats(){
+  const secrets=await (await api('/api/secrets')).json();
+  const aud=(await (await api('/api/audit?size=1000000&page=1')).json()).rows||[];
+  FOPTS.st_source=[...new Set(aud.map(r=>r.source).filter(Boolean))].sort();
+  FOPTS.st_actor=[...new Set(aud.map(r=>r.actor).filter(Boolean))].sort();
+  FOPTS.st_type=[...new Set(secrets.map(e=>e.type).filter(Boolean))].sort();
+  FOPTS.st_project=[...new Set(secrets.map(e=>e.project).filter(Boolean))].sort();
+  ['st_source','st_actor','st_type','st_project'].forEach(dm=>{ [...FILT[dm]].forEach(v=>{ if(!FOPTS[dm].includes(v))FILT[dm].delete(v); }); renderMsel(dm); });
+  updateStatsFilterCount();
+  const from=STPERIOD&&STPERIOD.ms?isoAgo(STPERIOD.ms):null;
+  let A=aud.filter(r=>!from||r.ts>=from);
+  if(FILT.st_source.size)A=A.filter(r=>FILT.st_source.has(String(r.source||'')));
+  if(FILT.st_actor.size)A=A.filter(r=>FILT.st_actor.has(String(r.actor||'')));
+  let S=secrets.slice();
+  if(FILT.st_type.size)S=S.filter(e=>FILT.st_type.has(String(e.type||'')));
+  if(FILT.st_project.size)S=S.filter(e=>FILT.st_project.has(String(e.project||'')));
+  renderStats(S,A);
+}
+function renderStats(S,A){
+  const acc=A.filter(r=>ACCESS_ACTS.has(r.action)), actors=new Set(A.map(r=>r.actor).filter(Boolean));
+  const kpi=(n,l)=>`<div class="kpi"><div class="n">${n}</div><div class="l">${esc(l)}</div></div>`;
+  $('#stkpis').innerHTML=kpi(S.length,t('kpi_secrets'))+kpi(A.length,t('kpi_events'))+kpi(acc.length,t('kpi_access'))
+    +kpi(actors.size,t('kpi_actors'))+kpi(new Set(S.map(e=>e.type)).size,t('kpi_types'));
+  const card=(title,inner,wide)=>`<div class="chartcard ${wide?'wide':''}"><h3>${esc(title)}</h3>${inner}</div>`;
+  const accByKey=countFlat(acc,r=>String(r.key||'').split(','));
+  $('#stcharts').innerHTML=[
+    card(t('ch_trend'),trendSVG(trendData(A,STPERIOD)),true),
+    card(t('ch_type'),barsHTML(countBy(S,e=>e.type))),
+    card(t('ch_platform'),barsHTML(countFlat(S,e=>e.tags),{color:tagColor})),
+    card(t('ch_interface'),barsHTML(countBy(A,r=>r.source),{color:tagColor})),
+    card(t('ch_action'),barsHTML(countBy(A,r=>r.action),{label:actLabel})),
+    card(t('ch_actor'),barsHTML(countBy(A,r=>r.actor))),
+    card(t('ch_accessed'),barsHTML(accByKey)),
+    card(t('ch_project'),barsHTML(countBy(S,e=>e.project))),
+    card(t('ch_tenant'),barsHTML(countBy(S,e=>e.tenant))),
+    card(t('ch_env'),barsHTML(countBy(S,e=>e.environment))),
+    card(t('ch_repo'),barsHTML(countBy(S,e=>e.repo))),
+  ].join('');
 }
 function auditDetail(r){
   modal('🧾 '+t('audit_rec')+' #'+r.n,`<div class="grid">
     <div><label class="fld">${t('time')}</label><div class="mono">${fmtTs(r.ts)} UTC</div></div>
     <div><label class="fld">${t('th_source')}</label><div>${esc(r.source)}</div></div>
     <div><label class="fld">${t('th_actor')}</label><div>${esc(r.actor||'—')}</div></div>
-    <div><label class="fld">${t('th_action')}</label><div><b>${esc(r.action)}</b></div></div>
+    <div><label class="fld">${t('th_action')}</label><div><b>${esc(actLabel(r.action))}</b></div></div>
     <div><label class="fld">${t('th_key')}</label><div class="mono">${esc(r.key||'—')}</div></div>
     <div class="full"><label class="fld">${t('detail')}</label><div>${esc(r.detail||'—')}</div></div>
     <div class="full"><label class="fld">${t('hash')}</label><div class="mono" style="word-break:break-all;font-size:12px">${esc(r.hash)}</div></div>
@@ -940,14 +1347,58 @@ function modal(title,bodyHtml,actions){
   ov.innerHTML=`<div class="modal"><div class="head"><h2>${title}</h2><span style="flex:1"></span><button class="ghost" onclick="closeModal()">✕</button></div><div class="body">${bodyHtml}</div><div class="foot"></div></div>`;
   document.body.appendChild(ov);
   const foot=ov.querySelector('.foot');
-  (actions||[]).forEach(a=>{ const b=document.createElement('button'); b.textContent=a.x; if(a.p)b.className='primary'; b.onclick=a.f; foot.appendChild(b); });
+  (actions||[]).forEach(a=>{ const b=document.createElement('button'); b.textContent=a.x; if(a.p)b.className='primary'; if(a.c)b.className=a.c; if(a.id)b.id=a.id; if(a.dis)b.disabled=true; b.onclick=a.f; foot.appendChild(b); });
   window._ov=ov;
 }
 function closeModal(){ if(window._ov){window._ov.remove();window._ov=null;} }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeModal(); });
 
+// ---------- login redaksiyon arkaplani ----------
+// [prefix, DUMMY-deger, suffix] — tum degerler sahte (…DUMMY…); asla gercek secret basma.
+const LOGIN_SNIPPETS=[
+  ['<span class="k">const</span> OPENAI_API_KEY = <span class="s">"</span>','sk-DUMMY-9f2aE7b1c04d8x21Qv7Kp','<span class="s">"</span>'],
+  ['<span class="k">export</span> AWS_SECRET_ACCESS_KEY=<span class="s">"</span>','wJalrXUtnFEMI-DUMMY-EXAMPLEKEY','<span class="s">"</span>'],
+  ['db.password = <span class="s">"</span>','P@ssw0rd-DUMMY-8f21b','<span class="s">"</span>'],
+  ['Authorization: Bearer ','eyJhbGciOiJIUzI1NiJ9.DUMMY.sig',''],
+  ['GITHUB_TOKEN=','ghp_DUMMY0000example0000token00',''],
+  ['STRIPE_KEY=','sk_live_DUMMY_51HxAqRedactedXyz',''],
+  ['<span class="k">private_key</span>: <span class="s">"</span>','-----BEGIN KEY----- DUMMY','<span class="s">"</span>'],
+  ['DATABASE_URL=postgres://user:','DUMMY-pw-2931','@db:5432'],
+  ['SLACK_TOKEN=','xoxb-DUMMY-000000-slacktoken',''],
+  ['<span class="k">let</span> jwt = <span class="s">"</span>','eyJ0eXAiOiJKV1QifQ.DUMMY.h4x','<span class="s">"</span>'],
+  ['redis://:','DUMMY-r3d1s-pw@cache:6379',''],
+  ['GOOGLE_API_KEY=<span class="s">"</span>','AIza-DUMMY-SyD3xampleKeyXyz','<span class="s">"</span>'],
+  ['ssh-rsa ','AAAAB3NzaC1yc2E-DUMMY-key','== user@host'],
+  ['PAT=<span class="s">"</span>','npm_DUMMY0000registrytoken00','<span class="s">"</span>'],
+  ['client_secret=','DUMMY-oauth-7c1f9b2a',''],
+  ['HEX_KEY = ','a3f1c0DUMMYd90b8e7f2beef4211',''],
+];
+const _rnd=(a,b)=>a+Math.random()*(b-a);   // ponytail: dekoratif, Math.random yeterli
+function placeFrag(f){   // ekranın rastgele bir yerine taşı (parça görünmezken çağrılır → sıçrama yok)
+  f.style.top=_rnd(2,92).toFixed(1)+'%'; f.style.left=_rnd(1,72).toFixed(1)+'%';
+}
+// akan (streaming) redaksiyon: her parça yaşam-döngüsüyle belirir/redakte olur/kaybolur; görünmez sınırda yeni yere taşınır
+function renderLoginBg(){
+  const bg=document.getElementById('loginbg'); if(!bg||bg.dataset.done)return; bg.dataset.done=1;
+  const N=28, frags=[];
+  for(let i=0;i<N;i++){
+    const s=LOGIN_SNIPPETS[i%LOGIN_SNIPPETS.length];
+    const dur=_rnd(8,15).toFixed(2);               // yavaş, her parça ayrı süre
+    const del=(-_rnd(0,parseFloat(dur))).toFixed(2);// negatif → yüklenince akış hâlihazırda ortasında
+    const f=document.createElement('div'); f.className='frag';
+    f.style.cssText=`--dur:${dur}s;--del:${del}s`;  // --dur/--del rx pseudo'lara miras geçer (aynı faz)
+    f.innerHTML=`${s[0]}<span class="rx">${esc(s[1])}</span>${s[2]}`;
+    placeFrag(f);
+    f.addEventListener('animationiteration',e=>{ if(e.animationName.indexOf('fraglife')===0)placeFrag(f); });
+    frags.push(f);
+  }
+  bg.replaceChildren(...frags);
+}
+
 // ---------- boot ----------
 (async()=>{
+  renderLoginBg();
+  setTheme(localStorage.getItem('concealer_theme')||'dark');
   setLang(localStorage.getItem('concealer_lang')||'tr');
   const s=await (await fetch('/api/session')).json();
   if(s.unlocked)showApp(s.remaining); else showLogin();

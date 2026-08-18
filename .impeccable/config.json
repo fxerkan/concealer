@@ -1,0 +1,35 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "dark-glow",
+        "value": "0 2px 8px rgba(255,176,32,.22)",
+        "createdAt": "2026-08-18T07:00:57.734Z",
+        "reason": "CLAUDE.md branding rule: the 'er' redaction chip is intentional house branding, pre-existing"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "0 24px 70px rgba(0,0,0,.55)",
+        "createdAt": "2026-08-18T07:01:19.637Z",
+        "reason": "false positive: neutral black elevation shadow on login card, not a colored glow; pre-existing"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "0 0 14px 2px rgba(255,176,32,.45)",
+        "createdAt": "2026-08-18T11:06:29.714Z",
+        "reason": "user confirmed: requested a glow/halo around the header logo like the feature-graphic"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "webui.html"
+        ],
+        "createdAt": "2026-08-18T13:02:04.063Z",
+        "reason": "concealer decided: Matrix theme phosphor text-shadow is the literal intent of a user-requested CRT theme; header amber halo is sanctioned house branding per CLAUDE.md"
+      }
+    ]
+  }
+}
