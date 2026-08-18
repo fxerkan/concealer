@@ -53,6 +53,9 @@ a{color:var(--acc);text-decoration:none}
 #login .cli{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--mut);
   margin:0 0 22px;padding:8px 11px;background:var(--bg);border:1px solid var(--line);border-radius:8px}
 #login .cli b{color:var(--acc);font-weight:600}
+#login .foot{margin:22px 0 0;font-size:12px;color:var(--mut);text-align:center}
+#login .foot a{color:var(--mut);text-decoration:none}#login .foot a:hover{color:var(--acc)}
+#login .foot .ac{color:var(--acc)}
 .pwrow{display:flex;gap:8px}.pwrow input{flex:1}
 
 header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
@@ -65,27 +68,42 @@ header .grow{flex:1}
 .lang button{border:0;background:transparent;color:var(--mut);padding:4px 9px;border-radius:6px;font-size:12px;font-weight:600}
 .lang button.active{background:var(--acc);color:var(--ink)}
 #idle{font-variant-numeric:tabular-nums;color:var(--mut);font-size:12px}
-main{padding:20px;max-width:1400px;margin:0 auto}
+main{padding:20px;max-width:none;margin:0 auto}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
 .toolbar input,.toolbar select{width:auto}
 .toolbar .search{min-width:280px;flex:1}
 
-table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+/* not: table'da overflow:hidden YOK — sticky thead'i kirar (scroll-container olusturur) */
 th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
-th{background:var(--panel2);color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+th{background:#232833;color:#cfd4de;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid var(--line2)}
+tbody tr:nth-child(even){background:rgba(255,255,255,.022)}   /* zebra */
 tbody tr:hover{background:var(--panel2)}
 th{position:relative;user-select:none}
 th.sortable{cursor:pointer}
 th .sarr{color:var(--acc);font-size:10px;margin-left:4px}
 th .rsz{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize}
 th .rsz:hover{background:var(--acc)}
+th .colbtn{position:absolute;top:50%;right:10px;transform:translateY(-50%);cursor:pointer;color:var(--mut);font-size:15px;padding:2px 5px;border-radius:6px}
+th .colbtn:hover{color:var(--acc);background:var(--panel)}
 tr:last-child td{border-bottom:0}
 .chip{display:inline-block;background:var(--chip);color:#bcd;border-radius:20px;padding:2px 9px;font-size:11px;margin:1px 2px}
-.type-badge{font-size:11px;padding:3px 9px;border-radius:6px;font-weight:600}
+.type-badge{font-size:11px;padding:3px 9px;border-radius:6px;font-weight:600;background:#242a33;color:#c6ccd6}
 .t-api_key{background:#132534;color:#8fd0ff}.t-database{background:#241d33;color:#c3a6ff}
-.t-website{background:#12301f;color:#86e6a8}.t-custom{background:#2e2612;color:#ffcf7a}
-.rowact{display:flex;gap:4px;justify-content:flex-end}
+.t-website{background:#12301f;color:#86e6a8}.t-login{background:#12301f;color:#86e6a8}.t-custom{background:#2e2612;color:#ffcf7a}
+.t-access_token,.t-jwt,.t-oauth{background:#132534;color:#8fd0ff}
+.t-ssh_key,.t-certificate,.t-server{background:#1a2432;color:#9ec5ff}
+.t-pin,.t-wifi{background:#2a1b2e;color:#f0a6d6}
+.t-credit_card,.t-bank_account{background:#122b28;color:#7fe0c7}
+.t-passport,.t-id_card,.t-membership{background:#2e2612;color:#ffcf7a}
+.t-secure_note{background:#22262e;color:#c6ccd6}
+.rowact{display:flex;gap:4px;justify-content:flex-end;align-items:center}
 .count{color:var(--mut);font-size:13px;margin-top:10px}
+/* row action kebab menu */
+.rowmenu{position:absolute;z-index:45;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.5);padding:5px;min-width:150px}
+.rowmenu button{display:flex;gap:8px;width:100%;border:0;background:transparent;text-align:left;padding:8px 10px;border-radius:7px;color:var(--txt)}
+.rowmenu button:hover{background:var(--panel)}
+.rowmenu button.danger:hover{color:var(--bad)}
 
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
 .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:720px;max-width:100%;box-shadow:0 24px 70px rgba(0,0,0,.5)}
@@ -103,7 +121,84 @@ label.fld{display:block;margin-bottom:4px;color:var(--mut);font-size:12px;font-w
 #toast.show{opacity:1}
 .pill{padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600}
 .pill.ok{background:#12331d;color:var(--ok)}.pill.bad{background:#3a1518;color:var(--bad)}
-.pager{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:14px}
+.pager{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:14px;flex-wrap:wrap}
+.pager button{padding:5px 10px}
+.pager .pg{min-width:34px;text-align:center}
+.pager .pg.active{background:var(--acc);border-color:var(--acc);color:var(--ink);font-weight:700}
+
+/* --- sticky sub-bar + table header (measured header/subbar heights in --hh/--sh) --- */
+:root{--hh:56px;--sh:0px}
+.subbar{position:sticky;top:var(--hh);z-index:15;background:var(--bg);padding:12px 0 8px;margin-bottom:8px;border-bottom:1px solid var(--line)}
+.subrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.subrow .search{flex:1;min-width:200px;width:auto}
+.actionrow{display:flex;gap:10px;justify-content:flex-start;flex-wrap:wrap;margin-top:10px}
+/* thead sticks to viewport just under header+subbar (no scroll wrapper, or sticky breaks) */
+#view-secrets thead th{position:sticky;top:calc(var(--hh) + var(--sh));z-index:10}
+.tablewrap{overflow:visible}
+.btn-filter{display:inline-flex;gap:6px;align-items:center}
+.btn-filter.on{border-color:var(--acc);color:var(--acc)}
+.pagesize{display:flex;gap:6px;align-items:center;color:var(--mut);font-size:12px}
+.pagesize select{width:auto;padding:5px 8px}
+
+/* action buttons — each its own color */
+button.gen{background:#2a1f3a;border-color:#7c5cff;color:#c6b4ff}
+button.gen:hover{background:#352748}
+button.b-scan{background:#12262e;border-color:#2b7d8f;color:#8fe0f0}
+button.b-scan:hover{background:#173038}
+button.b-new{background:var(--acc);border-color:var(--acc);color:var(--ink);font-weight:700}
+button.b-new:hover{background:var(--acc2)}
+/* idle countdown — turns red in the last 10s; #idle desktop (next to lock), #idle-m mobile */
+#idle.warn,#idle-m.warn{color:var(--bad);font-weight:700}
+#idle-m{display:none;font-variant-numeric:tabular-nums;color:var(--mut);font-size:12px}
+/* header logo chip so it stands out from the dark bar */
+header .brand .logo{background:#1c2029;border-radius:7px;padding:3px;vertical-align:-8px;margin-right:5px}
+
+/* --- filter panel (collapsible) with labelled multi-selects --- */
+.filterpanel{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:10px}
+.filterpanel.hidden{display:none}
+.msel{position:relative}
+.msel>.fld{margin-bottom:4px}
+.msel-btn{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line2)}
+.msel-btn .arr{color:var(--mut);font-size:11px}
+.msel-btn.has{border-color:var(--acc)}
+.msel-pop{position:absolute;z-index:40;top:calc(100% + 4px);left:0;right:0;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.5);padding:8px;max-height:280px;display:flex;flex-direction:column}
+.msel-pop.hidden{display:none}
+.msel-search{margin-bottom:6px}
+.msel-list{overflow:auto}
+.msel-opt{display:flex;gap:8px;align-items:center;padding:6px 6px;border-radius:6px;cursor:pointer}
+.msel-opt:hover{background:var(--panel)}
+.msel-opt input{width:auto}
+.msel-empty{color:var(--mut);padding:8px;font-size:12px}
+.msel-all{border-bottom:1px solid var(--line);margin-bottom:4px;padding-bottom:8px}
+
+/* --- hamburger menu (mobile) --- */
+.hamb{display:none}
+.menu{display:contents}
+@media(max-width:820px){
+  .hamb{display:inline-flex}
+  #idle-m{display:inline-block;margin-left:auto}
+  header{flex-wrap:wrap;gap:10px;padding:10px 14px}
+  header .grow{display:none}
+  .menu{display:none;order:99;flex-basis:100%;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid var(--line)}
+  .menu.open{display:flex}
+  .menu .tabs{flex-direction:column;background:transparent;padding:0}
+  .menu .tabs button{text-align:left}
+  .menu .lang{align-self:flex-start}
+  .actionrow{justify-content:stretch}
+  .actionrow button{flex:1}
+}
+/* --- responsive card layout for the secrets table --- */
+@media(max-width:720px){
+  main{padding:12px}
+  table.cards thead{display:none}
+  table.cards,table.cards tbody,table.cards tr,table.cards td{display:block;width:100%}
+  table.cards{border:0;background:transparent}
+  table.cards tr{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:12px;padding:6px 4px}
+  table.cards td{border:0;padding:8px 14px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+  table.cards td::before{content:attr(data-label);color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.4px;font-weight:600;flex:0 0 auto}
+  table.cards td[data-label=""]::before{content:none}
+  table.cards .rowact{justify-content:flex-end;flex-wrap:wrap}
+}
 </style>
 </head>
 <body>
@@ -120,51 +215,64 @@ label.fld{display:block;margin-bottom:4px;color:var(--mut);font-size:12px;font-w
     </div>
     <div id="loginerr" style="color:var(--bad);margin-top:10px;min-height:18px"></div>
     <button class="primary" style="width:100%;margin-top:8px" data-i18n="unlock" onclick="unlock()">Aç</button>
+    <div class="foot">conceal<span class="ac">er</span> · v__VERSION__ · <a href="https://github.com/FXerkan/concealer" target="_blank" rel="noopener" title="GitHub"><svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" style="vertical-align:-2px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a> · by <a href="https://fxerkan.com" target="_blank" rel="noopener">FXerkan</a></div>
   </div>
 </div>
 
 <!-- APP -->
 <div id="app" class="hidden">
   <header>
-    <span class="brand"><svg viewBox="0 0 512 512" width="24" height="24" style="vertical-align:-6px;margin-right:3px"><rect width="512" height="512" rx="116" fill="#0a0b0d"/><rect x="128" y="176" width="176" height="38" rx="19" fill="#2a2f38"/><rect x="128" y="232" width="256" height="52" rx="26" fill="#ffb020"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#2a2f38"/></svg>conceal<span class="ac">er</span></span>
-    <div class="tabs">
-      <button id="tab-secrets" class="active" data-i18n="secrets" onclick="showTab('secrets')">Secrets</button>
-      <button id="tab-audit" data-i18n="audit_log" onclick="showTab('audit')">Audit Log</button>
-      <button id="tab-leaks" data-i18n="leaks" onclick="showTab('leaks')">Risk</button>
-      <button id="tab-settings" data-i18n="settings_tab" onclick="showTab('settings')">⚙ Settings</button>
+    <span class="brand"><svg class="logo" viewBox="0 0 512 512" width="22" height="22"><rect x="128" y="176" width="176" height="38" rx="19" fill="#8a909b"/><rect x="128" y="232" width="256" height="52" rx="26" fill="#ffb020"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#8a909b"/></svg>conceal<span class="ac">er</span></span>
+    <div class="menu">
+      <div class="tabs">
+        <button id="tab-secrets" class="active" data-i18n="secrets" onclick="showTab('secrets')">Secrets</button>
+        <button id="tab-audit" data-i18n="audit_log" onclick="showTab('audit')">Audit Logs</button>
+        <button id="tab-leaks" data-i18n="leaks" onclick="showTab('leaks')">Risks</button>
+        <button id="tab-settings" data-i18n="settings_tab" onclick="showTab('settings')">Settings</button>
+      </div>
+      <span class="grow"></span>
+      <span id="idle"></span>
+      <button class="ghost" data-i18n="lock" onclick="lock()">🔒 Kilitle</button>
+      <div class="lang">
+        <button id="lang-tr" onclick="setLang('tr')">TR</button>
+        <button id="lang-en" onclick="setLang('en')">EN</button>
+      </div>
     </div>
-    <span class="grow"></span>
-    <button class="ghost" data-i18n="generate" onclick="openGen()">🎲 Generate</button>
-    <span id="idle"></span>
-    <button class="ghost" data-i18n="lock" onclick="lock()">🔒 Kilitle</button>
-    <div class="lang">
-      <button id="lang-tr" onclick="setLang('tr')">TR</button>
-      <button id="lang-en" onclick="setLang('en')">EN</button>
-    </div>
+    <span id="idle-m"></span>
+    <button class="ghost hamb" onclick="document.querySelector('.menu').classList.toggle('open')" aria-label="menu">☰</button>
   </header>
   <main>
     <section id="view-secrets">
-      <div class="toolbar">
-        <input class="search" id="q" data-i18n-ph="search_secrets" placeholder="ara…" oninput="debouncedLoad()">
-        <select id="ftype" onchange="loadSecrets()"></select>
-        <select id="ftenant" onchange="loadSecrets()"></select>
-        <select id="fproject" onchange="loadSecrets()"></select>
-        <select id="fenvironment" onchange="loadSecrets()"></select>
-        <select id="frepo" onchange="loadSecrets()"></select>
-        <button data-i18n="deploy_btn" onclick="openDeploy()">🚀 Deploy</button>
-        <button data-i18n="scan_folder" onclick="openScan()">🔎 Scan folder</button>
-        <button class="ghost" title="columns" onclick="gridColsMenu('secrets')">⋮</button>
-        <button class="primary" data-i18n="new_secret" onclick="openEditor()">+ New Secret</button>
+      <div class="subbar">
+        <div class="subrow">
+          <input class="search" id="q" data-i18n-ph="search_secrets" placeholder="ara…" oninput="debouncedLoad()">
+          <button class="btn-filter" id="filterbtn" onclick="toggleFilters()"><span>⧩</span><span data-i18n="filters">Filters</span><span id="filtcount" class="mut"></span></button>
+        </div>
+        <div class="filterpanel" id="filterpanel">
+          <div class="msel" id="ms-type"></div>
+          <div class="msel" id="ms-tenant"></div>
+          <div class="msel" id="ms-project"></div>
+          <div class="msel" id="ms-environment"></div>
+          <div class="msel" id="ms-repo"></div>
+        </div>
+        <div class="actionrow">
+          <button class="b-new" data-i18n="new_secret" onclick="openEditor()">+ New Secret</button>
+          <button class="b-scan" data-i18n="scan_folder" onclick="openScan()">🔎 Scan folder</button>
+          <button class="gen" data-i18n="generate" onclick="openGen()">🎲 Generate</button>
+        </div>
       </div>
-      <table>
+      <div class="tablewrap">
+      <table class="cards">
         <thead><tr>
           <th data-i18n="th_name">Name</th><th data-i18n="th_type">Type</th>
           <th data-i18n="th_scope">Scope</th><th data-i18n="th_tags">Tags</th>
           <th data-i18n="th_updated">Updated</th><th data-i18n="th_access">Last access</th>
-          <th style="text-align:right" data-i18n="th_actions">Actions</th>
+          <th style="text-align:right"><span data-i18n="th_actions">Actions</span><span class="colbtn" title="columns" onclick="event.stopPropagation();gridColsMenu('secrets')">⚙</span></th>
         </tr></thead>
         <tbody id="srows"></tbody>
       </table>
+      </div>
+      <div class="pager" id="spager_bot"></div>
       <div class="count" id="scount"></div>
     </section>
 
@@ -231,15 +339,20 @@ label.fld{display:block;margin-bottom:4px;color:var(--mut);font-size:12px;font-w
 const IDLE = parseInt("__IDLE__") || 300;
 const CLIP_CLEAR = 20;
 const DIMS=['tenant','project','environment','repo'];
+const FDIMS=['type','tenant','project','environment','repo'];   // filter dropdown alanlari
 let TYPES={}, idleLeft=IDLE, idleTimer=null, LANG='tr';
+// coklu-secim filtre durumu + secenekler + istemci-tarafi sayfalama
+const FILT={type:new Set(),tenant:new Set(),project:new Set(),environment:new Set(),repo:new Set()};
+const FOPTS={type:[],tenant:[],project:[],environment:[],repo:[]};
+let SPAGE=1; let SPAGE_SIZE=parseInt(localStorage.getItem('concealer_psize'))||25; let SROWS=[];
 
 // ---------- i18n ----------
 const I18N={
  tr:{login_sub:"Lokal secret vault — master password ile aç",master_pw:"Master password",unlock:"Aç",
-  wrong_pw:"Yanlış master password.",secrets:"Secrets",audit_log:"Audit Log",lock:"🔒 Kilitle",
+  wrong_pw:"Yanlış master password.",secrets:"Secrets",audit_log:"Audit Logs",lock:"🔒 Kilitle",filters:"Filtreler",search:"ara",
   search_secrets:"🔎 ara: name, url, tag, notes…",all_types:"tüm tipler",new_secret:"+ Yeni Secret",
   th_name:"Name",th_type:"Type",th_scope:"Kapsam (tenant/project/env/repo)",th_tags:"Etiketler",th_updated:"Güncellendi",th_actions:"İşlemler",
-  no_records:"kayıt yok",records:"kayıt",view:"Görüntüle",edit:"Düzenle",del:"Sil",
+  no_records:"kayıt yok",records:"kayıt",view:"Görüntüle",edit:"Düzenle",del:"Sil",more:"Daha fazla",per_page:"sayfa başına",
   del_confirm:s=>`"${s}" silinsin mi?`,deleted:"silindi",saved:"kaydedildi",created:"oluşturuldu",updated:"güncellendi",
   copied:`kopyalandı — ${CLIP_CLEAR}s sonra pano temizlenecek`,copy_fail:"kopyalanamadı (izin?)",
   idle_lock:"⏱ auto-lock",idle_locked:"Boşta kalma — kilitlendi",
@@ -249,7 +362,7 @@ const I18N={
   all_actions:"tüm eylemler",all_sources:"tüm kaynaklar",key_filter:"key filtre",verify_chain:"🔗 Zincir doğrula",
   th_time:"Zaman (UTC)",th_source:"Kaynak",th_action:"Eylem",th_key:"Key",th_detail:"Detay",
   th_actor:"Aktör",th_access:"Son Erişim",actor:"aktör",all:"Tümü",never:"—",
-  leaks:"Risk",leaks_hint:"Aynı değeri paylaşan (yeniden kullanılan) secret'lar — sızma riski skorlanır.",
+  leaks:"Risks",leaks_hint:"Aynı değeri paylaşan (yeniden kullanılan) secret'lar — sızma riski skorlanır.",
   th_score:"Skor",th_shared:"Paylaşılan değer",th_uses:"Kullanım",th_projects:"Projeler",th_envs:"Ortamlar",th_records:"Kayıtlar",
   no_leaks:"paylaşılan değer yok 🎉",leak_groups:"grup",
   scan_folder:"Klasör Tara",scan_path:"Klasör yolu",scan_history:"shell history'yi de tara (~/.zsh_history, ~/.bash_history)",
@@ -259,7 +372,7 @@ const I18N={
   generate:"🎲 Üret",generate_title:"Parola / Secret Üret",gen_format:"format",gen_password:"parola",gen_hex:"hex token",
   gen_b64:"base64url token",gen_length:"uzunluk",gen_classes:"karakter sınıfları",gen_result:"üretilen değer",
   gen_regen:"yeniden üret",gen_save:"concealer'a Kaydet",
-  settings:"Ayarlar",settings_tab:"⚙ Ayarlar",confirm:"Onayla",set_idle:"Auto-lock (saniye)",set_confirm:"Şu işlemlerden önce master parola sor",
+  settings:"Ayarlar",settings_tab:"Ayarlar",confirm:"Onayla",set_idle:"Auto-lock (saniye)",set_confirm:"Şu işlemlerden önce master parola sor",
   set_portability:"Taşınabilirlik (makineler arası)",export_btn:"⬇ Export (.age)",import_btn:"⬆ Import",
   set_export_hint:"Export tüm vault'u master parolayla (age) şifreler; başka makineye taşınabilir. Import kayıtları bu vault'a birleştirir.",
   exported:"export indirildi",imp_pick:"önce .age dosyası seç",imp_fail:"import başarısız",imported_n:(n,u)=>`+${n} yeni, ~${u} güncellendi`,
@@ -268,10 +381,10 @@ const I18N={
   chain_ok:c=>`✓ bütünlük OK (${c})`,chain_bad:b=>`✗ kırık @ #${b}`,
   audit_rec:"Audit kaydı",time:"zaman",detail:"detay",hash:"hash (HMAC)"},
  en:{login_sub:"Local secret vault — unlock with master password",master_pw:"Master password",unlock:"Unlock",
-  wrong_pw:"Wrong master password.",secrets:"Secrets",audit_log:"Audit Log",lock:"🔒 Lock",
+  wrong_pw:"Wrong master password.",secrets:"Secrets",audit_log:"Audit Logs",lock:"🔒 Lock",filters:"Filters",search:"search",
   search_secrets:"🔎 search: name, url, tag, notes…",all_types:"all types",new_secret:"+ New Secret",
   th_name:"Name",th_type:"Type",th_scope:"Scope (tenant/project/env/repo)",th_tags:"Tags",th_updated:"Updated",th_actions:"Actions",
-  no_records:"no records",records:"records",view:"View",edit:"Edit",del:"Delete",
+  no_records:"no records",records:"records",view:"View",edit:"Edit",del:"Delete",more:"More",per_page:"per page",
   del_confirm:s=>`Delete "${s}"?`,deleted:"deleted",saved:"saved",created:"created",updated:"updated",
   copied:`copied — clipboard clears in ${CLIP_CLEAR}s`,copy_fail:"copy failed (permission?)",
   idle_lock:"⏱ auto-lock",idle_locked:"Idle — locked",
@@ -281,7 +394,7 @@ const I18N={
   all_actions:"all actions",all_sources:"all sources",key_filter:"key filter",verify_chain:"🔗 Verify chain",
   th_time:"Time (UTC)",th_source:"Source",th_action:"Action",th_key:"Key",th_detail:"Detail",
   th_actor:"Actor",th_access:"Last access",actor:"actor",all:"All",never:"—",
-  leaks:"Risk",leaks_hint:"Secrets that share the same value (reuse) — leak risk is scored.",
+  leaks:"Risks",leaks_hint:"Secrets that share the same value (reuse) — leak risk is scored.",
   th_score:"Score",th_shared:"Shared value",th_uses:"Uses",th_projects:"Projects",th_envs:"Envs",th_records:"Records",
   no_leaks:"no shared values 🎉",leak_groups:"groups",
   scan_folder:"Scan folder",scan_path:"Folder path",scan_history:"also scan shell history (~/.zsh_history, ~/.bash_history)",
@@ -291,7 +404,7 @@ const I18N={
   generate:"🎲 Generate",generate_title:"Generate Password / Secret",gen_format:"format",gen_password:"password",gen_hex:"hex token",
   gen_b64:"base64url token",gen_length:"length",gen_classes:"character classes",gen_result:"generated value",
   gen_regen:"regenerate",gen_save:"Save to concealer",
-  settings:"Settings",settings_tab:"⚙ Settings",confirm:"Confirm",set_idle:"Auto-lock (seconds)",set_confirm:"Ask master password before",
+  settings:"Settings",settings_tab:"Settings",confirm:"Confirm",set_idle:"Auto-lock (seconds)",set_confirm:"Ask master password before",
   set_portability:"Portability (move between machines)",export_btn:"⬇ Export (.age)",import_btn:"⬆ Import",
   set_export_hint:"Export encrypts the whole vault with your master password (age); portable to another machine. Import merges records into this vault.",
   exported:"export downloaded",imp_pick:"pick a .age file first",imp_fail:"import failed",imported_n:(n,u)=>`+${n} new, ~${u} updated`,
@@ -306,7 +419,7 @@ function setLang(l){
   document.getElementById('lang-tr').classList.toggle('active',l==='tr');
   document.getElementById('lang-en').classList.toggle('active',l==='en');
   applyStatic();
-  if(!$('#app').classList.contains('hidden')){ rebuildSelects(); loadSecrets(); if(!$('#view-audit').classList.contains('hidden'))loadAudit(1); }
+  if(!$('#app').classList.contains('hidden')){ rebuildSelects(); FDIMS.forEach(renderMsel); loadSecrets(); if(!$('#view-audit').classList.contains('hidden'))loadAudit(1); }
 }
 function applyStatic(){
   document.querySelectorAll('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));
@@ -357,27 +470,82 @@ async function unlock(){
   else $('#loginerr').textContent=t('wrong_pw');
 }
 async function lock(){ await fetch('/api/lock',{method:'POST'}); showLogin(); }
-function showLogin(){ clearInterval(idleTimer); $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#pw').focus(); }
+function showLogin(){ clearInterval(idleTimer); closeModal(); $('.menu').classList.remove('open'); $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#pw').focus(); }
 async function showApp(startSecs){
   $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
   TYPES=await (await api('/api/types')).json();
   window.CFG=await (await api('/api/settings')).json();
-  rebuildSelects(); idleLeft=(startSecs!=null?startSecs:IDLE); startIdle(); showTab('secrets');
+  rebuildSelects(); FOPTS.type=Object.keys(TYPES); FDIMS.forEach(renderMsel);
+  $('#filterpanel').classList.toggle('hidden', window.innerWidth<=820);   // masaustunde acik, mobilde kapali
+  $('#filterbtn').classList.toggle('on',!$('#filterpanel').classList.contains('hidden'));
+  measureSticky();
+  idleLeft=(startSecs!=null?startSecs:IDLE); startIdle(); showTab('secrets');
 }
 function rebuildSelects(){
-  $('#ftype').innerHTML=`<option value="">${t('all_types')}</option>`+Object.keys(TYPES).map(x=>`<option>${x}</option>`).join('');
   $('#a_action').innerHTML=`<option value="">${t('all_actions')}</option>`; $('#a_action').dataset.done='';
   $('#a_source').innerHTML=`<option value="">${t('all_sources')}</option><option>web</option><option>cli</option><option>mcp</option><option>scan</option>`;
 }
 // hard auto-lock: aktivite sayaci sifirlamaz; unlock'tan itibaren sabit geri sayim
-function startIdle(){ clearInterval(idleTimer); idleTimer=setInterval(()=>{ idleLeft--; const m=String(Math.floor(Math.max(0,idleLeft)/60)).padStart(2,'0'),s=String(Math.max(0,idleLeft)%60).padStart(2,'0'); $('#idle').textContent=t('idle_lock')+' '+m+':'+s; if(idleLeft<=0){clearInterval(idleTimer);lock();toast(t('idle_locked'));} },1000); }
+function startIdle(){ clearInterval(idleTimer); idleTimer=setInterval(()=>{ idleLeft--; const m=String(Math.floor(Math.max(0,idleLeft)/60)).padStart(2,'0'),s=String(Math.max(0,idleLeft)%60).padStart(2,'0'); const txt=t('idle_lock')+' '+m+':'+s;
+  [$('#idle'),$('#idle-m')].forEach(el=>{ if(el){ el.textContent=txt; el.classList.toggle('warn',idleLeft<=10); } });
+  if(idleLeft<=0){clearInterval(idleTimer);lock();toast(t('idle_locked'));} },1000); }
+
+// header/subbar yuksekliklerini olcup sticky ofsetlerini CSS degiskenlerine yaz
+function measureSticky(){
+  const h=document.querySelector('header'), sb=$('#view-secrets .subbar');
+  if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');
+  if(sb)document.documentElement.style.setProperty('--sh',sb.offsetHeight+'px');
+}
+new ResizeObserver(measureSticky).observe(document.documentElement);
+
+// ---------- coklu-secim, aranabilir filtre dropdown'lari ----------
+function toggleFilters(){ const p=$('#filterpanel'); p.classList.toggle('hidden'); $('#filterbtn').classList.toggle('on',!p.classList.contains('hidden')); measureSticky(); }
+function renderMsel(dim){
+  const box=$('#ms-'+dim); if(!box)return;
+  const sel=FILT[dim], n=sel.size;
+  const btnlabel = n===0 ? t('all') : (n===1 ? [...sel][0] : n+' ✓');
+  box.innerHTML=`<label class="fld">${dim}</label>
+    <button class="msel-btn ${n?'has':''}" onclick="mselOpen('${dim}',event)">
+      <span>${esc(btnlabel)}</span><span class="arr">▾</span></button>
+    <div class="msel-pop hidden" id="pop-${dim}">
+      <input class="msel-search" placeholder="${t('search')||'…'}" oninput="mselFilter('${dim}')" ${NOPM}>
+      <div class="msel-list" id="list-${dim}"></div></div>`;
+  mselFilter(dim);
+}
+function mselFilter(dim){
+  const q=($('#pop-'+dim+' .msel-search')?.value||'').toLowerCase();
+  const opts=FOPTS[dim].filter(v=>v.toLowerCase().includes(q));
+  const list=$('#list-'+dim), n=FILT[dim].size;
+  const allRow=`<label class="msel-opt msel-all"><input type="checkbox" ${n===0?'checked':''} onchange="mselAll('${dim}')"><span><b>${t('all')}</b></span></label>`;
+  list.innerHTML=allRow+(opts.length?opts.map(v=>`<label class="msel-opt">
+    <input type="checkbox" ${FILT[dim].has(v)?'checked':''} onchange="mselPick('${dim}',this,${JSON.stringify(v).replace(/"/g,'&quot;')})">
+    <span>${esc(v)}</span></label>`).join(''):`<div class="msel-empty">—</div>`);
+}
+function mselAll(dim){ FILT[dim].clear(); renderMsel(dim); updateFilterCount(); SPAGE=1; loadSecrets(); }
+function mselOpen(dim,ev){
+  ev.stopPropagation();
+  document.querySelectorAll('.msel-pop').forEach(p=>{ if(p.id!=='pop-'+dim)p.classList.add('hidden'); });
+  $('#pop-'+dim).classList.toggle('hidden'); measureSticky();
+}
+function mselPick(dim,cb,val){ cb.checked?FILT[dim].add(val):FILT[dim].delete(val); renderMsel(dim); updateFilterCount(); SPAGE=1; loadSecrets(); }
+function updateFilterCount(){ const n=FDIMS.reduce((a,d)=>a+FILT[d].size,0); $('#filtcount').textContent=n?'('+n+')':''; }
+document.addEventListener('click',()=>document.querySelectorAll('.msel-pop').forEach(p=>p.classList.add('hidden')));
+// secenek listelerini (filtrelenmemis tum kayitlardan) tazele, secimi koru
+async function refreshFilterOptions(){
+  const rows=await (await api('/api/secrets')).json();
+  DIMS.forEach(d=>FOPTS[d]=[...new Set(rows.map(e=>e[d]).filter(Boolean))].sort());
+  FOPTS.type=[...new Set(rows.map(e=>e.type).filter(Boolean))].sort();
+  FDIMS.forEach(d=>{ [...FILT[d]].forEach(v=>{ if(!FOPTS[d].includes(v))FILT[d].delete(v); }); renderMsel(d); });
+  updateFilterCount();
+}
 
 function showTab(tab){
+  $('.menu').classList.remove('open');
   ['secrets','audit','leaks','settings'].forEach(x=>{
     $('#view-'+x).classList.toggle('hidden',tab!==x);
     $('#tab-'+x).classList.toggle('active',tab===x);
   });
-  if(tab==='secrets')loadSecrets(); else if(tab==='audit')loadAudit(1);
+  if(tab==='secrets'){ refreshFilterOptions(); loadSecrets(); } else if(tab==='audit')loadAudit(1);
   else if(tab==='leaks')loadLeaks(); else loadSettings();
 }
 
@@ -425,7 +593,7 @@ function doImport(){
       const r=await api('/api/import',{method:'POST',body:JSON.stringify({pw,b64})});
       const d=await r.json();
       if(!r.ok){toast(d.error||t('imp_fail'));return;}
-      toast(t('imported_n',d.imported,d.updated)); loadSecrets();
+      toast(t('imported_n',d.imported,d.updated)); refreshFilterOptions(); loadSecrets();
     });
   };
   rd.readAsArrayBuffer(f);
@@ -477,7 +645,7 @@ async function doScanImport(){
   const r=await (await api('/api/scan/import',{method:'POST',body:JSON.stringify({
     path,history:$('#sc_hist').checked,names,
     project:$('#sc_project').value.trim(),environment:$('#sc_environment').value.trim()})})).json();
-  closeModal(); toast(t('scan_imported',r.imported,r.skipped)); loadSecrets();
+  closeModal(); toast(t('scan_imported',r.imported,r.skipped)); refreshFilterOptions(); loadSecrets();
 }
 
 // ---------- password/secret uretici (runtime, tarayicida crypto) ----------
@@ -523,32 +691,25 @@ function openGen(){
   genOpts(); regen();
 }
 
-// ---------- deploy: secret'ları hedef formatına render et (env / AWS / k8s / ...) ----------
-const DEPLOY_TARGETS=['dotenv','export','docker','json','k8s','aws-secrets','aws-ssm','github'];
-function openDeploy(){
-  const cur=n=>$('#f'+n)?$('#f'+n).value:'';
-  const body=`<div class="grid">
-    <div class="field"><label class="fld">${t('deploy_target')}</label>
+// ---------- deploy: tek secret'i hedef ortama (env/AWS/k8s/github…) gonderecek komutu uret ----------
+const DEPLOY_TARGETS=['export','dotenv','docker','json','k8s','aws-secrets','aws-ssm','github'];
+let _dpId=null;
+function openDeploy(id){
+  _dpId=id;
+  const body=`<div class="field"><label class="fld">${t('deploy_target')}</label>
       <select id="dp_target" onchange="doDeploy()">${DEPLOY_TARGETS.map(x=>`<option>${x}</option>`).join('')}</select></div>
-    <div class="field"><label class="fld">project</label><input id="dp_project" value="${esc(cur('project'))}" oninput="doDeploy()" ${NOPM}></div>
-    <div class="field"><label class="fld">environment</label><input id="dp_environment" value="${esc(cur('environment'))}" oninput="doDeploy()" ${NOPM}></div>
-    <div class="field"><label class="fld">tenant</label><input id="dp_tenant" value="${esc(cur('tenant'))}" oninput="doDeploy()" ${NOPM}></div>
-    <div class="field"><label class="fld">repo</label><input id="dp_repo" value="${esc(cur('repo'))}" oninput="doDeploy()" ${NOPM}></div>
-    </div>
     <div class="field"><label class="fld">${t('deploy_result')}</label>
-      <textarea id="dp_out" readonly style="min-height:190px"></textarea>
-      <button class="ghost" style="margin-top:6px" onclick="doCopy($('#dp_out').value)">📋</button></div>`;
+      <textarea id="dp_out" class="mono" readonly style="min-height:200px"></textarea>
+      <button class="ghost" style="margin-top:6px" onclick="doCopy($('#dp_out').value)">📋 ${t('copy')||'copy'}</button></div>`;
   modal('🚀 '+t('deploy_title'),body,[{x:t('close'),p:1,f:closeModal}]);
   doDeploy();
 }
 let _dpSeq=0;
 async function doDeploy(){
   const seq=++_dpSeq;
-  const b={target:$('#dp_target').value,tenant:$('#dp_tenant').value.trim(),project:$('#dp_project').value.trim(),
-    environment:$('#dp_environment').value.trim(),repo:$('#dp_repo').value.trim()};
-  const r=await (await api('/api/deploy',{method:'POST',body:JSON.stringify(b)})).json();
+  const r=await (await api('/api/deploy',{method:'POST',body:JSON.stringify({id:_dpId,target:$('#dp_target').value})})).json();
   if(seq!==_dpSeq)return;   // eski (yaris) yaniti yoksay
-  const out=$('#dp_out'); if(out)out.value=r.text||'(no match)';
+  const out=$('#dp_out'); if(out)out.value=r.text||'—';
 }
 
 // ---------- grid: sort / resize / kolon gizle-göster (tüm tablolar) ----------
@@ -588,45 +749,75 @@ function gridColsMenu(id){
   const st=gridState(id);
   const body=gridHeads(id).map((h,i)=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0">
     <input type="checkbox" ${st.hidden.has(i)?'':'checked'} onchange="gridToggle('${id}',${i},this.checked)" style="width:auto">
-    ${esc(h.textContent.replace(/[▲▼]/g,'').trim())||'#'+ (i+1)}</label>`).join('');
+    ${esc(h.textContent.replace(/[▲▼⚙]/g,'').trim())||'#'+ (i+1)}</label>`).join('');
   modal('⋮ '+t('columns'),body,[{x:t('close'),p:1,f:closeModal}]);
 }
 function gridToggle(id,i,show){ const st=gridState(id); show?st.hidden.delete(i):st.hidden.add(i);
   localStorage.setItem('gh_'+id,JSON.stringify([...st.hidden])); gridApply(id); }
 
 // ---------- secrets ----------
-let _dt=null; function debouncedLoad(){ clearTimeout(_dt); _dt=setTimeout(loadSecrets,250); }
+let _dt=null; function debouncedLoad(){ clearTimeout(_dt); SPAGE=1; _dt=setTimeout(loadSecrets,250); }
 async function loadSecrets(){
   const p=new URLSearchParams();
   if($('#q').value)p.set('q',$('#q').value);
-  ['type','tenant','project','environment','repo'].forEach(k=>{const v=$('#f'+k).value;if(v)p.set(k,v);});
-  const rows=await (await api('/api/secrets?'+p)).json();
-  DIMS.forEach(d=>fillDim(rows,d));
-  $('#srows').innerHTML=rows.map(e=>`
+  FDIMS.forEach(k=>{ if(FILT[k].size)p.set(k,[...FILT[k]].join(',')); });   // coklu secim -> virgullu
+  SROWS=await (await api('/api/secrets?'+p)).json();
+  renderSecretsPage();
+}
+function renderSecretsPage(){
+  const rows=SROWS, total=rows.length, pages=Math.max(1,Math.ceil(total/SPAGE_SIZE));
+  if(SPAGE>pages)SPAGE=pages;
+  const slice=rows.slice((SPAGE-1)*SPAGE_SIZE,SPAGE*SPAGE_SIZE);
+  const L=t; // kisalt
+  $('#srows').innerHTML=slice.map(e=>`
     <tr>
-      <td class="mono"><b>${esc(e.name)}</b>${e.url?` <a href="${esc(e.url)}" target="_blank">↗</a>`:''}</td>
-      <td><span class="type-badge t-${e.type}">${e.type}</span></td>
-      <td class="mut mono">${DIMS.map(d=>esc(e[d]||'*')).join(' / ')}</td>
-      <td>${(e.tags||[]).map(tagChip).join('')}</td>
-      <td class="mut">${fmtTs(e.updated)}</td>
-      <td class="mut" style="font-size:12px">${e.access?fmtTs(e.access.ts)+' '+tagChip(e.access.source)+(e.access.actor?' '+esc(e.access.actor):''):t('never')}</td>
-      <td><div class="rowact">
-        <button class="ghost" title="${t('view')}" onclick="viewSecret('${e.id}')">👁</button>
-        <button class="ghost" title="${t('edit')}" onclick="openEditor('${e.id}')">✏️</button>
-        <button class="ghost" title="${t('del')}" onclick="delSecret('${e.id}','${esc(e.name)}')">🗑</button>
-      </div></td></tr>`).join('') || `<tr><td colspan="7" class="mut" style="text-align:center;padding:30px">${t('no_records')}</td></tr>`;
-  $('#scount').textContent=rows.length+' '+t('records');
-  regrid('secrets');
+      <td class="mono" data-label="${L('th_name')}"><b>${esc(e.name)}</b>${e.url?` <a href="${esc(e.url)}" target="_blank">↗</a>`:''}</td>
+      <td data-label="${L('th_type')}"><span class="type-badge t-${e.type}">${e.type}</span></td>
+      <td class="mut mono" data-label="${L('th_scope')}">${DIMS.map(d=>esc(e[d]||'*')).join(' / ')}</td>
+      <td data-label="${L('th_tags')}">${(e.tags||[]).map(tagChip).join('')}</td>
+      <td class="mut" data-label="${L('th_updated')}">${fmtTs(e.updated)}</td>
+      <td class="mut" style="font-size:12px" data-label="${L('th_access')}">${e.access?fmtTs(e.access.ts)+' '+tagChip(e.access.source)+(e.access.actor?' '+esc(e.access.actor):''):L('never')}</td>
+      <td data-label=""><div class="rowact">
+        <button class="ghost" title="${L('view')}" onclick="viewSecret('${e.id}')">👁</button>
+        <button class="ghost" title="${L('more')}" onclick="rowMenu(event,'${e.id}','${esc(e.name)}')">⋮</button>
+      </div></td></tr>`).join('') || `<tr><td colspan="7" class="mut" style="text-align:center;padding:30px">${L('no_records')}</td></tr>`;
+  $('#scount').textContent=total+' '+L('records');
+  renderPager('#spager_bot',pages,total);
+  regrid('secrets'); measureSticky();
 }
-function fillDim(rows,dim){
-  const sel=$('#f'+dim),cur=sel.value;
-  const vals=[...new Set(rows.map(e=>e[dim]).filter(Boolean))].sort();
-  sel.innerHTML=`<option value="">${t('all')} · ${dim}</option>`+vals.map(v=>`<option ${v===cur?'selected':''}>${esc(v)}</option>`).join('');
+function rowMenu(ev,id,name){
+  ev.stopPropagation(); closeRowMenu();
+  const m=document.createElement('div'); m.className='rowmenu'; m.id='rowmenu';
+  m.innerHTML=`<button onclick="closeRowMenu();openEditor('${id}')">✏️ ${t('edit')}</button>
+    <button onclick="closeRowMenu();openDeploy('${id}')">${t('deploy_btn')}</button>
+    <button class="danger" onclick="closeRowMenu();delSecret('${id}','${esc(name)}')">🗑 ${t('del')}</button>`;
+  document.body.appendChild(m);
+  const r=ev.currentTarget.getBoundingClientRect();
+  m.style.top=(window.scrollY+r.bottom+4)+'px';
+  m.style.left=(window.scrollX+r.right-m.offsetWidth)+'px';
 }
+function closeRowMenu(){ const m=$('#rowmenu'); if(m)m.remove(); }
+document.addEventListener('click',closeRowMenu);
+const PAGE_SIZES=[10,25,50,100];
+function renderPager(sel,pages,total){
+  const el=$(sel); if(!el)return;
+  const sizesel=`<span class="pagesize">${t('per_page')} <select onchange="setPageSize(this.value)">${PAGE_SIZES.map(n=>`<option ${n===SPAGE_SIZE?'selected':''}>${n}</option>`).join('')}</select></span>`;
+  // secili sayfa etrafinda +-2 pencere
+  const win=[]; for(let i=Math.max(1,SPAGE-2);i<=Math.min(pages,SPAGE+2);i++)win.push(i);
+  const nav = pages<=1 ? '' :
+    `<button ${SPAGE<=1?'disabled':''} onclick="gotoPage(${SPAGE-1})">${t('prev')}</button>`
+    +(win[0]>1?`<button class="pg" onclick="gotoPage(1)">1</button><span class="mut">…</span>`:'')
+    +win.map(i=>`<button class="pg ${i===SPAGE?'active':''}" onclick="gotoPage(${i})">${i}</button>`).join('')
+    +(win[win.length-1]<pages?`<span class="mut">…</span><button class="pg" onclick="gotoPage(${pages})">${pages}</button>`:'')
+    +`<button ${SPAGE>=pages?'disabled':''} onclick="gotoPage(${SPAGE+1})">${t('next')}</button>`;
+  el.innerHTML=nav+sizesel;
+}
+function setPageSize(v){ SPAGE_SIZE=parseInt(v)||25; localStorage.setItem('concealer_psize',SPAGE_SIZE); SPAGE=1; renderSecretsPage(); }
+function gotoPage(p){ SPAGE=p; renderSecretsPage(); document.querySelector('#view-secrets').scrollIntoView({block:'start'}); }
 async function delSecret(id,name){
   if(!confirm(t('del_confirm',name)))return;
   const send=async pw=>{ const r=await api('/api/secret/'+id,{method:'DELETE',body:JSON.stringify(pw?{pw}:{})});
-    if(r.status===403){toast(t('wrong_pw'));return;} toast(t('deleted')); loadSecrets(); };
+    if(r.status===403){toast(t('wrong_pw'));return;} toast(t('deleted')); refreshFilterOptions(); loadSecrets(); };
   if((window.CFG&&window.CFG.confirm_ops||[]).includes('delete')) askPw(t('del'),send); else send();
 }
 
@@ -695,7 +886,7 @@ async function saveSecret(id){
     notes:$('#e_notes').value,tags:$('#e_tags').value.split(',').map(s=>s.trim()).filter(Boolean),fields};
   if(!b.name){toast(t('name_req'));return;}
   if(id)await api('/api/secret/'+id,{method:'PUT',body:JSON.stringify(b)}); else await api('/api/secrets',{method:'POST',body:JSON.stringify(b)});
-  closeModal(); toast(id?t('updated'):t('created')); loadSecrets();
+  closeModal(); toast(id?t('updated'):t('created')); refreshFilterOptions(); loadSecrets();
 }
 
 // ---------- audit ----------

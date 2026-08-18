@@ -12,11 +12,18 @@ Audit: keys/audit.log (JSONL, HMAC-zincirli, tamper-evident). Sadece anahtar
 ISIMLERI ve eylemleri tutar, secret DEGERLERINI tutmaz.
 """
 import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse, html, getpass
-import hashlib, hmac, shlex, re, csv, io, tempfile, base64
-from datetime import datetime, timezone
+import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil
+from datetime import datetime, timezone, timedelta
 
+VERSION = "0.4.0"   # 0.x boyunca ilerler; 1.0 = tam canli/yayin surumu icin ayrilmistir
 BASE = os.path.dirname(os.path.realpath(__file__))
-HOME = os.environ.get("CONCEALER_HOME", BASE)
+def _default_home():
+    # Depo checkout'u: vault script'in yaninda yasar → BASE'i koru (mevcut kurulumlar bozulmasin).
+    # Brew/paket kurulumu (BASE salt-okunur) ya da temiz kurulum → kullanici-basi ~/.concealer.
+    if os.path.exists(os.path.join(BASE, "keys")) or os.path.exists(os.path.join(BASE, "secrets.enc.yaml")):
+        return BASE
+    return os.path.expanduser("~/.concealer")
+HOME = os.environ.get("CONCEALER_HOME", _default_home())
 FILE = os.environ.get("CONCEALER_FILE", os.path.join(HOME, "secrets.enc.yaml"))
 KEY  = os.environ.get("CONCEALER_KEY",  os.path.join(HOME, "keys", "age-key.txt"))
 BACKUP   = os.path.join(HOME, "keys", "age-key.txt.age")
@@ -26,6 +33,7 @@ AUDITKEY = os.path.join(HOME, "keys", "audit.key")
 AUDITLOG = os.path.join(HOME, "keys", "audit.log")
 AUDITHEAD= os.path.join(HOME, "keys", "audit.head")   # son satir capasi (kuyruk-kirpma tespiti)
 RECOVERY = os.path.join(HOME, "keys", "recovery.json")# recovery kod hash'leri + kod-sarmali age key
+AGENTS   = os.path.join(HOME, "keys", "agents.json")  # unlock token hash'leri + token-sarmali age key
 CONFIG   = os.path.join(HOME, "keys", "config.json")
 SOPSCFG  = os.path.join(HOME, ".sops.yaml")
 WEBUI    = os.path.join(BASE, "webui.html")
@@ -50,11 +58,28 @@ CFG = load_cfg()
 
 # ---- secret tipleri: alan sablonlari (secret alanlar maskelenir) ----
 TYPES = {
+    # --- developer / infra ---
     "api_key":  [("value", "secret")],
+    "access_token": [("token", "secret"), ("refresh_token", "secret"), ("expires", "plain"), ("scopes", "plain")],
+    "oauth":    [("client_id", "plain"), ("client_secret", "secret"), ("auth_url", "plain"), ("token_url", "plain"), ("scopes", "plain")],
+    "jwt":      [("token", "secret"), ("issuer", "plain"), ("audience", "plain"), ("expires", "plain")],
+    "ssh_key":  [("private_key", "secret"), ("public_key", "plain"), ("passphrase", "secret"), ("host", "plain"), ("user", "plain")],
+    "certificate": [("certificate", "plain"), ("private_key", "secret"), ("chain", "plain"), ("expires", "plain")],
     "database": [("host", "plain"), ("port", "plain"), ("database", "plain"),
                  ("schema", "plain"), ("username", "plain"), ("password", "secret"),
                  ("auth_type", "plain"), ("jdbc_url", "plain")],
+    "server":   [("host", "plain"), ("port", "plain"), ("username", "plain"), ("password", "secret"), ("ssh_key", "secret")],
     "website":  [("web_url", "plain"), ("username", "plain"), ("password", "secret")],
+    "login":    [("web_url", "plain"), ("username", "plain"), ("password", "secret"), ("totp", "secret")],
+    # --- everyday / end-user ---
+    "pin":         [("pin", "secret"), ("label", "plain")],   # telefon pin, kapi pin, kart pin…
+    "wifi":        [("ssid", "plain"), ("password", "secret"), ("security", "plain")],
+    "credit_card": [("cardholder", "plain"), ("number", "secret"), ("expiry", "plain"), ("cvv", "secret"), ("pin", "secret"), ("brand", "plain")],
+    "bank_account": [("bank", "plain"), ("account_holder", "plain"), ("iban", "secret"), ("account_number", "secret"), ("swift", "plain")],
+    "passport":    [("full_name", "plain"), ("number", "secret"), ("country", "plain"), ("expiry", "plain")],
+    "id_card":     [("full_name", "plain"), ("number", "secret"), ("expiry", "plain")],
+    "membership":  [("provider", "plain"), ("member_id", "plain"), ("password", "secret")],
+    "secure_note": [("note", "secret")],
     "custom":   [],   # serbest alanlar
 }
 _SECRETY = re.compile(r"pass|secret|token|value|key|credential|apikey", re.I)
@@ -63,7 +88,13 @@ def field_is_secret(typ, fname):
         if f == fname: return k == "secret"
     return bool(_SECRETY.search(fname))
 
-def _env(): e = dict(os.environ); e["SOPS_AGE_KEY_FILE"] = KEY; return e
+_KEY_CACHE = None   # cozulmus age private key (process-omru bellek cache; diske yazilmaz)
+def _env():
+    e = dict(os.environ)
+    k = _unlock_key()               # key metni (hardened) ya da None (eski: duz metin dosya)
+    if k: e["SOPS_AGE_KEY"] = k     # sops'a DOSYA yerine bellekten ver → diskte duz metin key yok
+    else: e["SOPS_AGE_KEY_FILE"] = KEY
+    return e
 def now_iso(): return datetime.now(timezone.utc).isoformat(timespec="seconds")
 def mask(v):
     v = str(v); return v[:4] + "…" + v[-2:] if len(v) > 8 else ("•" * len(v) or "—")
@@ -100,7 +131,7 @@ def norm(e):
 
 def secs(d): return d["secrets"]
 def by_id(d, sid): return next((e for e in secs(d) if e["id"] == sid), None)
-def matches(e, sel): return all(e.get(k, "") == v for k, v in sel.items())
+def matches(e, sel): return all(str(e.get(k, "")) in v.split(",") for k, v in sel.items())  # v = tekli veya virgullu coklu secim
 def label(e): return "/".join(e.get(k, "") or "*" for k in DIMS)
 
 def filt(d, sel=None, tag=None, term=None, typ=None):
@@ -108,7 +139,7 @@ def filt(d, sel=None, tag=None, term=None, typ=None):
     for e in secs(d):
         if sel and not matches(e, sel): continue
         if tag and tag not in e["tags"]: continue
-        if typ and e["type"] != typ: continue
+        if typ and e["type"] not in typ.split(","): continue
         if term:
             hay = json.dumps({k: e.get(k) for k in DIMS + ["name", "tags", "url", "notes", "type"]}).lower()
             hay += " " + " ".join(e["fields"].keys()).lower()
@@ -407,17 +438,6 @@ def _gen_codes(n=RECV_N):
         return "-".join(raw[i:i+4] for i in range(0, 20, 4))
     return [one() for _ in range(n)]
 
-def _age_wrap(pw):
-    """KEY dosyasini pw ile sifrele, ciphertext bytes dondur."""
-    tout = tempfile.NamedTemporaryFile(delete=False, suffix=".age").name
-    try:
-        rc, err = _age_pw(["-p", "-o", tout, KEY], pw, confirm=True)
-        if rc: raise RuntimeError(err.strip() or "age wrap hatasi")
-        return open(tout, "rb").read()
-    finally:
-        try: os.remove(tout)
-        except OSError: pass
-
 def _age_unwrap(blob, pw):
     """kod-sarmali key ciphertext'i coz, age key metnini dondur."""
     tin = tempfile.NamedTemporaryFile(delete=False, suffix=".age"); tout = tin.name + ".key"
@@ -431,9 +451,9 @@ def _age_unwrap(blob, pw):
             try: os.remove(p)
             except OSError: pass
 
-def write_recovery(codes):
+def write_recovery(codes, keytext):
     salt = os.urandom(16)
-    entries = [{"h": _scrypt(c, salt).hex(), "blob": base64.b64encode(_age_wrap(c)).decode()} for c in codes]
+    entries = [{"h": _scrypt(c, salt).hex(), "blob": base64.b64encode(_age_enc_bytes(keytext, c)).decode()} for c in codes]
     with open(RECOVERY, "w") as f: json.dump({"salt": salt.hex(), "codes": entries}, f)
     os.chmod(RECOVERY, 0o600)
 
@@ -463,6 +483,106 @@ def _print_codes(codes):
     for i, c in enumerate(codes, 1): print(f"   {i}.  {c}")
     print(bar + "\n")
 
+# ---------------- key-at-rest + unlock token'lari ----------------
+# age private key diskte DUZ METIN durmaz: yalniz BACKUP (master pw ile sifreli) ve
+# opsiyonel token/kod-sarmali kopyalar. sops'a bellekten SOPS_AGE_KEY ile verilir.
+# Token = uzun-omurlu (agent) ya da TTL'li (insan/cli); DEGERI sadece istemci env'inde
+# (CONCEALER_TOKEN) yasar, diske yalniz scrypt hash + token-sarmali key yazilir.
+TOKEN_TTL = 8 * 3600   # insan/cli token'i icin varsayilan yasam suresi (agent token'i suresiz)
+def _age_enc_bytes(data, pw):
+    """rasgele bytes'i pw ile age -p sifrele, ciphertext dondur."""
+    tin = tempfile.NamedTemporaryFile(delete=False)
+    tin.write(data if isinstance(data, bytes) else data.encode()); tin.close()
+    tout = tin.name + ".age"
+    try:
+        rc, err = _age_pw(["-p", "-o", tout, tin.name], pw, confirm=True)
+        if rc: raise RuntimeError(err.strip() or "age enc hatasi")
+        return open(tout, "rb").read()
+    finally:
+        for p in (tin.name, tout):
+            try: os.remove(p)
+            except OSError: pass
+
+def key_from_master(pw):
+    """BACKUP'i master pw ile coz → age key metni (yanlis pw'de None). Hem dogrular hem key verir."""
+    if not os.path.exists(BACKUP): return None
+    tout = tempfile.NamedTemporaryFile(delete=False, suffix=".key").name
+    try:
+        rc, _ = _age_pw(["-d", "-o", tout, BACKUP], pw)
+        return open(tout).read() if rc == 0 else None
+    finally:
+        try: os.remove(tout)
+        except OSError: pass
+
+def _write_backup(keytext, pw):
+    """keytext'i pw ile sifreleyip BACKUP'a yaz (duz metin key dosyasina ihtiyac duymaz)."""
+    tk = tempfile.NamedTemporaryFile(delete=False, suffix=".key")
+    tk.write(keytext.encode() if isinstance(keytext, str) else keytext); tk.close()
+    tmp = BACKUP + ".new"
+    try:
+        if os.path.exists(tmp): os.remove(tmp)
+        rc, err = _age_pw(["-p", "-o", tmp, tk.name], pw, confirm=True)
+        if rc: raise RuntimeError(err.strip() or "yedek olusturulamadi")
+        os.replace(tmp, BACKUP)
+    finally:
+        try: os.remove(tk.name)
+        except OSError: pass
+
+def _agents_data():
+    return json.load(open(AGENTS)) if os.path.exists(AGENTS) else None
+def _save_agents(d):
+    with open(AGENTS, "w") as f: json.dump(d, f)
+    os.chmod(AGENTS, 0o600)
+
+def mint_token(keytext, label, source="agent", ttl=None):
+    """Yeni unlock token uret: hash + token-sarmali key sakla, token DEGERINI dondur (bir kez)."""
+    d = _agents_data() or {"salt": os.urandom(16).hex(), "tokens": []}
+    tok = _secrets.token_urlsafe(24)
+    kh = _scrypt(tok, bytes.fromhex(d["salt"])).hex()
+    blob = base64.b64encode(_age_enc_bytes(keytext, tok)).decode()
+    exp = (datetime.now(timezone.utc) + timedelta(seconds=ttl)).isoformat(timespec="seconds") if ttl else None
+    d["tokens"] = [t for t in d["tokens"] if t["label"] != label]   # ayni label → degistir
+    d["tokens"].append({"label": label, "source": source, "kh": kh, "blob": blob,
+                        "created": now_iso(), "expires": exp, "revoked": False})
+    _save_agents(d); return tok
+
+def resolve_token(tok):
+    """Gecerli/suresi-dolmamis token'i coz → age key metni; yoksa None."""
+    d = _agents_data()
+    if not d or not tok: return None
+    kh = _scrypt(tok.strip(), bytes.fromhex(d["salt"])).hex()
+    now = now_iso()
+    for e in d["tokens"]:
+        if e.get("revoked"): continue
+        if e.get("expires") and now > e["expires"]: continue
+        if hmac.compare_digest(e["kh"], kh):
+            try: return _age_unwrap(base64.b64decode(e["blob"]), tok.strip()).decode()
+            except Exception: return None
+    return None
+
+def revoke_token(label):
+    d = _agents_data()
+    if not d: return 0
+    n = len(d["tokens"]); d["tokens"] = [] if label == "all" else [t for t in d["tokens"] if t["label"] != label]
+    _save_agents(d); return n - len(d["tokens"])
+
+def _unlock_key():
+    """age private key metnini coz. Sirasiyla: bellek cache → CONCEALER_TOKEN →
+    (eski vault'ta duz metin dosya=None) → TTY'de master pw. Bulunamazsa hata."""
+    global _KEY_CACHE
+    if _KEY_CACHE: return _KEY_CACHE
+    tok = os.environ.get("CONCEALER_TOKEN")
+    if tok:
+        k = resolve_token(tok)
+        if k: _KEY_CACHE = k; return k
+        sys.exit("CONCEALER_TOKEN gecersiz/suresi dolmus/iptal. Yeni token: concealer unlock")
+    if os.path.exists(KEY): return None   # eski (hardened degil) vault: sops dosyadan okur
+    if sys.stdin.isatty():                # etkilesimli: master pw ile ac (tek process icin cache'le)
+        k = key_from_master(getpass.getpass("Master password (unlock): "))
+        if not k: sys.exit("parola yanlis.")
+        _KEY_CACHE = k; return k
+    sys.exit("kilitli: CONCEALER_TOKEN yok. Insan: 'concealer unlock', ajan: 'concealer agent register <ad>'.")
+
 def detect(dim):
     if dim in ("repo", "project"):
         r = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
@@ -481,71 +601,124 @@ def init(force=False):
     os.chmod(KEY, 0o600)
     pub = next(w for w in (r.stderr + r.stdout).split() if w.startswith("age1"))
     with open(PUBKEY, "w") as f: f.write(pub + "\n")
+    keytext = open(KEY).read()
     pw = _ask_new_password()
     rc, err = _age_pw(["-p", "-o", BACKUP, KEY], pw, confirm=True)
     if rc: sys.exit(f"parolali yedek olusturulamadi: {err.strip()}")
     write_master(pw); _audit_key()
-    for f in (RECOVERY, AUDITHEAD):   # force yeniden-kurulumda eski kalintiyi temizle
+    for f in (RECOVERY, AUDITHEAD, AGENTS):   # force yeniden-kurulumda eski kalintiyi temizle
         if os.path.exists(f): os.remove(f)
-    codes = _gen_codes(); write_recovery(codes)
+    codes = _gen_codes(); write_recovery(codes, keytext)
     with open(SOPSCFG, "w") as f:
         f.write("creation_rules:\n  - path_regex: \\.enc\\.(yaml|yml|json)$\n" f'    age: "{pub}"\n')
     save({"secrets": []}); audit("init", source="cli")
     with open(os.path.join(HOME, ".gitignore"), "w") as f:
-        f.write("keys/age-key.txt\nkeys/audit.key\nkeys/audit.head\nkeys/recovery.json\n")
+        f.write("keys/age-key.txt\nkeys/audit.key\nkeys/audit.head\nkeys/recovery.json\nkeys/agents.json\n")
     print(f"kuruldu: {HOME}\n  public key: {pub}\n  web: concealer web")
     _print_codes(codes)
+    # key-at-rest: age private key'i diskten kaldir (yalniz sifreli BACKUP kalir).
+    os.remove(KEY); audit("harden", source="cli")
+    tok = mint_token(keytext, "cli", "cli", ttl=TOKEN_TTL)
+    print("KEY-AT-REST acik: age private key artik diskte DUZ METIN degil.")
+    print("CLI icin baslangic token'i (shell'ine ekle, ~%dh gecerli):" % (TOKEN_TTL // 3600))
+    print(f'  export CONCEALER_TOKEN={tok}')
+    print("  (yenilemek: eval \"$(concealer unlock)\" | ajan icin: concealer agent register <ad>)")
 
 def passwd():
-    if not os.path.exists(KEY): sys.exit("once 'concealer init' calistir.")
-    # 1. faktor: mevcut master password. Tek basina yetmez → devralmayi zorlastir.
-    cur = getpass.getpass("Mevcut master password: ")
-    if not verify_master(cur): sys.exit("mevcut parola yanlis.")
-    # 2. faktor: gecerli bir recovery kodu (tuketilir).
+    if not os.path.exists(BACKUP): sys.exit("once 'concealer init' calistir.")
+    # 1. faktor: mevcut master password (decrypt ile hem dogrula hem key'i al).
+    keytext = key_from_master(getpass.getpass("Mevcut master password: "))
+    if not keytext: sys.exit("mevcut parola yanlis.")
+    # 2. faktor: gecerli bir recovery kodu (tuketilir) — master pw tek basina devralmasin.
     d = _recovery_data()
     if not d or not d["codes"]:
         sys.exit("recovery kodu gerekli ama kalmadi/yok.\n"
                  "  once yeni set uret:  concealer recovery   (master password ister)")
-    code = getpass.getpass("Recovery kodu (2. faktor): ")
-    i = recovery_index(code)
+    i = recovery_index(getpass.getpass("Recovery kodu (2. faktor): "))
     if i is None: sys.exit("gecersiz recovery kodu.")
-    pw = _ask_new_password(); tmp = BACKUP + ".new"
-    if os.path.exists(tmp): os.remove(tmp)
-    rc, err = _age_pw(["-p", "-o", tmp, KEY], pw, confirm=True)
-    if rc: sys.exit(f"hata: {err.strip()}")
-    os.replace(tmp, BACKUP); write_master(pw); consume_recovery(i); audit("passwd", source="cli")
+    pw = _ask_new_password()
+    _write_backup(keytext, pw); write_master(pw); consume_recovery(i); audit("passwd", source="cli")
     left = len(_recovery_data()["codes"])
     print(f"master password guncellendi. kalan recovery kodu: {left}"
           + ("\n  UYARI: kod kalmadi → 'concealer recovery' ile yenile." if left == 0 else ""))
 
 def recover():
-    """Master password unutuldu: recovery kodu ile age key'i geri getir + yeni parola ata."""
+    """Master password unutuldu: recovery kodu ile age key'i coz + yeni parola ata."""
     if not os.path.exists(RECOVERY): sys.exit("recovery.json yok; bu vault recovery kodu ile kurulmamis.")
     code = getpass.getpass("Recovery kodu: ")
     i = recovery_index(code)
     if i is None: sys.exit("gecersiz recovery kodu.")
     blob = base64.b64decode(_recovery_data()["codes"][i]["blob"])
-    try: keytext = _age_unwrap(blob, code.strip())
+    try: keytext = _age_unwrap(blob, code.strip()).decode()
     except Exception as ex: sys.exit(f"cozme hatasi: {ex}")
-    os.makedirs(os.path.dirname(KEY), exist_ok=True)
-    with open(KEY, "wb") as f: f.write(keytext)      # kayip age key'i geri yaz
-    os.chmod(KEY, 0o600)
-    pw = _ask_new_password(); tmp = BACKUP + ".new"
-    if os.path.exists(tmp): os.remove(tmp)
-    rc, err = _age_pw(["-p", "-o", tmp, KEY], pw, confirm=True)
-    if rc: sys.exit(f"yedek olusturulamadi: {err.strip()}")
-    os.replace(tmp, BACKUP); write_master(pw); consume_recovery(i); audit("recover", source="cli")
+    if os.path.exists(KEY):                       # eski vault: kayip key dosyasini geri yaz
+        with open(KEY, "w") as f: f.write(keytext)
+        os.chmod(KEY, 0o600)
+    pw = _ask_new_password()
+    _write_backup(keytext, pw); write_master(pw); consume_recovery(i); audit("recover", source="cli")
     left = len(_recovery_data()["codes"])
     print(f"kurtarildi; yeni master password ayarlandi. kalan recovery kodu: {left}"
           + ("\n  UYARI: kod kalmadi → 'concealer recovery' ile yenile." if left == 0 else ""))
+    if not os.path.exists(KEY):
+        global _KEY_CACHE; _KEY_CACHE = keytext
+        print("  export CONCEALER_TOKEN=%s" % mint_token(keytext, "cli", "cli", ttl=TOKEN_TTL))
 
 def recovery_regen():
     """Yeni recovery kod seti uret (eskiler gecersiz olur). Master password ister."""
-    if not os.path.exists(KEY): sys.exit("once 'concealer init' calistir.")
-    pw = getpass.getpass("Master password: ")
-    if not verify_master(pw): sys.exit("parola yanlis.")
-    codes = _gen_codes(); write_recovery(codes); audit("recovery_regen", source="cli")
+    if not os.path.exists(BACKUP): sys.exit("once 'concealer init' calistir.")
+    keytext = key_from_master(getpass.getpass("Master password: "))
+    if not keytext: sys.exit("parola yanlis.")
+    codes = _gen_codes(); write_recovery(codes, keytext); audit("recovery_regen", source="cli")
     _print_codes(codes)
+
+def unlock():
+    """Insan: master pw ile TTL'li CLI token uret. stdout=SADECE export satiri (eval icin)."""
+    if not os.path.exists(BACKUP): sys.exit("once 'concealer init' calistir.")
+    keytext = key_from_master(getpass.getpass("Master password: "))
+    if not keytext: sys.exit("parola yanlis.")
+    tok = mint_token(keytext, "cli", "cli", ttl=TOKEN_TTL); audit("unlock", source="cli")
+    sys.stderr.write(f"CLI token uretildi (~{TOKEN_TTL // 3600}h). Calistir:  eval \"$(concealer unlock)\"\n")
+    print(f"export CONCEALER_TOKEN={tok}")
+
+def agent_cmd(a):
+    """Ajan token'lari: register/list/revoke. Ajan bir kez kaydolur, bir daha parola sormaz."""
+    sub = a[0] if a else "list"
+    if sub == "register":
+        if len(a) < 2: sys.exit("kullanim: concealer agent register <ad>")
+        keytext = key_from_master(getpass.getpass("Master password: "))
+        if not keytext: sys.exit("parola yanlis.")
+        tok = mint_token(keytext, a[1], "agent", ttl=None); audit("agent_register", key=a[1], source="cli")
+        print(f"agent '{a[1]}' kaydedildi (suresiz, iptal edilebilir token).")
+        print("MCP sunucu env'ine (or. .mcp.json / claude config) ekle:")
+        print(f'  "env": {{ "CONCEALER_TOKEN": "{tok}" }}')
+        print(f"  (iptal: concealer agent revoke {a[1]})")
+    elif sub == "revoke":
+        if len(a) < 2: sys.exit("kullanim: concealer agent revoke <ad|all>")
+        n = revoke_token(a[1]); audit("agent_revoke", key=a[1], source="cli"); print(f"iptal edilen token: {n}")
+    else:
+        d = _agents_data()
+        if not d or not d["tokens"]: print("token yok."); return
+        for t in d["tokens"]:
+            st = "revoked" if t["revoked"] else (("expires " + t["expires"]) if t["expires"] else "suresiz")
+            print(f"  {t['label']:16} {t['source']:6} {st:30} created {t['created']}")
+
+def harden():
+    """Eski (duz metin key'li) vault'u key-at-rest'e gecir: age-key.txt'i kaldir, CLI token uret."""
+    if not os.path.exists(BACKUP): sys.exit("once 'concealer init' calistir.")
+    if not os.path.exists(KEY): print("zaten hardened (diskte duz metin key yok)."); return
+    keytext = key_from_master(getpass.getpass("Master password: "))
+    if not keytext: sys.exit("parola yanlis.")
+    os.remove(KEY); audit("harden", source="cli")
+    gi = os.path.join(HOME, ".gitignore")           # eski init agents.json satirini yazmamis olabilir
+    try:
+        cur = open(gi).read() if os.path.exists(gi) else ""
+        miss = [ln for ln in ("keys/agents.json", "keys/recovery.json", "keys/audit.head") if ln not in cur]
+        if miss:
+            with open(gi, "a") as f: f.write("\n".join(miss) + "\n")
+    except OSError: pass
+    tok = mint_token(keytext, "cli", "cli", ttl=TOKEN_TTL)
+    print("hardened: age private key diskten kaldirildi (yalniz sifreli yedek kaldi).")
+    print(f"  export CONCEALER_TOKEN={tok}   (~{TOKEN_TTL // 3600}h; ajan: concealer agent register <ad>)")
 
 # ---------------- injection ----------------
 def collect_secrets(target, d=None):
@@ -580,6 +753,18 @@ def deploy_render(scope, target):
     """Kapsama uyan secret'lari secili deploy hedefi icin metne render eder (komut/manifest uretir)."""
     kv, d = collect_secrets(scope)
     stem = "-".join(scope.get(x) for x in DIMS if scope.get(x)) or "concealer"
+    return _render_target(kv, stem, target)
+
+def deploy_render_one(e, target):
+    """Tek bir secret'i secili deploy hedefi icin render eder (row-level Deploy)."""
+    if e["type"] == "api_key":
+        kv = {e["name"]: str(e["fields"].get("value", ""))}
+    else:
+        kv = {f'{e["name"]}_{fn.upper()}': str(fv) for fn, fv in e["fields"].items()}
+    stem = "-".join(e.get(x) for x in DIMS if e.get(x)) or e["name"]
+    return _render_target(kv, stem, target)
+
+def _render_target(kv, stem, target):
     if target == "dotenv": return "\n".join(f"{k}={v}" for k, v in kv.items())
     if target == "export": return "\n".join(f"export {k}={shlex.quote(v)}" for k, v in kv.items())
     if target == "docker": return " ".join(f"-e {k}={shlex.quote(v)}" for k, v in kv.items())
@@ -622,12 +807,105 @@ def _print(rows):
         print(f"{e['name']:22} {e['type']:9} {e['tenant']:8} {e['project']:12} "
               f"{e['environment']:8} {e['repo']:14} {','.join(e['tags'])}")
 
+HELP = f"""concealer {VERSION} — local-only secret manager (SOPS + age)   ·   alias: cer
+
+USAGE
+  concealer <command> [options]           # ya da kisa: cer <command>
+
+VAULT / KEY
+  init [--force]              yeni vault kur; master parola + 8 recovery kodu + CLI token uretir
+  unlock                      master parola ile insan icin suureli (TTL) token al
+  harden                      eski vault'u sertlestir (duz-metin age key'i diskten kaldir)
+  passwd                      master parolayi degistir (recovery kodu gerektirir)
+  recover                     recovery kodu ile vault'a eris (parola unutuldu)
+  recovery                    recovery kod setini yeniden uret
+  agent register|list|revoke <ad>   ajanlar icin uzun-omurlu, iptal-edilebilir token
+
+SECRETS
+  list [term] [boyutlar] [--tag X] [--type T]     kayitlari listele (maskeli)
+  search <term>              tum alanlarda ara
+  get --name N [boyutlar]    secret degerini yazdir (tek eslesme gerekir)
+  set --name N [--type T] <value | field=val ...> [--tags a,b]   olustur/guncelle
+  rm --name N [boyutlar]     kaydi sil
+  rotate --name N [yeni-deger]   degeri dondur (deger verilmezse rastgele uret)
+  dims                       kullanilan boyut (tenant/project/env/repo) degerlerini goster
+  leaks                      yeniden-kullanilan (paylasilan) secret degerlerini bul
+
+TARAMA / DAGITIM
+  scan <folder> [--import] [--history] [boyutlar]   .env/dosya/git-history'den secret cikar
+  deploy --target <t> [boyutlar]   render et: dotenv|export|docker|json|k8s|aws-secrets|aws-ssm|github
+  run [boyutlar] <cmd...>    secret'lari env'e enjekte edip komutu calistir (deger sizmaz)
+
+TASIMA / DENETIM / ARAYUZ
+  export [file]              parola-korumali .age bundle disari aktar
+  import <bundle.age>        bundle iceri aktar
+  audit [verify]             HMAC-zincirli denetim gunlugu (verify: butunluk kontrolu)
+  config [key [val]]         calisma-zamani ayarlari (idle, confirm_ops)
+  web [port]                 web UI + JSON API sun (varsayilan 8787)
+  mcp                        MCP stdio sunucusu (ajanlar icin; CONCEALER_TOKEN gerekir)
+  version | help             surum / bu yardim
+
+BOYUTLAR (scope) — her komutta filtre/kapsam olarak kullanilir
+  --tenant T  --project P  --env E  --repo R          --name N  --type T
+  Tipler: api_key (varsayilan) · database · website · custom
+
+ORNEKLER
+  # 1) Kur ve token'i al
+  concealer init                                  # ciktidaki 'export CONCEALER_TOKEN=…' satirini calistir
+
+  # 2) Bir API anahtari ekle ve oku
+  cer set --name openai --project web --env prod sk-DUMMY-123
+  cer get --name openai --project web --env prod
+
+  # 3) Veritabani kaydi (coklu alan)
+  cer set --name pg --type database --project web \\
+      host=db.local port=5432 database=app username=app password=sk-DUMMY-pw
+
+  # 4) Bir projeyi tara ve iceri aktar
+  cer scan ./myrepo --history --import --project myrepo --env dev
+
+  # 5) Secret'lari sizdirmadan bir komut calistir
+  cer run --project web --env prod npm run deploy
+
+  # 6) .env olarak render et
+  cer deploy --target dotenv --project web --env prod > .env
+
+  # 7) Web arayuzunu ac
+  cer web 8787            # http://localhost:8787  (master parola ile unlock)
+
+  # 8) Ajan token'i uret ve MCP sunucusunu calistir
+  cer agent register my-agent                     # CONCEALER_TOKEN=… uretir
+  CONCEALER_TOKEN=… cer mcp
+
+ORTAM DEGISKENLERI
+  CONCEALER_HOME   vault dizini (varsayilan: ~/.concealer; depo checkout'unda script yani)
+  CONCEALER_TOKEN  CLI/MCP unlock token'i (init/unlock/agent register uretir)
+  CONCEALER_IDLE   web oturumu bosta-kilit suresi (saniye)
+
+Docs: https://github.com/fxerkan/concealer"""
+
+# harici bagimliliklar; brew formulu bunlari otomatik kurar, ama elle kurulumda net hata verelim.
+_DEPS = {"sops": "sops", "age": "age", "age-keygen": "age", "expect": "expect"}
+def _preflight():
+    missing = sorted({_DEPS[b] for b in _DEPS if not shutil.which(b)})
+    if not missing: return
+    hint = ("brew install " + " ".join(missing)) if shutil.which("brew") else \
+           ("apt/dnf ile kur: " + ", ".join(missing))
+    sys.exit(f"eksik bagimlilik: {', '.join(missing)}\nkur: {hint}\n"
+             "(homebrew ile 'brew install fxerkan/tap/concealer' hepsini birlikte kurar)")
+
 def cli(argv):
     cmd = argv[0] if argv else "help"; a = argv[1:]
+    if cmd in ("version", "--version", "-v"): return print("concealer " + VERSION)
+    if cmd in ("help", "--help", "-h", ""): return print(HELP)
+    _preflight()
     if cmd == "init": return init("--force" in a)
     if cmd == "passwd": return passwd()
     if cmd == "recover": return recover()
     if cmd == "recovery": return recovery_regen()
+    if cmd == "unlock": return unlock()
+    if cmd == "agent": return agent_cmd(a)
+    if cmd == "harden": return harden()
     if cmd == "list":
         tag = _flag(a, "--tag"); sel = _sel(a); typ = sel.pop("type", None)
         _print(filt(load(), sel, tag, a[0] if a else None, typ))
@@ -740,27 +1018,21 @@ def cli(argv):
     elif cmd == "web": serve_web(int(a[0]) if a else 8787)
     elif cmd == "mcp": mcp_stdio()
     else:
-        print("concealer — lokal secret manager (SOPS+age)  ·  kisa alias: cer\n"
-              "  init [--force] | passwd | recover | recovery | web [port] | mcp\n"
-              "  list [term] [--type T --tenant .. --project .. --env .. --repo .. --tag X]\n"
-              "  search <term> | dims | audit [verify] | leaks\n"
-              "  scan <folder> [--import] [--history] [boyutlar]\n"
-              "  export [file] | import <bundle.age> | config [key [val]]\n"
-              "  deploy --target dotenv|export|docker|json|k8s|aws-secrets|aws-ssm|github [boyutlar]\n"
-              "  set --name N [--type T --project P ..] <value|field=val ...> [--tags a,b]\n"
-              "  get/rm/rotate --name N [boyutlar]\n"
-              "  run [--project P --env E ..] <cmd...>\n"
-              "Tipler: api_key, database, website, custom")
+        print(HELP)
 
 # ---------------- Web (SPA + JSON API) ----------------
 _SESSIONS = {}   # token -> last_activity_epoch
+_SESS_KEY = {}   # token -> cozulmus age key metni (hardened vault'ta; bellekte, diske yazilmaz)
 
 def serve_web(port):
     import time
     def valid(tok):
+        global _KEY_CACHE
         t = _SESSIONS.get(tok)
         if not t: return False
-        if time.time() - t > CFG["idle"]: _SESSIONS.pop(tok, None); return False
+        if time.time() - t > CFG["idle"]:   # idle auto-lock: session + bellekteki key temizlenir
+            _SESSIONS.pop(tok, None); _SESS_KEY.pop(tok, None); _KEY_CACHE = None; return False
+        _KEY_CACHE = _SESS_KEY.get(tok)     # bu istek icin key'i cache'e koy (sops bellekten okur)
         return True   # sabit yasam suresi: aktivite TTL'i uzatmaz (hard auto-lock)
     def remaining(tok):
         t = _SESSIONS.get(tok)
@@ -790,7 +1062,7 @@ def serve_web(port):
             u = urllib.parse.urlparse(self.path); path = u.path
             q = {k: v[0] for k, v in urllib.parse.parse_qs(u.query).items()}
             if path == "/" or path == "/index.html":
-                try: page = open(WEBUI, "rb").read().replace(b"__IDLE__", str(CFG["idle"]).encode())
+                try: page = open(WEBUI, "rb").read().replace(b"__IDLE__", str(CFG["idle"]).encode()).replace(b"__VERSION__", VERSION.encode())
                 except FileNotFoundError: page = b"<h1>webui.html bulunamadi</h1>"
                 self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers(); self.wfile.write(page); return
@@ -848,14 +1120,18 @@ def serve_web(port):
             path = urllib.parse.urlparse(self.path).path
             if path == "/api/unlock":
                 pw = self._body().get("pw", "")
-                if verify_master(pw):
+                keytext = key_from_master(pw)          # decrypt hem dogrular hem key'i verir
+                if keytext or verify_master(pw):       # 2. kosul: eski (duz metin key'li) vault
                     tok = _secrets.token_urlsafe(18); _SESSIONS[tok] = time.time()
+                    if keytext: _SESS_KEY[tok] = keytext   # hardened: key'i bellekte session'a bagla
                     audit("unlock", source="web")
                     return self._json({"ok": True}, cookie=f"tok={tok}; HttpOnly; Path=/; SameSite=Strict")
                 audit("unlock_fail", source="web"); return self._json({"ok": False}, 403)
             tok = self._tok()
             if path == "/api/lock":
-                if tok: _SESSIONS.pop(tok, None); audit("lock", source="web")
+                if tok:
+                    _SESSIONS.pop(tok, None); _SESS_KEY.pop(tok, None)
+                    global _KEY_CACHE; _KEY_CACHE = None; audit("lock", source="web")
                 return self._json({"ok": True})
             if not valid(tok or ""): return self._json({"error": "locked"}, 401)
             if path == "/api/secrets":     # create
@@ -901,6 +1177,11 @@ def serve_web(port):
                 return self._json({"ok": True, "imported": nn, "updated": nu})
             if path == "/api/deploy":
                 b = self._body(); target = b.get("target", "dotenv")
+                if b.get("id"):                       # tek secret (row-level deploy)
+                    e = by_id(load(), b["id"])
+                    if not e: return self._json({"error": "yok"}, 404)
+                    audit("deploy", key=e["name"], source="web", detail=f"{target} {label(e)}")
+                    return self._json({"text": deploy_render_one(e, target), "targets": DEPLOY_TARGETS})
                 scope = {dim: b.get(dim, "") for dim in DIMS if b.get(dim)}
                 audit("deploy", source="web", detail=f"{target} {label(scope)}")
                 return self._json({"text": deploy_render(scope, target), "targets": DEPLOY_TARGETS})
@@ -1016,7 +1297,7 @@ def mcp_stdio():
         req = json.loads(line); mid = req.get("id"); m = req.get("method")
         if m == "initialize":
             send({"jsonrpc": "2.0", "id": mid, "result": {"protocolVersion": "2024-11-05",
-                  "capabilities": {"tools": {}}, "serverInfo": {"name": "concealer", "version": "0.4.0"}}})
+                  "capabilities": {"tools": {}}, "serverInfo": {"name": "concealer", "version": VERSION}}})
         elif m == "notifications/initialized": pass
         elif m == "tools/list": send({"jsonrpc": "2.0", "id": mid, "result": {"tools": MCP_TOOLS}})
         elif m == "tools/call":
