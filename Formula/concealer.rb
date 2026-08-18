@@ -12,14 +12,13 @@ class Concealer < Formula
   url "https://github.com/fxerkan/concealer/archive/refs/tags/v0.8.0.tar.gz"
   sha256 "220dbe1e5dac5bf358b2ea969374fa28dd0882310fe2dd479d6515c9b2b71d17"
   license "MIT"
-  version "0.8.0"
 
   # Kullanici sops/age/expect'i AYRICA kurmak zorunda kalmasin — hepsi burada.
   depends_on "age"
   depends_on "expect"
-  depends_on "sops"
   # macOS'ta python3 sistemde var; Linux/temiz kurulumda garanti icin:
   depends_on "python@3.13"
+  depends_on "sops"
 
   def install
     libexec.install "concealer", "webui.html"
