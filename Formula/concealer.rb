@@ -10,7 +10,7 @@ class Concealer < Formula
   desc "Local-only, single-file secret manager over SOPS + age (CLI · Web UI · MCP)"
   homepage "https://github.com/fxerkan/concealer"
   url "https://github.com/fxerkan/concealer/archive/refs/tags/v0.8.0.tar.gz"
-  sha256 "REPLACE_WITH_TARBALL_SHA256" # shasum -a 256 ile hesaplayin (PACKAGING.md)
+  sha256 "220dbe1e5dac5bf358b2ea969374fa28dd0882310fe2dd479d6515c9b2b71d17"
   license "MIT"
   version "0.8.0"
 
