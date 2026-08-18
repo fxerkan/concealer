@@ -15,7 +15,7 @@ import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse
 import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil
 from datetime import datetime, timezone, timedelta
 
-VERSION = "0.4.0"   # 0.x boyunca ilerler; 1.0 = tam canli/yayin surumu icin ayrilmistir
+VERSION = "0.6.3"   # 0.x boyunca ilerler; 1.0 = tam canli/yayin surumu icin ayrilmistir
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Depo checkout'u: vault script'in yaninda yasar → BASE'i koru (mevcut kurulumlar bozulmasin).
@@ -67,26 +67,34 @@ TYPES = {
     "certificate": [("certificate", "plain"), ("private_key", "secret"), ("chain", "plain"), ("expires", "plain")],
     "database": [("host", "plain"), ("port", "plain"), ("database", "plain"),
                  ("schema", "plain"), ("username", "plain"), ("password", "secret"),
-                 ("auth_type", "plain"), ("jdbc_url", "plain")],
+                 ("auth_type", "plain"), ("jdbc_url", "secret")],   # baglanti dizesi kimlik tasir → gizli
     "server":   [("host", "plain"), ("port", "plain"), ("username", "plain"), ("password", "secret"), ("ssh_key", "secret")],
     "website":  [("web_url", "plain"), ("username", "plain"), ("password", "secret")],
     "login":    [("web_url", "plain"), ("username", "plain"), ("password", "secret"), ("totp", "secret")],
-    # --- everyday / end-user ---
-    "pin":         [("pin", "secret"), ("label", "plain")],   # telefon pin, kapi pin, kart pin…
+    # --- everyday / end-user (PII-tasiyan kart/pasaport/kimlik tipleri BILEREK yok) ---
+    "pin":         [("pin", "secret"), ("label", "plain")],   # telefon pin, kapi pin…
     "wifi":        [("ssid", "plain"), ("password", "secret"), ("security", "plain")],
-    "credit_card": [("cardholder", "plain"), ("number", "secret"), ("expiry", "plain"), ("cvv", "secret"), ("pin", "secret"), ("brand", "plain")],
-    "bank_account": [("bank", "plain"), ("account_holder", "plain"), ("iban", "secret"), ("account_number", "secret"), ("swift", "plain")],
-    "passport":    [("full_name", "plain"), ("number", "secret"), ("country", "plain"), ("expiry", "plain")],
-    "id_card":     [("full_name", "plain"), ("number", "secret"), ("expiry", "plain")],
     "membership":  [("provider", "plain"), ("member_id", "plain"), ("password", "secret")],
     "secure_note": [("note", "secret")],
     "custom":   [],   # serbest alanlar
 }
 _SECRETY = re.compile(r"pass|secret|token|value|key|credential|apikey", re.I)
+_URL_CREDS = re.compile(r"://[^\s/@]*:[^\s/@]+@")   # gomulu [user]:pass@ (redis://:pw@ dahil; host:port/ haric)
 def field_is_secret(typ, fname):
     for f, k in TYPES.get(typ, []):
         if f == fname: return k == "secret"
     return bool(_SECRETY.search(fname))
+def rec_field_secret(e, fname):
+    """Kayit-farkinda gizlilik: kayda ozel override → tip sablonu/ad → deger icinde gomulu kimlik."""
+    fm = (e.get("field_meta") or {}).get(fname) or {}
+    if isinstance(fm, dict) and "secret" in fm: return bool(fm["secret"])
+    if field_is_secret(e.get("type", "custom"), fname): return True
+    return bool(_URL_CREDS.search(str(e.get("fields", {}).get(fname, ""))))
+def rec_mask(e, fname, v):
+    """Maskeleme stili: field_meta.mask == 'full' → tam yildiz; aksi halde kismi (mask())."""
+    fm = (e.get("field_meta") or {}).get(fname) or {}
+    if isinstance(fm, dict) and fm.get("mask") == "full": return "•" * 8
+    return mask(v)
 
 _KEY_CACHE = None   # cozulmus age private key (process-omru bellek cache; diske yazilmaz)
 def _env():
@@ -126,6 +134,7 @@ def norm(e):
     if not e.get("id"):
         e["id"] = hashlib.sha1((e.get("name", "") + "".join(e.get(x, "") for x in DIMS)
                                 + now_iso()).encode()).hexdigest()[:12]
+    e.setdefault("field_meta", {})   # {fname: {"secret":bool,"mask":"partial"|"full"}} — kayda ozel gizlilik
     e.setdefault("created", now_iso()); e.setdefault("updated", e["created"])
     return e
 
@@ -138,7 +147,7 @@ def filt(d, sel=None, tag=None, term=None, typ=None):
     out = []
     for e in secs(d):
         if sel and not matches(e, sel): continue
-        if tag and tag not in e["tags"]: continue
+        if tag and not any(tg in e["tags"] for tg in tag.split(",")): continue   # coklu tag: herhangi biri eslesirse
         if typ and e["type"] not in typ.split(","): continue
         if term:
             hay = json.dumps({k: e.get(k) for k in DIMS + ["name", "tags", "url", "notes", "type"]}).lower()
@@ -150,10 +159,10 @@ def filt(d, sel=None, tag=None, term=None, typ=None):
 def entry_public(e, reveal=False):
     fields = {}
     for fn, fv in e["fields"].items():
-        sec = field_is_secret(e["type"], fn)
-        fields[fn] = {"secret": sec, "value": fv} if (reveal or not sec) else {"secret": True, "mask": mask(fv)}
+        sec = rec_field_secret(e, fn)   # kayit-farkinda: override + jdbc/dsn kimlik sezgisi
+        fields[fn] = {"secret": sec, "value": fv} if (reveal or not sec) else {"secret": True, "mask": rec_mask(e, fn, fv)}
     pub = {k: e.get(k) for k in ["id", "name", "type"] + DIMS + ["tags", "url", "notes", "created", "updated"]}
-    pub["fields"] = fields; return pub
+    pub["fields"] = fields; pub["field_meta"] = e.get("field_meta") or {}; return pub
 
 # ---------------- audit (HMAC zinciri) ----------------
 def _audit_key():
@@ -253,7 +262,7 @@ def leak_scan(d=None):
     d = d or load(); by_val = {}
     for e in secs(d):
         for fn, fv in e["fields"].items():
-            if not fv or not field_is_secret(e["type"], fn): continue
+            if not fv or not rec_field_secret(e, fn): continue   # override + gomulu-kimlik degerleri de dahil
             by_val.setdefault(str(fv), []).append(
                 {"id": e["id"], "name": e["name"], "field": fn, "scope": label(e),
                  "project": e.get("project", ""), "environment": e.get("environment", "")})
@@ -324,6 +333,30 @@ def scan_folder(root, history=False):
             for m in re.finditer(r"(?:export\s+)?([A-Z][A-Z0-9_]{2,})=([^\s;|&'\"]+)", txt):
                 add(m.group(1), m.group(2), os.path.basename(hp))
     return sorted(cands.values(), key=lambda c: c["name"])
+def _native_pickdir():
+    """Yerel app: OS'un klasor secme diyalogunu (Finder/Explorer) ac, secilen yolu dondur (iptal=None)."""
+    try:
+        if sys.platform == "darwin":
+            scr = 'try\nPOSIX path of (choose folder with prompt "concealer")\nend try'
+            r = subprocess.run(["osascript", "-e", scr], capture_output=True, text=True, timeout=300)
+            return (r.stdout.strip() or None)
+        if sys.platform.startswith("linux"):
+            if shutil.which("zenity"):
+                r = subprocess.run(["zenity", "--file-selection", "--directory"], capture_output=True, text=True, timeout=300)
+                return (r.stdout.strip() or None)
+            if shutil.which("kdialog"):
+                r = subprocess.run(["kdialog", "--getexistingdirectory", os.path.expanduser("~")], capture_output=True, text=True, timeout=300)
+                return (r.stdout.strip() or None)
+            return None
+        if sys.platform.startswith("win"):
+            ps = ('Add-Type -AssemblyName System.Windows.Forms;'
+                  '$d=New-Object System.Windows.Forms.FolderBrowserDialog;'
+                  'if($d.ShowDialog() -eq "OK"){[Console]::Out.Write($d.SelectedPath)}')
+            r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, timeout=300)
+            return (r.stdout.strip() or None)
+    except Exception:
+        return None
+    return None
 def _import_cands(d, cands, scope):
     n_new = n_skip = 0
     for c in cands:
@@ -333,8 +366,9 @@ def _import_cands(d, cands, scope):
         if hit:
             hit["fields"]["value"] = c["value"]; hit["updated"] = now_iso(); n_new += 1
         else:
+            origin = "scan-history" if c["source"] in (".zsh_history", ".bash_history") else "scan-folder"
             e = dict(ident); e["type"] = "api_key"; e["fields"] = {"value": c["value"]}
-            e["tags"] = ["scan"]; e["url"] = ""; e["notes"] = f"scan: {c['source']}"
+            e["tags"] = ["scan", origin]; e["url"] = ""; e["notes"] = f"scan: {c['source']}"
             secs(d).append(norm(e)); n_new += 1
     return n_new, n_skip
 
@@ -787,9 +821,657 @@ def _render_target(kv, stem, target):
 def redact(text, d):
     for e in secs(d):
         for fn, fv in e["fields"].items():
-            if fv and field_is_secret(e["type"], fn):
+            if fv and rec_field_secret(e, fn):   # kayit-farkinda: override + gomulu-kimlik degerleri de redakte et
                 text = text.replace(str(fv), "***REDACTED***")
     return text
+
+# ---------------- TUI (curses) ----------------
+# ANSI-Shadow "CONCEALER" banner (big) + a compact fallback for narrow terminals.
+_LOGO = [
+    " ██████╗ ██████╗ ███╗   ██╗ ██████╗███████╗ █████╗ ██╗     ███████╗██████╗ ",
+    "██╔════╝██╔═══██╗████╗  ██║██╔════╝██╔════╝██╔══██╗██║     ██╔════╝██╔══██╗",
+    "██║     ██║   ██║██╔██╗ ██║██║     █████╗  ███████║██║     █████╗  ██████╔╝",
+    "██║     ██║   ██║██║╚██╗██║██║     ██╔══╝  ██╔══██║██║     ██╔══╝  ██╔══██╗",
+    "╚██████╗╚██████╔╝██║ ╚████║╚██████╗███████╗██║  ██║███████╗███████╗██║  ██║",
+    " ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝",
+]
+
+_TUI_UTF8 = True   # curses UTF-8 kutu-cizim karakterleri emniyetli mi (locale'e gore, tui() ayarlar)
+
+def tui():
+    try: import curses, locale  # noqa: F401  (curses is Unix/macOS only)
+    except ImportError: sys.exit("TUI needs the 'curses' module (Unix/macOS). Windows: pip install windows-curses.")
+    # UTF-8 locale ZORLA: VS Code gibi terminaller C/ASCII locale ile acilir → ncurses
+    # Unicode kutu-cizim karakterlerini (┌│─) sessizce dusurur. Once UTF-8 dene, olmazsa ASCII'ye don.
+    global _TUI_UTF8; _TUI_UTF8 = False
+    for loc in ("", "en_US.UTF-8", "C.UTF-8", "UTF-8", "en_US.utf8"):
+        try: locale.setlocale(locale.LC_ALL, loc)
+        except locale.Error: continue
+        try: enc = locale.nl_langinfo(locale.CODESET) or ""
+        except Exception: enc = ""
+        if enc.upper().replace("-", "") == "UTF8": _TUI_UTF8 = True; break
+    d = load()                       # TTY unlock (master pw prompt) happens here, before curses grabs the screen
+    try:
+        curses.wrapper(_tui_main, d)
+    finally:
+        # Guven duvari: curses zaten alternate-screen (?1049) kullaniyor, ama iTerm2'nin
+        # "Save lines to scrollback in alternate screen mode" ayari acikken TUI kareleri
+        # gercek scrollback'e kopyalaniyor → cikista secret'lar yukari kaydirinca gorunur
+        # kaliyor. Terminal ayarina guvenmeyip cikista scrollback + ekrani BIZ siliyoruz.
+        # \033[3J = scrollback sil (xterm/iTerm2), \033[2J = ekran, \033[H = imleci basa al.
+        try:
+            with open("/dev/tty", "w") as tty:
+                tty.write("\033[H\033[2J\033[3J"); tty.flush()
+        except Exception:
+            sys.stdout.write("\033[H\033[2J\033[3J"); sys.stdout.flush()
+
+def _tui_glyphs(u8):
+    if u8:
+        return {"tl": "┌", "tr": "┐", "bl": "└", "br": "┘", "h": "─", "v": "│",
+                "lt": "├", "rt": "┤", "cur": "▸ ", "on": "◉ ", "off": "○ ", "ud": "↕"}
+    return {"tl": "+", "tr": "+", "bl": "+", "br": "+", "h": "-", "v": "|",
+            "lt": "+", "rt": "+", "cur": "> ", "on": "* ", "off": ". ", "ud": "^"}
+
+def _tui_palette(curses):
+    """Renk paleti — web 'Covert' temasi (amber accent). Barlar/secim icin
+    A_REVERSE|amber kullanilir: temadan bagimsiz olarak amber zemin + koyu yazi
+    verir (duz COLOR_BLACK bazi terminallerde amber uzerinde gorunmez kaliyordu)."""
+    if curses.has_colors():
+        curses.start_color(); curses.use_default_colors()
+        amber = 214 if curses.COLORS >= 256 else curses.COLOR_YELLOW
+        gray  = 245 if curses.COLORS >= 256 else curses.COLOR_WHITE
+        curses.init_pair(1, amber, -1); curses.init_pair(2, gray, -1)
+        curses.init_pair(3, curses.COLOR_GREEN, -1); curses.init_pair(4, curses.COLOR_RED, -1)
+        curses.init_pair(5, curses.COLOR_CYAN, -1)
+        curses.init_pair(6, gray, curses.COLOR_BLACK)   # modal icin OPAK siyah zemin
+        acc, mut, ok, bad, typ = (curses.color_pair(i) for i in range(1, 6))
+        fill = curses.color_pair(6)
+    else:
+        acc = curses.A_BOLD; mut = curses.A_DIM; ok = 0; bad = curses.A_BOLD; typ = 0; fill = 0
+    return {"acc": acc, "mut": mut, "ok": ok, "bad": bad, "typ": typ, "fill": fill,
+            "bar": acc | curses.A_REVERSE, "sel": acc | curses.A_REVERSE, "norm": 0}
+
+_TYP_COLOR = {"api_key": "typ", "access_token": "typ", "jwt": "typ", "oauth": "typ",
+              "database": "acc", "server": "acc", "ssh_key": "acc", "certificate": "acc",
+              "website": "ok", "login": "ok", "wifi": "ok", "membership": "ok"}
+CLIP_CLEAR = 45   # saniye — kopyalanan deger panodan bu sure sonra silinir (web ile ayni davranis)
+
+def _tui_main(scr, data):
+    import curses
+    curses.curs_set(0); scr.keypad(True); scr.timeout(-1)
+    try: curses.set_escdelay(25)
+    except Exception: pass
+    C = _tui_palette(curses)
+    G = _tui_glyphs(_TUI_UTF8)   # UTF-8 yoksa ( or. C locale'li VS Code terminali) ASCII kutu-cizim
+    st = {"d": data, "rows": [], "sel": 0, "top": 0, "term": "",
+          "mode": "list", "focus": "list", "fsel": 0, "ftop": 0, "dtop": 0,
+          "shown": set(), "dsel": 0,   # shown: bu kayitta acilan field adlari · dsel: detay field imleci
+          "active": {}, "fitems": [], "msg": "", "quit": False,
+          "show_filters": True, "show_detail": True}
+    def FOCUS():   # gorunur panellere gore odak halkasi (dar terminalde gizli panele odaklanma)
+        r = ["list"]
+        if st["show_filters"]: r.insert(0, "filters")
+        if st["show_detail"]: r.append("detail")
+        return r
+
+    # ---- cizim yardimcilari ----
+    def put(y, x, s, attr=0, maxw=None):
+        if y < 0 or x < 0: return
+        s = str(s)
+        if maxw is not None:
+            if maxw <= 0: return
+            s = s[:maxw]
+        try: scr.addstr(y, x, s, attr)
+        except (curses.error, UnicodeError, ValueError): pass   # kenar/son-hucre + non-UTF8 locale glyph
+
+    def box(y, x, h, w, attr=0, title="", tattr=None):
+        if h < 2 or w < 2: return
+        put(y, x, G["tl"] + G["h"] * (w - 2) + G["tr"], attr)
+        put(y + h - 1, x, G["bl"] + G["h"] * (w - 2) + G["br"], attr)
+        for i in range(1, h - 1):
+            put(y + i, x, G["v"], attr); put(y + i, x + w - 1, G["v"], attr)
+        if title:
+            put(y, x + 2, (G["rt"] + " " + title + " " + G["lt"])[:w - 4], tattr if tattr is not None else attr)
+
+    # ---- filtre / veri ----
+    def facets():
+        d = st["d"]; out = []
+        for dim, lbl in [("type", "Type"), ("project", "Project"), ("environment", "Env"),
+                         ("tenant", "Tenant"), ("repo", "Repo"), ("tags", "Tags")]:
+            vals = {}
+            for e in secs(d):
+                if dim == "tags":
+                    for tg in e.get("tags", []): vals[tg] = vals.get(tg, 0) + 1
+                elif e.get(dim): vals[e[dim]] = vals.get(e[dim], 0) + 1
+            if not vals: continue
+            out.append(("hdr", dim, lbl, 0))
+            for v in sorted(vals): out.append(("item", dim, v, vals[v]))
+        return out
+
+    def apply():
+        d = st["d"]; sel = {}
+        for dim in DIMS:
+            if st["active"].get(dim): sel[dim] = ",".join(sorted(st["active"][dim]))
+        typ = ",".join(sorted(st["active"].get("type", []))) or None
+        tag = ",".join(sorted(st["active"].get("tags", []))) or None
+        st["rows"] = filt(d, sel or None, tag, st["term"] or None, typ)
+        st["sel"] = min(st["sel"], max(0, len(st["rows"]) - 1)); st["top"] = 0
+        reset_detail()
+        st["fitems"] = facets()   # her zaman guncel tut (dar terminalde de toggle calissin)
+        st["fsel"] = min(st["fsel"], max(0, sum(1 for f in st["fitems"] if f[0] == "item") - 1))
+
+    def reset_detail():   # secim degisince: her sey yeniden maskeli, imlec/skroll basa
+        st["shown"] = set(); st["dsel"] = 0; st["dtop"] = 0
+
+    def reload_(msg=""):
+        try: st["d"] = load()
+        except SystemExit as ex: st["msg"] = str(ex); return
+        apply(); st["msg"] = msg
+
+    def cur():
+        return st["rows"][st["sel"]] if st["rows"] else None
+
+    def nfilters():
+        return sum(len(v) for v in st["active"].values())
+
+    # ---- panolama ----
+    def clip(val, what):
+        for tool in (["pbcopy"], ["xclip", "-selection", "clipboard"], ["wl-copy"]):
+            if shutil.which(tool[0]):
+                try:
+                    subprocess.run(tool, input=str(val), text=True, check=True)
+                    subprocess.Popen(["sh", "-c", f"sleep {CLIP_CLEAR}; printf '' | {' '.join(tool)}"],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    e = cur()
+                    if e: audit("copy", key=e["name"], source="tui", detail=what)
+                    st["msg"] = f"copied {what} → clipboard (clears in {CLIP_CLEAR}s)"; return
+                except Exception: pass
+        st["msg"] = "no clipboard tool found (pbcopy / xclip / wl-copy)"
+
+    def secret_field(e):
+        return next((f for f in e["fields"] if rec_field_secret(e, f)), None)
+
+    def copy_value():
+        e = cur()
+        if not e: return
+        if st["focus"] == "detail" and e["fields"]:   # detay panelinde: secili field'i kopyala
+            fn = list(e["fields"].keys())[max(0, min(st["dsel"], len(e["fields"]) - 1))]
+            clip(e["fields"][fn], fn); return
+        f = secret_field(e) or next(iter(e["fields"]), None)
+        if f: clip(e["fields"][f], f)
+        else: st["msg"] = "nothing to copy"
+
+    def copy_field(names, what):
+        e = cur()
+        if not e: return
+        f = next((k for k in e["fields"] if k in names), None)
+        if f: clip(e["fields"][f], f)
+        else: st["msg"] = f"no {what} field"
+
+    # ---- modallar ----
+    def fill(y, x, h, w, attr):   # opak zemin (modal arkasi transparan gorunmesin)
+        for r in range(h): put(y + r, x, " " * w, attr)
+
+    def prompt(msg, default="", secret=False):
+        curses.curs_set(1); H, W = scr.getmaxyx()
+        bw = min(72, W - 4); by = H // 2 - 1; bx = (W - bw) // 2; buf = default
+        while True:
+            fill(by, bx, 3, bw, C["fill"]); box(by, bx, 3, bw, C["acc"], msg, C["acc"] | curses.A_BOLD)
+            put(by + 1, bx + 1, " " * (bw - 2), C["fill"])
+            shown = ("•" * len(buf)) if secret else buf
+            put(by + 1, bx + 2, shown[-(bw - 4):], maxw=bw - 4)
+            scr.refresh(); c = scr.getch()
+            if c in (10, 13): curses.curs_set(0); return buf
+            if c == 27: curses.curs_set(0); return None
+            if c in (curses.KEY_BACKSPACE, 127, 8): buf = buf[:-1]
+            elif 32 <= c < 127: buf += chr(c)
+
+    def confirm(msg, danger=True):
+        H, W = scr.getmaxyx(); bw = min(72, W - 4); a = C["bad"] if danger else C["acc"]
+        fill(H // 2 - 1, (W - bw) // 2, 3, bw, C["fill"])
+        box(H // 2 - 1, (W - bw) // 2, 3, bw, a, "confirm", a | curses.A_BOLD)
+        put(H // 2, (W - bw) // 2 + 2, (msg + "  (y/N)")[:bw - 4], a | curses.A_BOLD); scr.refresh()
+        return scr.getch() in (ord("y"), ord("Y"))
+
+    def pick(title, labels, start=0):
+        if not labels: return None
+        i = min(start, len(labels) - 1)
+        while True:
+            H, W = scr.getmaxyx()
+            bw = min(max(len(title) + 6, max(len(x) for x in labels) + 6), W - 4)
+            bh = min(len(labels) + 2, H - 4); y = (H - bh) // 2; x = (W - bw) // 2
+            fill(y, x, bh, bw, C["fill"]); box(y, x, bh, bw, C["acc"], title, C["acc"] | curses.A_BOLD)
+            vis = bh - 2; topo = 0
+            if len(labels) > vis: topo = max(0, min(i - vis // 2, len(labels) - vis))
+            for r in range(vis):
+                idx = topo + r
+                if idx >= len(labels): break
+                put(y + 1 + r, x + 1, (" " + labels[idx]).ljust(bw - 2),
+                    C["sel"] if idx == i else C["fill"], bw - 2)
+            scr.refresh(); c = scr.getch()
+            if c in (27, ord("q")): return None
+            if c in (10, 13): return i
+            if c in (curses.KEY_DOWN, ord("j")): i = (i + 1) % len(labels)
+            elif c in (curses.KEY_UP, ord("k")): i = (i - 1) % len(labels)
+            elif c == ord("g"): i = 0
+            elif c == ord("G"): i = len(labels) - 1
+
+    def helpwin():
+        rows = [
+            ("Tab / Shift-Tab", "cycle panels   (1 / 2 / 3 jump to panel)"),
+            ("← → h l", "move focus between panels"),
+            ("↑ ↓ j k", "move   ·   g/G top/bottom   ·   PgUp/Dn, Ctrl-D/U page"),
+            ("/", "search (live)   ·   Esc clears / exits"),
+            ("Space / Enter", "Filters: toggle a facet   ·   x: clear all filters"),
+            ("", ""),
+            ("in Details panel", "↑↓/j k pick a field   ·   Enter/m reveal that field"),
+            ("m", "Secrets panel: reveal / hide ALL fields of the record"),
+            ("p  u  w", "copy value · username · url  (clipboard clears in 45s)"),
+            ("a  e  d  r", "add · edit · delete · rotate (random)"),
+            ("", ""),
+            ("R  Ctrl-L", "reload vault   ·   force redraw"),
+            ("?", "this help   ·   q / Ctrl-Q quit"),
+        ]
+        H, W = scr.getmaxyx(); bw = min(74, W - 4); bh = min(len(rows) + 4, H - 2)
+        y = (H - bh) // 2; x = (W - bw) // 2
+        fill(0, 0, H, W, C["fill"])   # tum ekrani opak siyahla doldur (arkasi transparan gorunmesin)
+        box(y, x, bh, bw, C["acc"], "conceal·er  —  keyboard", C["acc"] | curses.A_BOLD)
+        for r, (k, v) in enumerate(rows):
+            if y + 2 + r >= y + bh - 1: break
+            put(y + 2 + r, x + 3, k.ljust(18), C["acc"] | curses.A_BOLD, 18)
+            put(y + 2 + r, x + 22, v, C["fill"] if not k and not v else (C["mut"]), bw - 24)
+        scr.refresh(); scr.getch()
+
+    def ask_visibility(fname, default_secret):
+        # eklenen/duzenlenen her field: gizli mi acik mi + maskeleme stili secilir
+        opts = ["masked — partial  (sk-D…xy)", "masked — full  (••••••••)", "visible — plain text"]
+        idx = pick(f"'{fname}' visibility", opts, 0 if default_secret else 2)
+        if idx is None: return None
+        if idx == 2: return {"secret": False}
+        return {"secret": True, "mask": "full" if idx == 1 else "partial"}
+
+    # ---- CRUD ----
+    def add_flow():
+        name = prompt("New secret — name")
+        if not name: st["msg"] = "add cancelled"; return
+        tkeys = sorted(TYPES.keys()); ti = pick("Type", tkeys, tkeys.index("api_key"))
+        if ti is None: st["msg"] = "add cancelled"; return
+        typ = tkeys[ti]
+        e = {dim: "" for dim in DIMS}; e["name"] = name; e["type"] = typ; e["tags"] = []
+        e["fields"] = {}; e["field_meta"] = {}
+        tmpl = TYPES.get(typ)
+        if tmpl:                                   # tipli: sablon alanlari, varsayilan gizlilikle
+            for fn, kind in tmpl:
+                v = prompt(f"{name} · {fn}", secret=(kind == "secret"))
+                if v is None: st["msg"] = "add cancelled"; return
+                if v != "": e["fields"][fn] = v
+        else:                                      # custom: serbest alanlar, her biri icin gorunurluk sor
+            while True:
+                fn = prompt("field name  (blank = done)")
+                if fn is None: st["msg"] = "add cancelled"; return
+                if not fn.strip(): break
+                fm = ask_visibility(fn, field_is_secret("custom", fn))
+                if fm is None: continue
+                v = prompt(f"{fn} value", secret=fm.get("secret", True))
+                if v is None: continue
+                e["fields"][fn] = v; e["field_meta"][fn] = fm
+        proj = prompt("project (optional)"); env = prompt("env (optional)")
+        if proj: e["project"] = proj
+        if env: e["environment"] = env
+        secs(st["d"]).append(norm(e)); save(st["d"])
+        audit("create", key=name, source="tui", detail=label(e)); reload_(f"added: {name}")
+
+    def edit_flow():
+        e0 = cur()
+        if not e0: return
+        tgt = by_id(st["d"], e0["id"]); tgt.setdefault("field_meta", {}); i = 0
+        while True:
+            meta = [("name", tgt["name"]), ("type", tgt["type"]),
+                    ("tags", ",".join(tgt["tags"])), ("project", tgt.get("project", "")),
+                    ("environment", tgt.get("environment", "")), ("tenant", tgt.get("tenant", "")),
+                    ("repo", tgt.get("repo", "")), ("url", tgt.get("url", "")),
+                    ("notes", tgt.get("notes", ""))]
+            fields = list(tgt["fields"].items())
+            rows = meta + fields
+            labels = []
+            for j, (k, v) in enumerate(rows):
+                if j >= len(meta) and rec_field_secret(tgt, k):
+                    labels.append(f"{k:<14} • {rec_mask(tgt, k, v)}"[:62])
+                else:
+                    labels.append(f"{k:<14}   {v}"[:62])
+            labels += ["+ add field", "» save & close"]
+            idx = pick(f"Edit: {tgt['name']}", labels, i)
+            if idx is None: st["msg"] = "edit cancelled (not saved)"; return
+            i = idx
+            if idx == len(labels) - 1:   # save
+                tgt["updated"] = now_iso(); save(st["d"])
+                audit("update", key=tgt["name"], source="tui"); reload_(f"updated: {tgt['name']}"); return
+            if idx == len(labels) - 2:   # add field
+                fn = prompt("new field name")
+                if fn and fn.strip():
+                    fm = ask_visibility(fn, field_is_secret(tgt["type"], fn))
+                    if fm is not None:
+                        tgt["fields"][fn] = prompt(f"{fn} value", secret=fm.get("secret", True)) or ""
+                        tgt["field_meta"][fn] = fm
+                continue
+            k = rows[idx][0]
+            if idx < len(meta):   # bolume gore ayir (ada gore degil): field adi meta ile cakisabilir
+                nv = prompt(f"{k}", tgt.get(k, "") if k != "tags" else ",".join(tgt["tags"]))
+                if nv is None: continue
+                if k == "tags": tgt["tags"] = [t for t in nv.split(",") if t.strip()]
+                elif k == "type": tgt["type"] = nv if nv in TYPES else tgt["type"]
+                else: tgt[k] = nv
+            else:                 # field satiri: deger mi gorunurluk mu duzenlenecek
+                act = pick(k, ["edit value", "set visibility", "cancel"], 0)
+                if act == 0:
+                    nv = prompt(f"{k}", secret=rec_field_secret(tgt, k))
+                    if nv is not None: tgt["fields"][k] = nv
+                elif act == 1:
+                    fm = ask_visibility(k, rec_field_secret(tgt, k))
+                    if fm is not None: tgt["field_meta"][k] = fm
+
+    def delete_flow():
+        e = cur()
+        if not e: return
+        if not confirm(f"Delete '{e['name']}'  ({label(e)}) ?"): st["msg"] = "delete cancelled"; return
+        tgt = by_id(st["d"], e["id"])
+        if tgt: secs(st["d"]).remove(tgt); save(st["d"]); audit("delete", key=e["name"], source="tui")
+        reload_(f"deleted: {e['name']}")
+
+    def rotate_flow():
+        e = cur()
+        if not e: return
+        f = secret_field(e)
+        if not f: st["msg"] = "no secret field to rotate"; return
+        if not confirm(f"Rotate '{e['name']}' → random value?"): st["msg"] = "rotate cancelled"; return
+        tgt = by_id(st["d"], e["id"]); tgt["fields"][f] = _secrets.token_urlsafe(32)
+        tgt["updated"] = now_iso(); save(st["d"]); audit("rotate", key=e["name"], source="tui")
+        reload_(f"rotated: {e['name']}")
+
+    # ---- ekran cizimi ----
+    def draw():
+        scr.erase(); H, W = scr.getmaxyx()
+        if H < 8 or W < 30:
+            put(0, 0, "terminal too small", C["bad"]); scr.refresh(); return
+        # ust bar (baslik)
+        put(0, 0, " " * W, C["bar"])
+        put(0, 1, "conceal", C["bar"] | curses.A_BOLD); put(0, 8, "er", C["bar"] | curses.A_BOLD | curses.A_UNDERLINE)
+        home = HOME.replace(os.path.expanduser("~"), "~", 1)
+        lockst = "[REVEALED]" if st["shown"] else "[masked]"
+        right = f"{len(st['rows'])}/{len(secs(st['d']))} secrets   {lockst} "
+        put(0, 11, f"· {home}", C["bar"], W - 12 - len(right))
+        put(0, max(11, W - len(right)), right, C["bar"])
+        # arama satiri
+        active_search = st["mode"] == "search"
+        sattr = C["acc"] if active_search else C["mut"]
+        fcount = f"  filters: {nfilters()}" if nfilters() else ""
+        put(1, 1, "Search: ", C["acc"] if active_search else C["mut"])
+        term = st["term"] + ("▏" if active_search else "")
+        put(1, 9, term or ("type / to search" if not active_search else ""),
+            C["norm"] if st["term"] else C["mut"], W - 10 - len(fcount))
+        put(1, W - len(fcount) - 1, fcount, C["mut"])
+        # panel geometrisi
+        by, bh = 2, H - 3
+        show_filters = W >= 92
+        show_detail = W >= 62
+        st["show_filters"], st["show_detail"] = show_filters, show_detail
+        if st["focus"] not in FOCUS(): st["focus"] = "list"   # gizli panelden odagi geri al
+        fw = 26 if show_filters else 0
+        dw = max(30, (W - fw) * 2 // 5) if show_detail else 0
+        lw = W - fw - dw
+        fx, lx, dx = 0, fw, fw + lw
+        draw_filters(fx, by, fw, bh) if show_filters else None
+        draw_list(lx, by, lw, bh)
+        draw_detail(dx, by, dw, bh) if show_detail else None
+        draw_help(H, W)
+        scr.refresh()
+
+    def draw_filters(x, y, w, h):
+        foc = st["focus"] == "filters"
+        box(y, x, h, w, C["acc"] if foc else C["mut"], "1·Filters", (C["acc"] | curses.A_BOLD) if foc else C["mut"])
+        items_idx = [i for i, f in enumerate(st["fitems"]) if f[0] == "item"]
+        sel_line = items_idx[st["fsel"]] if items_idx and st["fsel"] < len(items_idx) else -1
+        vis = h - 2
+        if sel_line >= 0:
+            if sel_line < st["ftop"]: st["ftop"] = sel_line
+            if sel_line >= st["ftop"] + vis: st["ftop"] = sel_line - vis + 1
+        for r in range(vis):
+            li = st["ftop"] + r
+            if li >= len(st["fitems"]): break
+            kind, dim, val, cnt = st["fitems"][li]
+            yy = y + 1 + r
+            if kind == "hdr":
+                put(yy, x + 1, val.upper()[:w - 2], C["acc"] | curses.A_BOLD, w - 2)
+            else:
+                on = val in st["active"].get(dim, set())
+                mark = G["on"] if on else G["off"]
+                text = f"{mark}{val}"
+                cnts = str(cnt)
+                if li == sel_line and foc:
+                    put(yy, x + 1, " " * (w - 2), C["sel"])
+                    put(yy, x + 1, text[:w - 3 - len(cnts)], C["sel"])
+                    put(yy, x + w - 1 - len(cnts), cnts, C["sel"])
+                else:
+                    put(yy, x + 1, mark, C["acc"] if on else C["mut"])
+                    put(yy, x + 3, val, (C["acc"] | curses.A_BOLD) if on else C["norm"], w - 4 - len(cnts))
+                    put(yy, x + w - 1 - len(cnts), cnts, C["mut"])
+
+    def draw_list(x, y, w, h):
+        foc = st["focus"] == "list"
+        box(y, x, h, w, C["acc"] if foc else C["mut"], "2·Secrets", (C["acc"] | curses.A_BOLD) if foc else C["mut"])
+        rows = st["rows"]; iw = w - 2
+        tcol = min(11, max(8, iw // 4)); scol = 0
+        namew = max(1, iw - tcol - 1)   # negatif genislik format-spec'te ValueError verir; koru
+        put(y, x + 2 + 11, "", 0)
+        # sutun basliklari
+        put(y + 0, x + 2, "", 0)
+        hdr = f"{'NAME':<{namew}} {'TYPE':<{tcol}}"
+        # header ust cizgi icine degil, ilk satira:
+        vis = h - 3
+        put(y + 1, x + 1, hdr[:iw], C["mut"] | curses.A_UNDERLINE)
+        if not rows:
+            put(y + 3, x + 2, "(no matches)", C["mut"])
+        if st["sel"] < st["top"]: st["top"] = st["sel"]
+        if st["sel"] >= st["top"] + (vis - 1): st["top"] = st["sel"] - (vis - 1) + 1
+        for r in range(vis - 1):
+            idx = st["top"] + r
+            if idx >= len(rows): break
+            e = rows[idx]; yy = y + 2 + r; sel = idx == st["sel"]
+            nm = e["name"][:namew]; tp = e["type"][:tcol]
+            if sel:
+                put(yy, x + 1, " " * iw, C["sel"])
+                put(yy, x + 1, (G["cur"] + nm)[:namew + 1], C["sel"] | curses.A_BOLD)
+                put(yy, x + 2 + namew, tp, C["sel"])
+            else:
+                put(yy, x + 1, "  " + nm, C["norm"], namew + 1)
+                tattr = C.get(_TYP_COLOR.get(e["type"], "mut"), C["mut"])
+                put(yy, x + 2 + namew, tp, tattr, tcol)
+        # kaydirma gostergesi
+        if len(rows) > vis - 1:
+            put(y + h - 1, x + w - 12, f"{G['rt']} {st['sel']+1}/{len(rows)} {G['lt']}", C["mut"])
+
+    def draw_detail(x, y, w, h):
+        foc = st["focus"] == "detail"
+        box(y, x, h, w, C["acc"] if foc else C["mut"], "3·Details", (C["acc"] | curses.A_BOLD) if foc else C["mut"])
+        e = cur(); iw = w - 3
+        if not e:
+            put(y + 2, x + 2, "no secret selected", C["mut"]); return
+        # meta satirlari (secilemez) — (key, value, color, fno=None)
+        lines = [("name", e["name"], C["acc"] | curses.A_BOLD, None),
+                 ("type", e["type"], C["typ"], None),
+                 ("scope", label(e), C["norm"], None),
+                 ("tags", ", ".join(e["tags"]) or "—", C["mut"], None)]
+        if e.get("url"): lines.append(("url", e["url"], C["mut"], None))
+        if e.get("notes"): lines.append(("notes", e["notes"], C["mut"], None))
+        lines.append(("updated", e.get("updated", "")[:19].replace("T", " "), C["mut"], None))
+        lines.append((None, None, None, None))   # ayrac
+        # field satirlari (fno = kacinci field; detay imleci bunlar arasinda gezer)
+        fnames = list(e["fields"].keys())
+        st["dsel"] = max(0, min(st["dsel"], len(fnames) - 1)) if fnames else 0
+        fline = {}
+        for fno, fn in enumerate(fnames):
+            fv = e["fields"][fn]; sec = rec_field_secret(e, fn)
+            revealed = (fn in st["shown"]) or not sec
+            val = fv if revealed else rec_mask(e, fn, fv)
+            col = C["ok"] if (revealed and sec) else (C["mut"] if sec else C["norm"])
+            fline[fno] = len(lines); lines.append((fn, str(val), col, fno))
+        vis = h - 3
+        if foc and fnames:   # secili field'i gorunur tut
+            t = fline.get(st["dsel"], 0)
+            if t < st["dtop"]: st["dtop"] = t
+            if t >= st["dtop"] + vis: st["dtop"] = t - vis + 1
+        st["dtop"] = max(0, min(st["dtop"], max(0, len(lines) - vis)))
+        for r in range(vis):
+            li = st["dtop"] + r
+            if li >= len(lines): break
+            k, val, col, fno = lines[li]; yy = y + 1 + r
+            if k is None:
+                put(yy, x + 1, G["h"] * iw, C["mut"]); continue
+            if foc and fno is not None and fno == st["dsel"]:   # secili field satiri
+                put(yy, x + 1, " " * iw, C["sel"])
+                put(yy, x + 1, (G["cur"] + k)[:14], C["sel"] | curses.A_BOLD)
+                put(yy, x + 1 + 14, val, C["sel"], iw - 14)
+            else:
+                put(yy, x + 1, (("  " if fno is not None else "") + k + "  ")[:14], C["acc"])
+                put(yy, x + 1 + 14, val, col, iw - 14)
+        hint = "j/k pick · Enter/m reveal · p copy" if foc else ("m: reveal all" if not st["shown"] else "m: hide all")
+        foot = G["rt"] + " " + hint + " " + G["lt"]
+        if len(lines) > vis: foot += f" {G['ud']}{st['dtop']+1}-{min(st['dtop']+vis, len(lines))}/{len(lines)}"
+        put(y + h - 1, x + 2, foot, C["mut"], w - 4)
+
+    def draw_help(H, W):
+        y = H - 1
+        put(y, 0, " " * W, C["bar"])
+        hints = "Tab panels · / search · m reveal · a add · e edit · d del · r rotate · p copy · ? help · q quit"
+        put(y, 1, hints, C["bar"], W - 2)
+        if st["msg"]:
+            m = " " + st["msg"] + " "
+            put(y, max(1, W - len(m) - 1), m[:W - 2], C["ok"] | curses.A_REVERSE)
+
+    # ---- olay dongusu ----
+    def move_list(delta):   # secim degisince her sey maskeli + detay imleci/skroll basa
+        st["sel"] = max(0, min(st["sel"] + delta, len(st["rows"]) - 1)); reset_detail()
+
+    def reveal_field(e, fno):   # tek bir field'i ac/kapat; gizli deger acilirsa denetime dus
+        fnames = list(e["fields"].keys())
+        if not fnames: return
+        fn = fnames[max(0, min(fno, len(fnames) - 1))]
+        if fn in st["shown"]: st["shown"].discard(fn); st["msg"] = f"hid {fn}"
+        else:
+            st["shown"].add(fn); st["msg"] = f"revealed {fn}"
+            if rec_field_secret(e, fn): audit("get", key=e["name"], source="tui", detail=fn)
+
+    def reveal_all(e):   # kayittaki tum field'lari ac/kapat
+        if st["shown"]: st["shown"] = set(); st["msg"] = "hidden"
+        else:
+            st["shown"] = set(e["fields"].keys()); st["msg"] = "revealed all"
+            if any(rec_field_secret(e, f) for f in e["fields"]):
+                audit("get", key=e["name"], source="tui", detail="reveal all")
+
+    def move_filter(delta):
+        n = sum(1 for f in st["fitems"] if f[0] == "item")
+        if n: st["fsel"] = max(0, min(st["fsel"] + delta, n - 1))
+
+    def cycle_focus(step):
+        ring = FOCUS()
+        i = ring.index(st["focus"]) if st["focus"] in ring else ring.index("list")
+        st["focus"] = ring[(i + step) % len(ring)]
+
+    _splash(scr, C, curses)
+    scr.clear()          # splash sonrasi tam temizle (logo kalintisi kalmasin)
+    apply()
+    while True:
+        draw(); c = scr.getch()
+        if c == curses.KEY_RESIZE:   # VS Code vb. terminal boyut degistirince: ncurses'i tazele + tam ciz
+            try: curses.update_lines_cols()
+            except Exception: pass
+            scr.clearok(True); continue
+        H, W = scr.getmaxyx()
+        # --- arama modu ---
+        if st["mode"] == "search":
+            if c in (10, 13, curses.KEY_DOWN): st["mode"] = "list"; st["focus"] = "list"
+            elif c == 27: st["mode"] = "list"; st["term"] = ""; apply()
+            elif c in (curses.KEY_BACKSPACE, 127, 8): st["term"] = st["term"][:-1]; apply()
+            elif c == 21: st["term"] = ""; apply()          # Ctrl-U
+            elif 32 <= c < 127: st["term"] += chr(c); apply()
+            continue
+        st["msg"] = ""
+        # --- global ---
+        if c in (ord("q"), 17): break                       # q / Ctrl-Q
+        elif c == ord("?"): helpwin()
+        elif c == ord("/"): st["mode"] = "search"
+        elif c == 12: scr.clearok(True)                      # Ctrl-L: force full redraw
+        elif c == 9: cycle_focus(1)                          # Tab
+        elif c == curses.KEY_BTAB: cycle_focus(-1)           # Shift-Tab
+        elif c == ord("1"): st["focus"] = "filters" if st["show_filters"] else st["focus"]
+        elif c == ord("2"): st["focus"] = "list"
+        elif c == ord("3"): st["focus"] = "detail" if st["show_detail"] else st["focus"]
+        elif c in (curses.KEY_LEFT, ord("h")): cycle_focus(-1)
+        elif c in (curses.KEY_RIGHT, ord("l")): cycle_focus(1)
+        elif c == ord("m"):
+            e = cur()
+            if e: reveal_field(e, st["dsel"]) if st["focus"] == "detail" else reveal_all(e)
+        elif c == ord("a"): add_flow()
+        elif c == ord("e"): edit_flow()
+        elif c == ord("d"): delete_flow()
+        elif c == ord("r"): rotate_flow()
+        elif c == ord("p"): copy_value()
+        elif c == ord("u"): copy_field({"username", "user", "member_id"}, "username")
+        elif c == ord("w"): copy_field({"url", "web_url", "auth_url"}, "url")
+        elif c == ord("R"): reload_("reloaded")
+        elif c == ord("x"):
+            st["active"] = {}; apply(); st["msg"] = "filters cleared"
+        # --- odak-bagimli ---
+        elif st["focus"] == "filters":
+            if c in (curses.KEY_DOWN, ord("j")): move_filter(1)
+            elif c in (curses.KEY_UP, ord("k")): move_filter(-1)
+            elif c == ord("g"): st["fsel"] = 0
+            elif c == ord("G"): move_filter(10 ** 6)
+            elif c in (10, 13, ord(" ")):
+                items = [f for f in st["fitems"] if f[0] == "item"]
+                if items and st["fsel"] < len(items):
+                    _, dim, val, _ = items[st["fsel"]]
+                    s = st["active"].setdefault(dim, set())
+                    s.discard(val) if val in s else s.add(val)
+                    if not s: st["active"].pop(dim, None)
+                    apply()
+        elif st["focus"] == "detail":   # detay panelinde j/k field'lar arasinda gezer; Enter acar
+            e = cur(); nf = len(e["fields"]) if e else 0
+            if c in (curses.KEY_DOWN, ord("j")): st["dsel"] = min(st["dsel"] + 1, max(0, nf - 1))
+            elif c in (curses.KEY_UP, ord("k")): st["dsel"] = max(0, st["dsel"] - 1)
+            elif c in (curses.KEY_NPAGE, 4): st["dsel"] = min(st["dsel"] + 5, max(0, nf - 1))
+            elif c in (curses.KEY_PPAGE, 21): st["dsel"] = max(0, st["dsel"] - 5)
+            elif c in (ord("g"), curses.KEY_HOME): st["dsel"] = 0
+            elif c in (ord("G"), curses.KEY_END): st["dsel"] = max(0, nf - 1)
+            elif c in (10, 13) and e: reveal_field(e, st["dsel"])
+        else:   # list
+            if c in (curses.KEY_DOWN, ord("j")): move_list(1)
+            elif c in (curses.KEY_UP, ord("k")): move_list(-1)
+            elif c == ord("g"): st["sel"] = 0; reset_detail()
+            elif c == ord("G"): move_list(10 ** 6)
+            elif c in (curses.KEY_NPAGE, 4): move_list((H - 6) or 5)     # PgDn / Ctrl-D
+            elif c in (curses.KEY_PPAGE, 21): move_list(-((H - 6) or 5)) # PgUp / Ctrl-U
+            elif c == curses.KEY_HOME: st["sel"] = 0; reset_detail()
+            elif c == curses.KEY_END: move_list(10 ** 6)
+            elif c in (10, 13): st["focus"] = "detail" if st["show_detail"] else "list"
+
+def _splash(scr, C, curses):
+    scr.erase(); H, W = scr.getmaxyx()
+    if _TUI_UTF8 and W >= len(_LOGO[0]) + 2: art = _LOGO   # UTF-8 blok logo
+    else: art = ["c o n c e a l e r"]                      # ASCII fallback (non-UTF8 terminal)
+    y0 = max(0, H // 2 - len(art) // 2 - 2)
+    for i, ln in enumerate(art):
+        x = max(0, (W - len(ln)) // 2)
+        try: scr.addstr(y0 + i, x, ln[:W - 1], C["acc"] | curses.A_BOLD)
+        except (curses.error, UnicodeError, ValueError): pass
+    dot = "  ·  " if _TUI_UTF8 else "  -  "
+    for txt, dy, at in [(f"local-only secret manager{dot}SOPS + age", len(art) + 1, C["mut"]),
+                        (f"v{VERSION}", len(art) + 2, C["mut"]),
+                        (f"press any key{dot}? for keyboard shortcuts", len(art) + 4, C["acc"])]:
+        try: scr.addstr(y0 + dy, max(0, (W - len(txt)) // 2), txt, at)
+        except (curses.error, UnicodeError, ValueError): pass
+    scr.refresh(); scr.timeout(2500); scr.getch(); scr.timeout(-1)
+
 
 # ---------------- CLI ----------------
 def _flag(a, name):
@@ -807,82 +1489,75 @@ def _print(rows):
         print(f"{e['name']:22} {e['type']:9} {e['tenant']:8} {e['project']:12} "
               f"{e['environment']:8} {e['repo']:14} {','.join(e['tags'])}")
 
-HELP = f"""concealer {VERSION} — local-only secret manager (SOPS + age)   ·   alias: cer
-
-USAGE
-  concealer <command> [options]           # ya da kisa: cer <command>
-
-VAULT / KEY
-  init [--force]              yeni vault kur; master parola + 8 recovery kodu + CLI token uretir
-  unlock                      master parola ile insan icin suureli (TTL) token al
-  harden                      eski vault'u sertlestir (duz-metin age key'i diskten kaldir)
-  passwd                      master parolayi degistir (recovery kodu gerektirir)
-  recover                     recovery kodu ile vault'a eris (parola unutuldu)
-  recovery                    recovery kod setini yeniden uret
-  agent register|list|revoke <ad>   ajanlar icin uzun-omurlu, iptal-edilebilir token
-
-SECRETS
-  list [term] [boyutlar] [--tag X] [--type T]     kayitlari listele (maskeli)
-  search <term>              tum alanlarda ara
-  get --name N [boyutlar]    secret degerini yazdir (tek eslesme gerekir)
-  set --name N [--type T] <value | field=val ...> [--tags a,b]   olustur/guncelle
-  rm --name N [boyutlar]     kaydi sil
-  rotate --name N [yeni-deger]   degeri dondur (deger verilmezse rastgele uret)
-  dims                       kullanilan boyut (tenant/project/env/repo) degerlerini goster
-  leaks                      yeniden-kullanilan (paylasilan) secret degerlerini bul
-
-TARAMA / DAGITIM
-  scan <folder> [--import] [--history] [boyutlar]   .env/dosya/git-history'den secret cikar
-  deploy --target <t> [boyutlar]   render et: dotenv|export|docker|json|k8s|aws-secrets|aws-ssm|github
-  run [boyutlar] <cmd...>    secret'lari env'e enjekte edip komutu calistir (deger sizmaz)
-
-TASIMA / DENETIM / ARAYUZ
-  export [file]              parola-korumali .age bundle disari aktar
-  import <bundle.age>        bundle iceri aktar
-  audit [verify]             HMAC-zincirli denetim gunlugu (verify: butunluk kontrolu)
-  config [key [val]]         calisma-zamani ayarlari (idle, confirm_ops)
-  web [port]                 web UI + JSON API sun (varsayilan 8787)
-  mcp                        MCP stdio sunucusu (ajanlar icin; CONCEALER_TOKEN gerekir)
-  version | help             surum / bu yardim
-
-BOYUTLAR (scope) — her komutta filtre/kapsam olarak kullanilir
-  --tenant T  --project P  --env E  --repo R          --name N  --type T
-  Tipler: api_key (varsayilan) · database · website · custom
-
-ORNEKLER
-  # 1) Kur ve token'i al
-  concealer init                                  # ciktidaki 'export CONCEALER_TOKEN=…' satirini calistir
-
-  # 2) Bir API anahtari ekle ve oku
-  cer set --name openai --project web --env prod sk-DUMMY-123
-  cer get --name openai --project web --env prod
-
-  # 3) Veritabani kaydi (coklu alan)
-  cer set --name pg --type database --project web \\
-      host=db.local port=5432 database=app username=app password=sk-DUMMY-pw
-
-  # 4) Bir projeyi tara ve iceri aktar
-  cer scan ./myrepo --history --import --project myrepo --env dev
-
-  # 5) Secret'lari sizdirmadan bir komut calistir
-  cer run --project web --env prod npm run deploy
-
-  # 6) .env olarak render et
-  cer deploy --target dotenv --project web --env prod > .env
-
-  # 7) Web arayuzunu ac
-  cer web 8787            # http://localhost:8787  (master parola ile unlock)
-
-  # 8) Ajan token'i uret ve MCP sunucusunu calistir
-  cer agent register my-agent                     # CONCEALER_TOKEN=… uretir
-  CONCEALER_TOKEN=… cer mcp
-
-ORTAM DEGISKENLERI
-  CONCEALER_HOME   vault dizini (varsayilan: ~/.concealer; depo checkout'unda script yani)
-  CONCEALER_TOKEN  CLI/MCP unlock token'i (init/unlock/agent register uretir)
-  CONCEALER_IDLE   web oturumu bosta-kilit suresi (saniye)
-
-Docs: https://github.com/fxerkan/concealer"""
+def _mkhelp():
+    R = lambda syn, desc: f"  {syn:<46}{desc}"
+    lines = [
+        f"concealer {VERSION} — local-only secret manager (SOPS + age)   ·   alias: cer",
+        "",
+        "USAGE",
+        "  concealer <command> [options]                 # short: cer <command>",
+        "  most commands accept a scope: --tenant T  --project P  --env E  --repo R",
+        "",
+        "VAULT / KEY",
+        R("init [--force]", "set up a new vault; prints master password, 8 recovery codes, CLI token"),
+        R("unlock", "get a time-limited (TTL) token for a human, via the master password"),
+        R("harden", "harden an old vault (remove the plaintext age key from disk)"),
+        R("passwd", "change the master password (requires a recovery code)"),
+        R("recover", "access the vault with a recovery code (forgotten password)"),
+        R("recovery", "regenerate the recovery-code set"),
+        R("agent register|list|revoke <name>", "long-lived, revocable token for agents"),
+        "",
+        "SECRETS",
+        R("list [term] [scope] [--tag X] [--type T]", "list records (masked)"),
+        R("search <term>", "search across all fields"),
+        R("get --name N [scope]", "print the secret value (must match exactly one)"),
+        R("set --name N [--type T] <value | k=v ...>", "create/update (add --tags a,b for tags)"),
+        R("rm --name N [scope]", "delete a record"),
+        R("rotate --name N [new-value]", "rotate the value (random if none given)"),
+        R("dims", "show the scope (tenant/project/env/repo) values in use"),
+        R("leaks", "find reused (shared) secret values"),
+        "",
+        "SCAN / DEPLOY",
+        R("scan <folder> [--import] [--history] [scope]", "extract secrets from .env/files/git history"),
+        R("deploy --target <t> [scope]", "render: dotenv|export|docker|json|k8s|aws-secrets|aws-ssm|github"),
+        R("run [scope] <cmd...>", "inject secrets into env and run a command (no values leak)"),
+        "",
+        "TRANSFER / AUDIT / INTERFACE",
+        R("export [file]", "export a password-protected .age bundle"),
+        R("import <bundle.age>", "import a bundle"),
+        R("audit [verify]", "HMAC-chained audit log (verify: integrity check)"),
+        R("config [key [val]]", "runtime settings (idle, confirm_ops)"),
+        R("tui", "interactive terminal UI (arrow keys, search, add/del/reveal)"),
+        R("web [port]", "serve the web UI + JSON API (default 8787)"),
+        R("mcp", "MCP stdio server (for agents; needs CONCEALER_TOKEN)"),
+        R("version | help", "version / this help"),
+        "",
+        "TYPES",
+        "  api_key (default) · database · website · login · oauth · jwt · ssh_key · wifi · custom · …",
+        "",
+        "EXAMPLES",
+        "  concealer init                                # run the 'export CONCEALER_TOKEN=…' line it prints",
+        "  cer set --name openai --project web --env prod sk-DUMMY-123",
+        "  cer get --name openai --project web --env prod",
+        "  cer set --name pg --type database --project web \\",
+        "      host=db.local port=5432 database=app username=app password=sk-DUMMY-pw",
+        "  cer scan ./myrepo --history --import --project myrepo --env dev",
+        "  cer run --project web --env prod npm run deploy",
+        "  cer deploy --target dotenv --project web --env prod > .env",
+        "  cer tui                                       # browse/search secrets in the terminal",
+        "  cer web 8787                                  # http://localhost:8787 (unlock with master pw)",
+        "  cer agent register my-agent                   # prints CONCEALER_TOKEN=…",
+        "  CONCEALER_TOKEN=… cer mcp",
+        "",
+        "ENVIRONMENT",
+        R("CONCEALER_HOME", "vault directory (default: ~/.concealer; repo checkout: next to the script)"),
+        R("CONCEALER_TOKEN", "CLI/MCP unlock token (init/unlock/agent register produce it)"),
+        R("CONCEALER_IDLE", "web session idle-lock timeout (seconds)"),
+        "",
+        "Docs: https://github.com/fxerkan/concealer",
+    ]
+    return "\n".join(lines)
+HELP = _mkhelp()
 
 # harici bagimliliklar; brew formulu bunlari otomatik kurar, ama elle kurulumda net hata verelim.
 _DEPS = {"sops": "sops", "age": "age", "age-keygen": "age", "expect": "expect"}
@@ -906,6 +1581,7 @@ def cli(argv):
     if cmd == "unlock": return unlock()
     if cmd == "agent": return agent_cmd(a)
     if cmd == "harden": return harden()
+    if cmd == "tui": return tui()
     if cmd == "list":
         tag = _flag(a, "--tag"); sel = _sel(a); typ = sel.pop("type", None)
         _print(filt(load(), sel, tag, a[0] if a else None, typ))
@@ -1101,6 +1777,17 @@ def serve_web(port):
                 return self._json({"idle": CFG["idle"], "confirm_ops": CFG["confirm_ops"]})
             if path == "/api/leaks":
                 audit("leak_scan", source="web"); return self._json(leak_scan())
+            if path == "/api/browse":      # scan-folder icin sunucu-tarafi klasor gezgini (yerel app)
+                raw = q.get("path") or os.path.expanduser("~")
+                p = os.path.abspath(os.path.expanduser(raw))
+                if not os.path.isdir(p): p = os.path.expanduser("~")
+                try: dirs = sorted((n for n in os.listdir(p) if not n.startswith(".") and os.path.isdir(os.path.join(p, n))), key=str.lower)
+                except Exception: dirs = []
+                parent = os.path.dirname(p)
+                return self._json({"path": p, "parent": parent if parent != p else None, "dirs": dirs})
+            if path == "/api/pickdir":     # OS-native klasor secme diyalogu (Finder/Explorer)
+                sup = sys.platform == "darwin" or sys.platform.startswith("win") or bool(shutil.which("zenity") or shutil.which("kdialog"))
+                return self._json({"path": _native_pickdir() if sup else None, "supported": sup})
             if path == "/api/audit/verify": return self._json(audit_verify())
             if path == "/api/audit/export":
                 rows = audit_rows()

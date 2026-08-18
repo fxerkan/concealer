@@ -8,9 +8,16 @@
 > Encrypted with [SOPS](https://github.com/getsops/sops) + [age](https://github.com/FiloSottile/age).
 > No cloud, no telemetry, no account. Master password + recovery codes. CLI · Web UI · MCP.
 
-<sub>Version **0.2.0** · pre‑1.0 (stays in `0.x` until the first full public release) · see [CHANGELOG](CHANGELOG.md)</sub>
+<sub>Version **0.5.1** · pre‑1.0 (stays in `0.x` until the first full public release) · see [CHANGELOG](CHANGELOG.md)</sub>
 
 `concealer` is a thin, auditable wrapper around two battle‑tested tools — it does **not** implement its own cryptography. Everything is encrypted by `sops`/`age`; concealer only adds the UX: typed secrets, scoping, tags, a professional web UI, tamper‑evident audit logs, and an MCP server so AI agents can *use* secrets without ever *seeing* them.
+
+**Agents use a secret (Home Assistant token) without ever seeing it:**
+
+<p align="center">
+  <img src="assets/demo-ha-token.gif" alt="Claude Code injecting a Home Assistant token via concealer MCP — the value is redacted from its context" width="820">
+</p>
+
 
 ---
 
@@ -32,6 +39,11 @@ I didn't want a **cloud** secret manager (Doppler, Infisical, Vault, 1Password) 
 5. **One place, many projects.** The same value used across many repos is disambiguated by `tenant / project / environment / repo` dimensions instead of a single ambiguous name.
 
 If you've ever pasted a secret into a chat window and immediately regretted it — that's the itch this scratches.
+
+<p align="center">
+  <img src="assets/app-secrets.png" alt="concealer Secrets — one searchable, scoped home for every credential across all your projects" width="820">
+  <br><sub>One searchable, scoped home for every credential — typed, tagged, masked, and disambiguated by tenant / project / environment / repo.</sub>
+</p>
 
 ---
 
@@ -138,24 +150,60 @@ The **token value** is only ever in your environment (`CONCEALER_TOKEN`); the va
 Every secret carries `tenant / project / environment / repo`. Empty = wildcard (a default). On `run`, the **most‑specific** match wins: `acme/proj-a/prod` overrides `proj-a` overrides `global`. Unspecified dimensions on `run` are auto‑detected from the current git repo.
 
 ### Secret types
+Each type has its own **type‑aware form** so you only enter the fields that make sense, and secret‑ish fields (`password`/`value`/`token`/`pin`/…) are stored masked and revealed only on demand (audited). Any field name works too via `custom`.
+
 | Type | Fields |
 |------|--------|
 | `api_key` | `value` |
+| `access_token` | token, refresh_token, expires, scopes |
+| `oauth` | client_id, client_secret, auth_url, token_url, scopes |
+| `jwt` | token, issuer, audience, expires |
+| `ssh_key` | private_key, public_key, passphrase, host, user |
+| `certificate` | certificate, private_key, chain, expires |
 | `database` | host, port, database, schema, username, password, auth_type, jdbc_url |
+| `server` | host, port, username, password, ssh_key |
 | `website` | web_url, username, password |
+| `login` | web_url, username, password, totp |
+| `pin` | pin, label (phone / door PINs) |
+| `wifi` | ssid, password, security |
+| `membership` | provider, member_id, password |
+| `secure_note` | note |
 | `custom` | any key/value you define |
 
-Secret‑ish fields (password/value/token…) are masked in lists and revealed only on demand (audited).
+> **No PII by design.** There are deliberately **no** credit‑card / passport / national‑ID types — this vault is for machine & account credentials, not identity documents.
+
+Each type renders exactly the inputs it needs — an API key is a single value, a cloud credential carries its client/secret/URLs, a database its host/port/user/password, a website its URL/login:
+
+<p align="center">
+  <img src="assets/secrets-cloud.png" alt="Cloud credential form" width="410">
+  <img src="assets/secrets-db.png" alt="Database secret form" width="410">
+  <br>
+  <img src="assets/secrets-web.png" alt="Website login form" width="410">
+  <img src="assets/secrets-custom.png" alt="Custom key/value secret form" width="410">
+  <br><sub>Type‑aware entry: cloud tokens · database connections · website logins · free‑form custom fields. Secret fields are masked; plain fields (host, url, username) stay readable and become optional table columns.</sub>
+</p>
 
 ### Web UI — `concealer web`
 Opens **http://127.0.0.1:8787** (localhost only). Features:
 - **TR / EN** interface toggle (top‑right)
-- Full **CRUD** with type‑aware forms
-- Search + tenant/project/environment/repo/tag/type filters
+- Full **CRUD** with type‑aware forms · responsive (phone/tablet) layout
+- Search + **searchable, multi‑select** type/tenant/project/environment/repo/**tags** filters
+- **Sortable, reorderable columns** — including any custom field (web_url, host, …) as its own column
+- **Per‑secret Deploy**: render the exact CLI/manifest to push a secret to `export`/`docker`/`k8s`/`aws-secrets`/`aws-ssm`/`github`/…
 - **Copy to clipboard with auto‑clear** (20s) · password **show/hide** toggle
 - Metadata: url, tags, notes
 - **Auto‑lock on idle** (default 300s, `CONCEALER_IDLE=…` to change)
 - **Audit Log viewer**: filter by action/source/key/date, pagination, row detail, **chain verification**, CSV/JSON export
+
+<p align="center">
+  <img src="assets/app-audit-logs.png" alt="Tamper-evident audit log with chain verification" width="640">
+  <br><sub><b>Audit Logs</b> — every read/write/copy/inject is HMAC‑chained; verify integrity or export to CSV/JSON.</sub>
+</p>
+<p align="center">
+  <img src="assets/app-risks.png" alt="Risk view: reused secret values scored by leak risk" width="410">
+  <img src="assets/app-scan-folder.png" alt="Scan a folder or shell history for leaked secrets" width="410">
+  <br><sub><b>Risks</b> — finds the same value reused across projects and scores the blast radius. &nbsp;·&nbsp; <b>Scan folder</b> — sweep a directory (or shell history) for stray secrets and import them, tagged by origin.</sub>
+</p>
 
 ### MCP (AI agents) — `concealer mcp`
 Register once, available in every session. On a hardened (key‑at‑rest) vault the
@@ -174,6 +222,13 @@ Tools exposed to the agent:
 - `run_with_secrets` — runs a command with secrets injected into env; **values are redacted** from the returned output
 
 The agent can use a DB password to run a query, but the password never appears in its context. Every MCP access is written to the audit log with `source=mcp`.
+
+**Agents list secret names — values stay hidden:**
+
+<p align="center">
+  <img src="assets/mcp-secret-list.gif" alt="Claude Code listing concealer secrets over MCP — names and scopes only, never values" width="820">
+</p>
+
 
 ---
 
@@ -215,4 +270,6 @@ MIT.
 
 ---
 
-*concealer is glue over [SOPS](https://github.com/getsops/sops) and [age](https://github.com/FiloSottile/age). All the hard cryptography is theirs; the laziness is mine.*
+**concealer** *is glue over [SOPS](https://github.com/getsops/sops) and [age](https://github.com/FiloSottile/age). All the hard cryptography is theirs; the laziness is mine.*
+
+Developed by [FXerkan](https://fxerkan.com) - Code more, worry less.

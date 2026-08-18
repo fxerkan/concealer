@@ -6,6 +6,166 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.6.3] — 2026-08-18
+
+### Security
+- **TUI wipes the terminal scrollback on exit.** The TUI already runs in the
+  alternate screen buffer, but terminals like iTerm2 (with *"Save lines to
+  scrollback in alternate screen mode"* enabled) copy the alt-screen frames into
+  the real scrollback — so after quitting `cer` you could scroll up and still see
+  the whole screen, including (masked) secret values. `cer` now clears the screen
+  **and** the scrollback (`ESC[2J ESC[3J`) on teardown, so nothing survives
+  regardless of terminal settings. Fires on both quit and crash.
+
+## [0.6.2] — 2026-08-18
+
+### Changed
+- **Login redaction is now a continuous streaming animation.** Each dummy secret
+  runs a full lifecycle on its own slow (8–15 s) loop — rises in, shows plaintext,
+  gets redacted (amber bar + strike-through), fades out, then **reappears at a new
+  random spot** — so the effect keeps flowing without a page refresh. Fragments
+  start mid-cycle (negative delays) so the stream is alive on load; repositioning
+  happens on the invisible frame boundary (`animationiteration`), so there are no
+  visible jumps. GPU-only (`transform`/`opacity`). Under `prefers-reduced-motion`
+  it **degrades to a calm opacity-only cross-fade** (no rise/scale motion) instead
+  of freezing — so the show/hide stream still plays for users who have Reduce
+  Motion on (which previously left the background static).
+
+## [0.6.1] — 2026-08-18
+
+Complete the Turkish translation of the web UI.
+
+### Fixed
+- **Missing Turkish strings.** Tab labels (Sırlar / Denetim Kayıtları / Riskler),
+  the scope-dimension filter & form labels (Tenant/Proje/Ortam/Repo), column
+  headers (Ad/Tip/Anahtar), the auto-lock countdown (oto-kilit), and the
+  export/import buttons now render in Turkish. Balanced `tr`/`en` key sets.
+- **Operation/action names** (create/update/delete/export/import/settings/…)
+  now show translated labels in the Settings confirm-ops list, the Audit Logs
+  Action column + detail, the Stats "by action" chart, and the action filter —
+  via a display-only `actLabel()` map (raw values kept for data/filtering).
+
+## [0.6.0] — 2026-08-18
+
+Audit grid parity, a Stats dashboard, themes, and a redaction login animation.
+
+### Added
+- **Stats dashboard** (new tab). Interactive, dependency-free charts (hand-rolled
+  HTML bars + inline SVG trend line) over secrets and the audit log: activity
+  trend, and top type / platform-tag / interface(source) / action / actor /
+  most-accessed-secret / project / tenant / environment / repo. KPI cards, a
+  period quick-select and source/actor/type/project multi-select filter panel.
+  All bars carry value labels; every series has a hover tooltip.
+- **Audit Logs grid parity with Secrets.** Client-side quick search, multi-select
+  filters (source / action / actor / key) with a show/hide filter panel, per-column
+  click-to-sort, drag-to-resize, reorder + hide (⚙), and client pagination with a
+  page-size selector. Column order/visibility persist in `localStorage`.
+- **Fast period selection** (30 min / 1 h / 6 h / 1 day / 1 week / 30 days / All)
+  on both Audit and Stats, alongside the existing from/to datetime range.
+- **Themes.** Besides the default Covert (Dark), a **White** and a **Matrix**
+  (phosphor-green mono) theme, switchable from the header and persisted.
+- **Login redaction animation.** Dummy secrets/API keys/tokens (all `…DUMMY…`)
+  scroll in the background and get "concealed" — an amber redaction bar wipes over
+  each value with a strike-through, on a loop. Respects `prefers-reduced-motion`.
+- **Per-field secrecy overrides (`field_meta`).** Every field can be marked
+  secret/plain with a mask style (partial `sk-D…xy` or full `••••••••`),
+  independent of the type template — set in the TUI add/edit flow. Resolved by
+  `rec_field_secret()`/`rec_mask()` (per-field override → type template → name
+  heuristic → **value heuristic**) and honoured consistently across the web
+  (`entry_public()`), the TUI, MCP `run_with_secrets` **redaction**, and
+  reuse/leak detection — so a field marked secret can't leak through any path.
+- **Connection strings masked by default.** `database.jdbc_url` is now a secret
+  field, and any value with embedded credentials `[user]:pass@` (jdbc/dsn/conn
+  strings, incl. password-only `redis://:pw@host`) is masked even in a "plain"
+  field — and redacted from MCP child-process output — so credentials in URLs
+  never show on sight. `host:port/path` (no credentials) stays visible.
+
+### Changed
+- **TUI Details panel is now interactive.** Focus it (`3`/Tab) and move a cursor
+  over each key/value with `↑↓`/`j`/`k`; `Enter` or `m` reveals **just the
+  selected field** (per-field, not all-at-once); `p` copies the selected field.
+  `m` from the Secrets panel still reveals/hides the whole record. Long records
+  auto-scroll to keep the cursor visible.
+- **Every TUI secret access is audited** (`source=tui`): revealing a masked field
+  (or reveal-all) records a `get` with the field name, alongside the existing
+  copy/create/update/delete/rotate events.
+- **TUI modals are opaque.** The `?` keymap and all prompts/pickers paint a solid
+  background instead of showing the vault behind them.
+
+### Fixed
+- **TUI now renders in the VS Code integrated terminal** (borders/panels were
+  invisible there). Root cause: VS Code launches the shell with a non-UTF-8
+  locale (`LC_ALL/LANG=C`), so ncurses silently dropped the Unicode box-drawing
+  characters. `tui()` now forces a UTF-8 locale (`en_US.UTF-8`/`C.UTF-8`) before
+  curses starts, and if none is available falls back to an all-ASCII glyph set
+  (`+ - |`), so panels always draw. Also added `KEY_RESIZE` handling (refresh
+  geometry + full repaint) and made `put()` swallow encoding errors.
+
+## [0.5.1] — 2026-08-18
+
+Secrets grid: custom-field columns, reorder, native folder picker.
+
+### Added
+- **Custom fields as table columns.** The column picker now lists every field
+  found across secrets (e.g. `web_url`, `host`, `username`) — toggle any on as
+  its own column. Plain fields show their value; secret fields stay masked.
+- **Column reordering** (▲▼ in the column picker) and per-column click-to-sort;
+  order/visibility persist in `localStorage`. Secrets grid is now model-driven.
+- **Native OS folder picker** in Scan folder (`/api/pickdir` → Finder /
+  Explorer / zenity / kdialog), falling back to the in-app browser only when no
+  native tool exists.
+- README: type-aware entry screenshots per secret type + Audit/Risks/Scan
+  screens; secret-types table refreshed.
+
+### Changed
+- Scan folder: **Import selected** stays disabled until a scan finds candidates;
+  **Scan** is now the amber (primary) button, Import is a distinct green.
+- Header logo enlarged, vertically centered with the wordmark, brighter glow.
+- Tags filter matching is **OR** (any selected tag matches) — a record with any
+  of the chosen tags shows.
+
+## [0.5.0] — 2026-08-18
+
+Terminal UI + English help.
+
+### Added
+- **`concealer tui`** — a full-screen curses vault browser (btop / Keeper-
+  Supershell style) mirroring the web app, in the Covert amber palette. Three
+  focusable panels — **Filters** (facets with live counts, multi-select),
+  **Secrets** (list) and **Details** — plus a top status bar, a live search
+  line and a help bar. Keyboard-driven: `Tab`/`1`/`2`/`3`/`h`/`l` switch panels;
+  `j`/`k`/arrows + `g`/`G` + PgUp/Dn + Ctrl-D/U navigate; `/` live search;
+  `Space` toggle a facet, `x` clear filters; `m` reveal/hide; `a`/`e`/`d`/`r`
+  add/edit/delete/rotate; `p`/`u`/`w` copy value/username/url (clipboard
+  auto-clears after 45 s); `?` keymap, `Ctrl-L` redraw, `q` quit. **Secrets are
+  masked by default** and revealed only on `m`. ASCII logo splash on launch;
+  unlocks once on the TTY (master pw / `CONCEALER_TOKEN`) before curses starts;
+  every mutation/copy is audited with `source=tui`. Stdlib `curses` only
+  (Unix/macOS).
+
+### Changed
+- **`help` / `--help` is now fully English** and column-aligned (built via a row
+  formatter so synopsis/description columns stay flush). Added the `tui` entry.
+
+## [0.4.1] — 2026-08-18
+
+Secrets-page follow-ups: privacy, tag filtering, and a real folder picker.
+
+### Removed
+- **PII-bearing secret types** (`credit_card`, `bank_account`, `passport`,
+  `id_card`) — these must never live in this vault. Remaining everyday types:
+  `pin`, `wifi`, `membership`, `secure_note`.
+
+### Added
+- **Tags** multi-select in the filter panel (`filt()` tag matching accepts
+  comma-joined values, any-match).
+- **Folder picker** in Scan folder: a server-side directory browser
+  (`/api/browse`) to navigate and pick a path, alongside typing it directly.
+- **Scanning progress bar** (indeterminate) while a scan runs.
+- Imported secrets are tagged by origin: `scan-folder` vs `scan-history`; the
+  scan candidate list shows a 📁/📜 badge per source.
+- **Glow/halo** around the header logo (matches the feature-graphic).
+
 ## [0.4.0] — 2026-08-18
 
 Web UI overhaul: responsive/mobile layout and per-secret deploy.
