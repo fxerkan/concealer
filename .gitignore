@@ -12,3 +12,5 @@ secrets.enc.json
 __pycache__/
 *.pyc
 *.age.new
+.impeccable/
+.claude/
