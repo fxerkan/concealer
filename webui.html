@@ -483,10 +483,34 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
       <label class="fld" data-i18n="set_portability">Portability (move between machines)</label>
       <div class="toolbar" style="margin-top:8px">
         <button data-i18n="export_btn" onclick="doExport()">⬇ Export (.age)</button>
-        <input type="file" id="imp_file" accept=".age" style="width:auto">
+        <input type="file" id="imp_file" accept=".age,.cer" style="width:auto">
         <button data-i18n="import_btn" onclick="doImport()">⬆ Import</button>
       </div>
-      <p class="mut" style="max-width:680px" data-i18n="set_export_hint">Export encrypts the whole vault with your master password (age). Import merges records into this vault.</p>
+      <p class="mut" style="max-width:680px" data-i18n="set_export_hint">Export encrypts the whole vault with your master password (age). Import merges records into this vault (also restores a .cer backup).</p>
+
+      <hr style="border-color:var(--line);margin:22px 0;max-width:680px">
+      <label class="fld" data-i18n="set_backup">Backup (.cer)</label>
+      <p class="mut" style="max-width:680px;margin:4px 0 10px" data-i18n="set_backup_hint">A .cer backup is the whole vault encrypted with a dedicated backup password (separate from your master password) — an opaque binary you can't open to read. Restore it via Import above. Automatic backups write a .cer to a local folder on unlock once the interval has elapsed.</p>
+      <div class="toolbar" style="margin-top:4px">
+        <button data-i18n="backup_now" onclick="doBackup()">⬇ Backup now (.cer)</button>
+      </div>
+      <div class="grid" style="max-width:680px;margin-top:14px">
+        <div class="field"><label class="fld" style="display:flex;gap:8px;align-items:center">
+          <input type="checkbox" id="bk_enabled" style="width:auto"> <span data-i18n="bk_auto">Automatic backups</span></label></div>
+        <div class="field"><label class="fld" data-i18n="bk_interval">Every (hours)</label>
+          <input id="bk_interval" type="number" min="1" max="8760"></div>
+        <div class="field"><label class="fld" data-i18n="bk_keep">Keep last (files)</label>
+          <input id="bk_keep" type="number" min="1" max="365"></div>
+        <div class="field"><label class="fld" data-i18n="bk_dir">Destination folder</label>
+          <input id="bk_dir" type="text" placeholder="/Users/…/concealer-backups"></div>
+        <div class="field"><label class="fld" data-i18n="bk_pw">Backup password <span id="bk_pw_set" class="mut"></span></label>
+          <input id="bk_pw" type="password" data-i18n-ph="bk_pw_ph" placeholder="set / change (leave blank to keep)"></div>
+      </div>
+      <div class="toolbar" style="margin-top:8px">
+        <button class="primary" data-i18n="save" onclick="saveBackupCfg()">Save</button>
+        <button data-i18n="bk_run" onclick="runBackupNow()">▶ Run auto-backup now</button>
+        <span id="bk_last" class="mut"></span>
+      </div>
     </section>
   </main>
 </div>
@@ -539,10 +563,18 @@ const I18N={
   set_limits:"MCP erişim limitleri (toplu-sızma engeli)",
   set_limits_hint:"AI ajanlar secret'ları yalnız kayıtlı bir agent token'ıyla okuyabilir. Çağrı başı tek yanıtı, pencere kotası ise bir ajanın pencere içinde açabileceği DISTINCT secret sayısını sınırlar — tekrarlı sorgularla tüm vault toplanamaz. Bir ajanı tamamen engellemek için pencere kotasını 0 yap.",
   lim_who:"Kim",lim_default:"Varsayılan (tüm ajanlar)",lim_per_call:"Çağrı başı",lim_quota:"Pencere kotası (distinct)",lim_window:"Pencere (sn)",
-  lim_add:"Ajan limiti ekle",lim_add_ph:"ajan seç…",lim_remove:"override'ı kaldır",lim_no_agents:"Kayıtlı ajan yok — `concealer agent register <ad>` ile ekle.",
+  lim_add:"Ajan limiti ekle",lim_add_ph:"ajan seç…",lim_remove:"override'ı kaldır",lim_no_agents:"Kayıtlı ajan yok — <code>concealer agent register &lt;ad&gt;</code> ile ekle.",
+  lim_not_hardened:"Vault HARDENED değil: diskte düz-metin age anahtarı (keys/age-key.txt) var. Bu yüzden MCP/CLI, secret'ları token/kayıt OLMADAN okuyabiliyor (bu sayfadaki limitler ve kayıt zorunluluğu bu haldeyken uygulanamaz). Zorunlu kılmak için: (1) <code>concealer harden</code> — düz-metin anahtarı kaldırır; (2) <code>concealer agent register claude-code</code> — CONCEALER_TOKEN üretir; (3) token'ı Claude Code MCP env'ine ekle; (4) MCP sunucusunu yeniden başlat.",
   set_portability:"Taşınabilirlik (makineler arası)",export_btn:"⬇ Dışa Aktar (.age)",import_btn:"⬆ İçe Aktar",
   set_export_hint:"Dışa aktarma tüm vault'u master parolayla (age) şifreler; başka makineye taşınabilir. İçe aktarma kayıtları bu vault'a birleştirir.",
   exported:"dışa aktarma indirildi",imp_pick:"önce .age dosyası seç",imp_fail:"içe aktarma başarısız",imported_n:(n,u)=>`+${n} yeni, ~${u} güncellendi`,
+  set_backup:"Yedek (.cer)",set_backup_hint:"Bir .cer yedeği, tüm vault'un master parolandan AYRI özel bir yedek parolasıyla şifrelenmiş halidir — içi açılıp okunamayan opak binary. Yukarıdaki İçe Aktar ile geri yüklenir. Otomatik yedekler, süre dolunca kilit açılışında bir .cer'i yerel klasöre yazar.",
+  backup_now:"⬇ Şimdi yedekle (.cer)",bk_auto:"Otomatik yedek",bk_interval:"Her (saat)",bk_keep:"Son (dosya) tut",bk_dir:"Hedef klasör",
+  bk_pw:"Yedek parolası",bk_pw_ph:"belirle / değiştir (boş = değişmesin)",bk_pw_isset:"(ayarlı)",bk_pw_unset:"(ayarlı değil)",bk_run:"▶ Otomatik yedeği şimdi al",
+  bk_saved:"yedek ayarı kaydedildi",bk_downloaded:"yedek indirildi",bk_ran:s=>`yedek yazıldı: ${s}`,
+  bk_pw_short:"yedek parolası en az 8 karakter olmalı",bk_pw_mismatch:"yedek parolaları eşleşmiyor",bk_pw_same:"yedek parolası master paroladan farklı olmalı",
+  bk_pw_need:"otomatik yedek için önce bir yedek parolası belirle",bk_dir_need:"hedef klasör gir",bk_last:s=>`son yedek: ${s}`,bk_last_never:"henüz yedek yok",
+  bk_set_pw_title:"Yedek parolası",bk_pw2_ph:"yedek parolasını tekrar gir",
   columns:"Kolonlar",deploy_btn:"🚀 Deploy",deploy_title:"Deploy / Hedefe Gönder",deploy_target:"hedef",deploy_result:"çıktı (komut/manifest)",
   prev:"‹ önceki",next:"sonraki ›",page:(p,t,n)=>`sayfa ${p}/${t} · ${n} kayıt`,
   chain_ok:c=>`✓ bütünlük OK (${c})`,chain_bad:b=>`✗ kırık @ #${b}`,
@@ -587,10 +619,18 @@ const I18N={
   set_limits:"MCP access limits (anti-bulk-exfiltration)",
   set_limits_hint:"AI agents may only read secrets through a registered agent token. Per call caps a single response; the window quota caps how many distinct secrets an agent may reveal within the window — repeated queries can't reassemble the whole vault. Set the window quota to 0 to fully block an agent.",
   lim_who:"Who",lim_default:"Default (all agents)",lim_per_call:"Per call",lim_quota:"Window quota (distinct)",lim_window:"Window (sec)",
-  lim_add:"Add agent limit",lim_add_ph:"pick agent…",lim_remove:"remove override",lim_no_agents:"No registered agents — add one with `concealer agent register <name>`.",
+  lim_add:"Add agent limit",lim_add_ph:"pick agent…",lim_remove:"remove override",lim_no_agents:"No registered agents — add one with <code>concealer agent register &lt;name&gt;</code>.",
+  lim_not_hardened:"Vault is NOT hardened: a plaintext age key (keys/age-key.txt) is on disk, so MCP/CLI can read secrets WITHOUT a token or registration (the limits and registration requirement on this page can't be enforced in this state). To enforce them: (1) <code>concealer harden</code> — removes the plaintext key; (2) <code>concealer agent register claude-code</code> — prints a CONCEALER_TOKEN; (3) put that token in the Claude Code MCP env; (4) restart the MCP server.",
   set_portability:"Portability (move between machines)",export_btn:"⬇ Export (.age)",import_btn:"⬆ Import",
   set_export_hint:"Export encrypts the whole vault with your master password (age); portable to another machine. Import merges records into this vault.",
   exported:"export downloaded",imp_pick:"pick a .age file first",imp_fail:"import failed",imported_n:(n,u)=>`+${n} new, ~${u} updated`,
+  set_backup:"Backup (.cer)",set_backup_hint:"A .cer backup is the whole vault encrypted with a dedicated backup password (separate from your master password) — an opaque binary you can't open to read. Restore it via Import above. Automatic backups write a .cer to a local folder on unlock once the interval has elapsed.",
+  backup_now:"⬇ Backup now (.cer)",bk_auto:"Automatic backups",bk_interval:"Every (hours)",bk_keep:"Keep last (files)",bk_dir:"Destination folder",
+  bk_pw:"Backup password",bk_pw_ph:"set / change (leave blank to keep)",bk_pw_isset:"(set)",bk_pw_unset:"(not set)",bk_run:"▶ Run auto-backup now",
+  bk_saved:"backup settings saved",bk_downloaded:"backup downloaded",bk_ran:s=>`backup written: ${s}`,
+  bk_pw_short:"backup password must be at least 8 characters",bk_pw_mismatch:"backup passwords don't match",bk_pw_same:"backup password must differ from the master password",
+  bk_pw_need:"set a backup password first to enable automatic backups",bk_dir_need:"enter a destination folder",bk_last:s=>`last backup: ${s}`,bk_last_never:"no backup yet",
+  bk_set_pw_title:"Backup password",bk_pw2_ph:"re-enter the backup password",
   columns:"Columns",deploy_btn:"🚀 Deploy",deploy_title:"Deploy / Send to target",deploy_target:"target",deploy_result:"output (command/manifest)",
   prev:"‹ prev",next:"next ›",page:(p,t,n)=>`page ${p}/${t} · ${n} records`,
   chain_ok:c=>`✓ integrity OK (${c})`,chain_bad:b=>`✗ broken @ #${b}`,
@@ -611,9 +651,11 @@ const ACTL={
    unlock_fail:"kilit açma başarısız",get:"getir",list:"listele",search:"ara",rotate:"döndür",scan:"tara",
    scan_import:"tarama içe aktarımı",leak_scan:"risk taraması",settings:"ayarlar",settings_fail:"ayar başarısız",
    init:"ilklendir",harden:"sıkılaştır",recover:"kurtar",recovery_regen:"kurtarma yenile",passwd:"parola değiştir",
-   agent_register:"ajan kaydı",agent_revoke:"ajan iptali"},
+   agent_register:"ajan kaydı",agent_revoke:"ajan iptali",
+   backup:"yedek",backup_auto:"oto-yedek",backup_cfg:"yedek ayarı",backup_cfg_fail:"yedek ayarı başarısız"},
  en:{leak_scan:"leak scan",export_fail:"export failed",unlock_fail:"unlock failed",settings_fail:"settings failed",
-   scan_import:"scan import",recovery_regen:"recovery regen",agent_register:"agent register",agent_revoke:"agent revoke"}
+   scan_import:"scan import",recovery_regen:"recovery regen",agent_register:"agent register",agent_revoke:"agent revoke",
+   backup:"backup",backup_auto:"auto-backup",backup_cfg:"backup settings",backup_cfg_fail:"backup settings failed"}
 };
 function actLabel(a){ return (ACTL[LANG] && ACTL[LANG][a]) || a; }
 function setLang(l){
@@ -779,6 +821,59 @@ async function loadSettings(){
   $('#set_confirm').innerHTML=['export','delete','settings','create','update'].map(o=>
     `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="cop" value="${o}" ${s.confirm_ops.includes(o)?'checked':''} style="width:auto"> ${esc(actLabel(o))}</label>`).join('');
   renderLimits(s);
+  loadBackup();
+}
+async function loadBackup(){
+  if(!$('#bk_enabled'))return;                       // eski sunucu / bu bolum yok → sessizce gec
+  const r=await api('/api/backup'); if(!r.ok)return; // eski sunucu 404 → sekmeyi bozma (sunucuyu yeniden baslat)
+  const b=await r.json();
+  $('#bk_enabled').checked=!!b.enabled; $('#bk_interval').value=b.interval_h||24; $('#bk_keep').value=b.keep||7;
+  $('#bk_dir').value=b.dir||''; $('#bk_pw').value='';
+  $('#bk_pw_set').textContent=b.has_pw?t('bk_pw_isset'):t('bk_pw_unset');
+  $('#bk_last').textContent=b.last?t('bk_last',b.last.replace('T',' ').slice(0,19)):t('bk_last_never');
+}
+// Manuel .cer indir: yedek parolasını 2 kez sor (master'dan farklı, min 8).
+function doBackup(){
+  const body=`<div class="field"><label class="fld">${t('bk_pw')}</label>
+      <input id="bk1" type="password" ${NOPM} data-i18n-ph="bk_pw_ph"></div>
+    <div class="field" style="margin-top:8px"><label class="fld">${t('bk_pw')} (2)</label>
+      <input id="bk2" type="password" ${NOPM} placeholder="${t('bk_pw2_ph')}" onkeydown="if(event.key==='Enter')document.getElementById('bk_go').click()"></div>`;
+  modal('🔐 '+t('backup_now'),body,[{x:t('confirm'),p:1,id:'bk_go',f:async()=>{
+    const pw=$('#bk1').value, pw2=$('#bk2').value;
+    if(pw.length<8){toast(t('bk_pw_short'));return;}
+    if(pw!==pw2){toast(t('bk_pw_mismatch'));return;}
+    closeModal();
+    const r=await api('/api/backup',{method:'POST',body:JSON.stringify({pw,pw2})});
+    const d=await r.json();
+    if(!d.ok){const k='bk_'+(d.error||''); toast(I18N[LANG][k]?t(k):(d.error||'error'));return;}
+    const bin=Uint8Array.from(atob(d.b64),c=>c.charCodeAt(0));
+    const url=URL.createObjectURL(new Blob([bin],{type:'application/octet-stream'}));
+    const a=document.createElement('a'); a.href=url; a.download=d.filename; a.click(); URL.revokeObjectURL(url);
+    toast(t('bk_downloaded'));
+  }},{x:t('cancel'),f:closeModal}]);
+  setTimeout(()=>$('#bk1')&&$('#bk1').focus(),50);
+}
+// Oto-yedek ayarını kaydet: master pw ile doğrula; yeni yedek parolası girildiyse gönder.
+function saveBackupCfg(){
+  const enabled=$('#bk_enabled').checked;
+  const interval_h=Math.max(1,Math.min(8760,parseInt($('#bk_interval').value)||24));
+  const keep=Math.max(1,Math.min(365,parseInt($('#bk_keep').value)||7));
+  const dir=$('#bk_dir').value.trim(), backup_pw=$('#bk_pw').value;
+  if(backup_pw && backup_pw.length<8){toast(t('bk_pw_short'));return;}
+  if(enabled && !dir){toast(t('bk_dir_need'));return;}
+  askPw(t('set_backup'),async pw=>{
+    const r=await api('/api/backup/config',{method:'POST',body:JSON.stringify({pw,enabled,interval_h,keep,dir,backup_pw})});
+    if(r.status===403){toast(t('wrong_pw'));return;}
+    const d=await r.json();
+    if(!d.ok){const k='bk_'+(d.error||''); toast(I18N[LANG][k]?t(k):(d.error||'error'));return;}
+    toast(t('bk_saved')); loadBackup();
+  });
+}
+async function runBackupNow(){
+  const r=await api('/api/backup/run',{method:'POST',body:'{}'});
+  const d=await r.json();
+  if(!d.ok){const k='bk_'+(d.error||''); toast(I18N[LANG][k]?t(k):(d.error||'error'));return;}
+  toast(t('bk_ran',d.path)); loadBackup();
 }
 function limRow(label,l,who){                  // who: '' = default, else agent label (deletable override)
   const d=window.CFG.limits.default||{};
@@ -793,11 +888,14 @@ function limRow(label,l,who){                  // who: '' = default, else agent 
 }
 function renderLimits(s){
   const agents=s.agents||[], ov=(s.limits.agents)||{};
+  const warn=s.hardened===false
+    ? `<div style="border:1px solid var(--bad);border-radius:10px;padding:10px 12px;margin-bottom:12px;color:var(--bad);background:rgba(220,60,60,.07)">⚠ ${t('lim_not_hardened')}</div>`
+    : '';
   const head=`<tr><th>${t('lim_who')}</th><th>${t('lim_per_call')}</th><th>${t('lim_quota')}</th><th>${t('lim_window')}</th><th></th></tr>`;
   let rows=limRow(t('lim_default'),s.limits.default||{},'');
   agents.forEach(a=>{ rows+=limRow(a, ov[a]||{}, a); });
   const opts=agents.filter(a=>!(a in ov)).map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
-  $('#limits_wrap').innerHTML=`<table style="width:100%"><thead>${head}</thead><tbody id="lim_body">${rows}</tbody></table>`+
+  $('#limits_wrap').innerHTML=warn+`<table style="width:100%"><thead>${head}</thead><tbody id="lim_body">${rows}</tbody></table>`+
     (opts?`<div class="toolbar" style="margin-top:8px"><select id="lim_add"><option value="">${t('lim_add_ph')}</option>${opts}</select>
       <button onclick="addLimRow()">+ ${t('lim_add')}</button></div>`:
       `<p class="mut" style="margin-top:8px">${agents.length?'':t('lim_no_agents')}</p>`);
