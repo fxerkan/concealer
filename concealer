@@ -15,7 +15,7 @@ import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse
 import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil
 from datetime import datetime, timezone, timedelta
 
-VERSION = "0.7.0"   # 0.x boyunca ilerler; 1.0 = tam canli/yayin surumu icin ayrilmistir
+VERSION = "0.8.0"   # 0.x boyunca ilerler; 1.0 = tam canli/yayin surumu icin ayrilmistir
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Depo checkout'u: vault script'in yaninda yasar → BASE'i koru (mevcut kurulumlar bozulmasin).
@@ -36,6 +36,7 @@ RECOVERY = os.path.join(HOME, "keys", "recovery.json")# recovery kod hash'leri +
 AGENTS   = os.path.join(HOME, "keys", "agents.json")  # unlock token hash'leri + token-sarmali age key
 CONFIG   = os.path.join(HOME, "keys", "config.json")
 RATESTATE= os.path.join(HOME, "keys", "ratestate.json")  # ajan basina aciklama penceresi (deger degil, sadece isim+ts)
+BACKUPCFG= os.path.join(HOME, "keys", "backup.json")     # oto-yedek ayari + age-recipient-sarmali yedek parolasi (DUZ parola YOK)
 SOPSCFG  = os.path.join(HOME, ".sops.yaml")
 WEBUI    = os.path.join(BASE, "webui.html")
 DIMS = ["tenant", "project", "environment", "repo"]
@@ -572,6 +573,102 @@ def import_bundle(pw, blob):
             try: os.remove(p)
             except OSError: pass
 
+# ---------------- yedek (.cer) ----------------
+# .cer = tum vault'un YEDEK PAROLASI (master'dan farkli, zorunlu) ile age -p sifreli hali.
+# Ciktisi opak binary age ciphertext'tir → dosya acilinca ne oldugu gorulemez; import ile geri yuklenir.
+# Oto-yedek: yedek parolasi vault'un age PUBLIC key'ine sarmalanir (keys/backup.json); yalniz age
+# private key (kilit acikken bellekte) cozer. Duz yedek parolasi diske ASLA yazilmaz.
+CER_EXT = ".cer"
+_DEFAULT_BACKUP = {"enabled": False, "interval_h": 24, "dir": "", "keep": 7, "last": None}
+
+def make_backup(pw):
+    """Tum vault'u yedek parolasi ile sifrele → opak .cer bytes (export_bundle ile ayni format → import geri yukler)."""
+    return export_bundle(pw)
+
+def _cer_name():
+    return "concealer-" + now_iso()[:19].replace(":", "").replace("-", "") + CER_EXT   # concealer-YYYYMMDDTHHMMSS.cer
+
+def _recipient():
+    return open(PUBKEY).read().strip() if os.path.exists(PUBKEY) else None
+
+def _age_enc_pub(data):
+    """data'yi age recipient (public key) ile sifrele → ciphertext bytes. Parolasiz; cozmek age private key ister."""
+    rcpt = _recipient()
+    if not rcpt: raise RuntimeError("pubkey yok (once init)")
+    tin = tempfile.NamedTemporaryFile(delete=False)
+    tin.write(data if isinstance(data, bytes) else data.encode()); tin.close(); tout = tin.name + ".age"
+    try:
+        r = subprocess.run(["age", "-r", rcpt, "-o", tout, tin.name], capture_output=True, text=True)
+        if r.returncode: raise RuntimeError(r.stderr.strip() or "age recipient enc hatasi")
+        return open(tout, "rb").read()
+    finally:
+        for p in (tin.name, tout):
+            try: os.remove(p)
+            except OSError: pass
+
+def _age_dec_priv(blob):
+    """recipient-sifreli blob'u age private key ile coz. Hardened vault: key stdin'den (-i -) verilir, diske YAZILMAZ."""
+    key = _unlock_key()                       # hardened: metin ; eski: None (duz metin dosya KEY)
+    tin = tempfile.NamedTemporaryFile(delete=False, suffix=".age"); tin.write(blob); tin.close()
+    try:
+        if key: r = subprocess.run(["age", "-d", "-i", "-", tin.name], input=key, capture_output=True, text=True)
+        else:   r = subprocess.run(["age", "-d", "-i", KEY, tin.name], capture_output=True, text=True)
+        if r.returncode: raise RuntimeError(r.stderr.strip() or "age coz hatasi")
+        return r.stdout
+    finally:
+        try: os.remove(tin.name)
+        except OSError: pass
+
+def _backup_cfg():
+    d = dict(_DEFAULT_BACKUP)
+    if os.path.exists(BACKUPCFG):
+        try: d.update(json.load(open(BACKUPCFG)))
+        except Exception: pass
+    return d
+def _save_backup_cfg(d):
+    os.makedirs(os.path.dirname(BACKUPCFG), exist_ok=True)
+    with open(BACKUPCFG, "w") as f: json.dump(d, f)
+    os.chmod(BACKUPCFG, 0o600)
+
+def _rotate_backups(d, keep):
+    """Klasordeki en eski .cer'leri sil, en yeni `keep` tanesini birak (isim zaman-sirali)."""
+    if keep <= 0: return
+    p = os.path.expanduser(d)
+    try: files = sorted(os.path.join(p, n) for n in os.listdir(p) if n.endswith(CER_EXT))
+    except OSError: return
+    for old in files[:-keep]:
+        try: os.remove(old)
+        except OSError: pass
+
+def _write_cer(pw, dst_dir, keep=7):
+    blob = make_backup(pw); p = os.path.expanduser(dst_dir); os.makedirs(p, exist_ok=True)
+    path = os.path.join(p, _cer_name())
+    with open(path, "wb") as f: f.write(blob)
+    os.chmod(path, 0o600); _rotate_backups(dst_dir, keep)
+    return path
+
+def run_auto_backup():
+    """Ayarli klasore bir .cer yaz (sarmali parolayi age key ile cozer). enabled/interval BAKMAZ (manuel/cron)."""
+    c = _backup_cfg()
+    if not c.get("dir") or not c.get("pw_wrapped"): raise RuntimeError("oto-yedek ayarli degil (klasor+parola)")
+    pw = _age_dec_priv(base64.b64decode(c["pw_wrapped"]))
+    path = _write_cer(pw, c["dir"], c.get("keep", 7))
+    c["last"] = now_iso(); _save_backup_cfg(c)
+    audit("backup_auto", source="auto", detail=os.path.basename(path))
+    return path
+
+def _auto_backup_maybe():
+    """Oto-yedek acik ve interval dolduysa sessizce bir .cer yaz (unlock/aktivite kancasi; hata yutulur)."""
+    c = _backup_cfg()
+    if not c.get("enabled") or not c.get("pw_wrapped") or not c.get("dir"): return
+    if c.get("last"):
+        try:
+            if datetime.now(timezone.utc) - datetime.fromisoformat(c["last"]) < timedelta(hours=c.get("interval_h", 24)):
+                return
+        except Exception: pass
+    try: run_auto_backup()
+    except Exception: pass
+
 # ---------------- age (expect) / master password ----------------
 def _age_pw(args, passphrase, confirm=False):
     # NOT: age sifreleme prompt'u "Enter passphrase (leave empty ...): " → sonu "passphrase:" DEGIL.
@@ -760,6 +857,12 @@ def _mcp_agent():
     e = _find_token(os.environ.get("CONCEALER_TOKEN", ""))
     return (e["label"], e.get("source")) if e else (None, None)
 
+def _cli_actor():
+    """CLI rate_gate anahtari = gecerli token'in label'i (yoksa 'cli'). CLI'yi kullanan
+    AI ajanlar da MCP ile ayni aciklama kotasina tabi olur; insan web/TUI'yi sinirsiz kullanir."""
+    label, _ = _mcp_agent()
+    return label or "cli"
+
 def revoke_token(label):
     d = _agents_data()
     if not d: return 0
@@ -813,7 +916,7 @@ def init(force=False):
         f.write("creation_rules:\n  - path_regex: \\.enc\\.(yaml|yml|json)$\n" f'    age: "{pub}"\n')
     save({"secrets": []}); audit("init", source="cli")
     with open(os.path.join(HOME, ".gitignore"), "w") as f:
-        f.write("keys/age-key.txt\nkeys/audit.key\nkeys/audit.head\nkeys/recovery.json\nkeys/agents.json\nkeys/ratestate.json\n")
+        f.write("keys/age-key.txt\nkeys/audit.key\nkeys/audit.head\nkeys/recovery.json\nkeys/agents.json\nkeys/ratestate.json\nkeys/backup.json\n")
     print(f"kuruldu: {HOME}\n  public key: {pub}\n  web: concealer web")
     _print_codes(codes)
     # key-at-rest: age private key'i diskten kaldir (yalniz sifreli BACKUP kalir).
@@ -912,7 +1015,7 @@ def harden():
     gi = os.path.join(HOME, ".gitignore")           # eski init agents.json satirini yazmamis olabilir
     try:
         cur = open(gi).read() if os.path.exists(gi) else ""
-        miss = [ln for ln in ("keys/agents.json", "keys/recovery.json", "keys/audit.head", "keys/ratestate.json") if ln not in cur]
+        miss = [ln for ln in ("keys/agents.json", "keys/recovery.json", "keys/audit.head", "keys/ratestate.json", "keys/backup.json") if ln not in cur]
         if miss:
             with open(gi, "a") as f: f.write("\n".join(miss) + "\n")
     except OSError: pass
@@ -1769,7 +1872,8 @@ def _mkhelp():
         "",
         "TRANSFER / AUDIT / INTERFACE",
         R("export [file]", "export a password-protected .age bundle"),
-        R("import <bundle.age>", "import a bundle"),
+        R("import <bundle.age|.cer>", "import a bundle / restore a .cer backup"),
+        R("backup [--dir D]", "write a .cer vault backup (uses the Settings backup password; for cron/launchd)"),
         R("audit [verify]", "HMAC-chained audit log (verify: integrity check)"),
         R("config [key [val]]", "runtime settings (idle, confirm_ops)"),
         R("tui", "interactive terminal UI (arrow keys, search, add/del/reveal)"),
@@ -1826,11 +1930,28 @@ def cli(argv):
     if cmd == "unlock": return unlock()
     if cmd == "agent": return agent_cmd(a)
     if cmd == "harden": return harden()
+    if cmd == "backup":
+        # oto-yedek ayarindaki (age-sarmali) parola + klasor ile bir .cer yaz — cron/launchd icin.
+        # Anahtar erisimi: CONCEALER_TOKEN (yoksa TTY'de master pw). --dir ile klasor gecici override.
+        d = _flag(a, "--dir")
+        if d: c = _backup_cfg(); c["dir"] = d; _save_backup_cfg(c)
+        try: path = run_auto_backup()
+        except Exception as ex: sys.exit(f"backup hatasi: {ex}")
+        return print(f"backup: {path}")
     if cmd == "tui": return tui()
     if cmd == "list":
         tag = _flag(a, "--tag"); sel = _sel(a); typ = sel.pop("type", None)
-        _print(filt(load(), sel, tag, a[0] if a else None, typ))
-    elif cmd == "search": _print(filt(load(), term=a[0]))
+        actor = _cli_actor()
+        rows, note = rate_gate(actor, filt(load(), sel, tag, a[0] if a else None, typ))
+        audit("list", source="cli", detail=json.dumps(sel), actor=actor)
+        _print(rows)
+        if note: sys.stderr.write(note.lstrip("\n") + "\n")
+    elif cmd == "search":
+        actor = _cli_actor()
+        rows, note = rate_gate(actor, filt(load(), term=a[0]))
+        audit("search", source="cli", detail=a[0] if a else "", actor=actor)
+        _print(rows)
+        if note: sys.stderr.write(note.lstrip("\n") + "\n")
     elif cmd == "dims":
         d = load()
         for dim in DIMS:
@@ -1844,7 +1965,12 @@ def cli(argv):
     elif cmd == "get":
         hits = filt(load(), _sel(a))
         if len(hits) != 1: sys.exit(f"{len(hits)} kayit eslesti, tekillestir.")
-        e = hits[0]; audit("get", key=e["name"], source="cli", detail=label(e))
+        e = hits[0]; actor = _cli_actor()
+        allowed, note = rate_gate(actor, [e])   # deger okuma da distinct-isim kotasina sayilir (get-donguleri engellenir)
+        if not allowed:
+            audit("get_denied", key=e["name"], source="cli", detail=label(e), actor=actor)
+            sys.exit(note.lstrip("\n") or "limit: erisim kotasi doldu.")
+        audit("get", key=e["name"], source="cli", detail=label(e), actor=actor)
         if e["type"] == "api_key": print(e["fields"].get("value", ""))
         else:
             for fn, fv in e["fields"].items(): print(f"{fn}={fv}")
@@ -1886,7 +2012,7 @@ def cli(argv):
     elif cmd == "run":
         sel = _sel(a)
         for dim in ("repo", "project"): sel.setdefault(dim, detect(dim))
-        env, _ = inject_env(sel, source="cli")
+        env, _ = inject_env(sel, source="cli", actor=_cli_actor())
         sys.stderr.write(f"[concealer] {label(sel)}\n")
         os.execvpe(a[0], a, env)
     elif cmd == "leaks":
@@ -2036,7 +2162,11 @@ def serve_web(port):
             if path == "/api/settings":
                 return self._json({"idle": CFG["idle"], "confirm_ops": CFG["confirm_ops"],
                                    "limits": CFG.get("limits") or {"default": dict(_DEFAULT_LIMITS), "agents": {}},
-                                   "agents": _agent_labels()})
+                                   "agents": _agent_labels(), "hardened": not os.path.exists(KEY)})
+            if path == "/api/backup":      # oto-yedek durumu (parola DONMEZ)
+                c = _backup_cfg()
+                return self._json({"enabled": c["enabled"], "interval_h": c["interval_h"], "dir": c["dir"],
+                                   "keep": c["keep"], "last": c["last"], "has_pw": bool(c.get("pw_wrapped"))})
             if path == "/api/leaks":
                 audit("leak_scan", source="web"); return self._json(leak_scan())
             if path == "/api/history":
@@ -2069,21 +2199,23 @@ def serve_web(port):
             self._json({"error": "not found"}, 404)
 
         def do_POST(self):
+            global _KEY_CACHE
             path = urllib.parse.urlparse(self.path).path
             if path == "/api/unlock":
                 pw = self._body().get("pw", "")
                 keytext = key_from_master(pw)          # decrypt hem dogrular hem key'i verir
                 if keytext or verify_master(pw):       # 2. kosul: eski (duz metin key'li) vault
                     tok = _secrets.token_urlsafe(18); _SESSIONS[tok] = time.time()
-                    if keytext: _SESS_KEY[tok] = keytext   # hardened: key'i bellekte session'a bagla
+                    if keytext: _SESS_KEY[tok] = keytext; _KEY_CACHE = keytext   # hardened: key'i bellekte session'a bagla
                     audit("unlock", source="web")
+                    _auto_backup_maybe()                   # interval dolduysa acilista bir .cer yaz (key bellekte)
                     return self._json({"ok": True}, cookie=f"tok={tok}; HttpOnly; Path=/; SameSite=Strict")
                 audit("unlock_fail", source="web"); return self._json({"ok": False}, 403)
             tok = self._tok()
             if path == "/api/lock":
                 if tok:
                     _SESSIONS.pop(tok, None); _SESS_KEY.pop(tok, None)
-                    global _KEY_CACHE; _KEY_CACHE = None; audit("lock", source="web")
+                    _KEY_CACHE = None; audit("lock", source="web")
                 return self._json({"ok": True})
             if not valid(tok or ""): return self._json({"error": "locked"}, 401)
             if path == "/api/secrets":     # create
@@ -2136,6 +2268,42 @@ def serve_web(port):
                 except Exception as ex: return self._json({"error": str(ex)}, 400)
                 audit("import", source="web", detail=f"+{nn} ~{nu}")
                 return self._json({"ok": True, "imported": nn, "updated": nu})
+            if path == "/api/backup":      # manuel .cer indir — YEDEK parolasi (master'dan farkli, zorunlu)
+                b = self._body(); pw = b.get("pw", "")
+                if len(pw) < 8: return self._json({"error": "backup_pw_short"}, 400)
+                if pw != b.get("pw2", ""): return self._json({"error": "backup_pw_mismatch"}, 400)
+                if verify_master(pw): return self._json({"error": "backup_pw_same_as_master"}, 400)
+                try: blob = make_backup(pw)
+                except Exception as ex: return self._json({"error": str(ex)}, 500)
+                audit("backup", source="web", detail=f"{len(secs(load()))} secrets")
+                return self._json({"ok": True, "filename": _cer_name(), "b64": base64.b64encode(blob).decode()})
+            if path == "/api/backup/config":   # oto-yedek ayari — master pw zorunlu (hassas)
+                b = self._body()
+                if not verify_master(b.get("pw", "")):
+                    audit("backup_cfg_fail", source="web"); return self._json({"error": "bad_pw"}, 403)
+                c = _backup_cfg()
+                c["enabled"] = bool(b.get("enabled"))
+                try: c["interval_h"] = max(1, min(8760, int(b.get("interval_h", c["interval_h"]))))
+                except Exception: pass
+                try: c["keep"] = max(1, min(365, int(b.get("keep", c["keep"]))))
+                except Exception: pass
+                if isinstance(b.get("dir"), str): c["dir"] = b["dir"].strip()
+                bp = b.get("backup_pw", "")
+                if bp:                                          # yeni yedek parolasi belirle → age pubkey'e sarmala
+                    if len(bp) < 8: return self._json({"error": "backup_pw_short"}, 400)
+                    if verify_master(bp): return self._json({"error": "backup_pw_same_as_master"}, 400)
+                    try: c["pw_wrapped"] = base64.b64encode(_age_enc_pub(bp)).decode()
+                    except Exception as ex: return self._json({"error": str(ex)}, 500)
+                if c["enabled"] and not c.get("pw_wrapped"):
+                    return self._json({"error": "backup_pw_required"}, 400)
+                _save_backup_cfg(c)
+                audit("backup_cfg", source="web", detail=f"enabled={c['enabled']} every={c['interval_h']}h keep={c['keep']}")
+                return self._json({"ok": True, "enabled": c["enabled"], "interval_h": c["interval_h"], "dir": c["dir"],
+                                   "keep": c["keep"], "last": c["last"], "has_pw": bool(c.get("pw_wrapped"))})
+            if path == "/api/backup/run":      # oto-yedegi simdi diske yaz (test/elle tetik)
+                try: p = run_auto_backup()
+                except Exception as ex: return self._json({"error": str(ex)}, 400)
+                return self._json({"ok": True, "path": p})
             if path == "/api/deploy":
                 b = self._body(); target = b.get("target", "dotenv")
                 if b.get("id"):                       # tek secret (row-level deploy)

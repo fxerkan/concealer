@@ -6,6 +6,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.8.0] — 2026-08-18
+
+### Added
+- **Encrypted vault backups (`.cer`).** Settings → **Backup** can now write the
+  whole vault to an opaque `.cer` file — the entire secret DB `age`-encrypted with
+  a **dedicated backup password that must differ from the master password** (min 8
+  chars, enforced). The file is binary `age` ciphertext: opening it reveals nothing.
+  Restore through the existing **Import** (it accepts `.age` and `.cer`), or from the
+  CLI. Two modes:
+  - **Backup now** — enter a backup password (twice) and download a `.cer`.
+  - **Automatic backups** — enable + set an interval, destination folder, and how
+    many files to keep. The backup password is wrapped to the vault's `age` public
+    key (`keys/backup.json`, git-ignored) so the **plaintext backup password is
+    never stored**; only the vault's `age` private key (in memory while unlocked)
+    can unwrap it. A due backup is written on unlock once the interval has elapsed,
+    and old files are rotated to the `keep` count.
+  - New `concealer backup [--dir D]` CLI writes a `.cer` using the configured
+    backup password + folder — schedule it with `cron`/`launchd` for unattended,
+    always-on periodic backups. `keys/backup.json` is added to the vault
+    `.gitignore` (init + `harden`).
+
+### Security
+- **The MCP anti-bulk-exfiltration control point now also covers the CLI.** AI
+  agents can drive the `concealer` CLI directly, so `list`, `search`, and `get`
+  now pass through the same `rate_gate` as MCP — `per_call` + rolling
+  `window_quota` on distinct secret names, keyed by the token label (`cli` for a
+  human/CLI token, or the agent label). A looped `concealer get` across names is
+  blocked once the window quota is spent (`get_denied` audit). The limit note
+  goes to **stderr** so it can't corrupt piped stdout. **Web and TUI are left
+  unrestricted** on purpose — that's the human owner, unlocked by master password.
+- **Settings → MCP access limits now shows a hardening warning.** `GET
+  /api/settings` returns `hardened` (true when no plaintext `keys/age-key.txt` is
+  on disk). If the vault is **not** hardened, the panel warns that MCP/CLI can
+  read secrets *without a token or registration* (the legacy plaintext-key
+  fallback bypasses tokens entirely) and shows the fix: `concealer harden` →
+  `concealer agent register <name>` → set `CONCEALER_TOKEN` in the agent's MCP env
+  → restart. Fixes the confusing "No registered agents" state on a non-hardened
+  vault, where agents were reading secrets through the key file rather than a
+  registered token. The "no agents" hint also stopped swallowing `<name>` as HTML.
+
 ## [0.7.0] — 2026-08-18
 
 ### Security

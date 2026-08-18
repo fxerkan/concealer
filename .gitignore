@@ -14,3 +14,8 @@ __pycache__/
 *.age.new
 .impeccable/
 .claude/
+keys/agents.json
+keys/recovery.json
+keys/audit.head
+keys/ratestate.json
+keys/backup.json
