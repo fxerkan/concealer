@@ -6,6 +6,126 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.7.0] — 2026-08-18
+
+### Security
+- **MCP anti-bulk-exfiltration control point.** An AI agent (or a stolen token)
+  can no longer dump the whole vault through MCP `list_secrets`/`search_secrets`.
+  Two limits now apply per agent:
+  - **`per_call`** — a single response returns at most N rows (default 10), so
+    "list everything" can never return ~150 secrets at once.
+  - **`window_quota`** — an agent may reveal at most N *distinct* secret names
+    within a rolling `window_sec` (default 25 / 3600 s), across **both** list and
+    search combined. Repeated/rapid queries can't reassemble the full list — once
+    the quota is spent the agent is told to narrow (`project`/`tag`/`type`) or
+    wait. Already-seen names re-list for free (idempotent) so honest re-queries
+    don't burn quota; `window_quota: 0` fully blocks an agent.
+  State is per-agent in `keys/ratestate.json` (git-ignored; holds only names +
+  timestamps, never values) so it survives an MCP process restart.
+- **Registration is now mandatory for MCP secret access.** Every MCP tool call
+  requires a **registered agent token** (`concealer agent register <name>` →
+  `source=agent`). A raw CLI/human token, or no token, is refused (fail-closed) —
+  so no unregistered agent (codex, deepseek, opencode, ChatGPT, …) can reach
+  secrets. The resolved agent label is now recorded as the `actor` on every
+  MCP `list`/`search`/`inject` audit line.
+
+### Added
+- **Per-agent limits managed in the web Settings page.** A new "MCP access limits"
+  panel edits the default limits and per-agent overrides (each registered agent is
+  listed); saving requires the master password. `GET/POST /api/settings` carry
+  `limits` + the registered `agents` list.
+
+## [0.6.10] — 2026-08-18
+
+### Security
+- **Custom field *names* that look like secret values are now blocked and hidden.**
+  A leaked credential/token/URL accidentally entered as a *field name* (e.g. an
+  Atlassian `ATATT…` token, a base64 blob, or a `https://…` URL) no longer:
+  (a) can be **stored** — CLI `set`, web create/update, MCP `set_secret`, and the
+  TUI add flow reject such names (error/warning shows only a **masked** form), and
+  (b) can be **displayed** — `entry_public()` drops them, so they never reach the
+  web UI (Columns picker, tables) or MCP output. Rule (`_bad_field_name`): a field
+  name must be a short identifier (≤40 chars, `[A-Za-z0-9 _.-]` only); names
+  matching a token pattern or containing a separator-free 20+ char mixed
+  alphanumeric run are treated as leaked values. Legit names like
+  `CLOUDFLARE_R2_ACCESS_KEY_ID`, `client_secret`, `api-version` still pass.
+  Already-stored bad names (from older versions) are hidden on read and cleaned
+  out the next time the record is saved.
+
+## [0.6.9] — 2026-08-18
+
+### Fixed
+- **Shell-history inline `KEY=VALUE` false positives.** The command-line inline
+  rule is far noisier than the `.env`-file rule it borrowed (`--file=path`,
+  `--tag-value=…`, `--parent=//…`). It now requires **both** a strongly
+  secret-looking key name (`secret|token|passw|credential|api_key|access_key|
+  private_key|bearer|pat` — no longer the broad `value|key|id`) **and** a
+  high-entropy value. File paths, URLs, and tag values no longer show as leaks;
+  real assignments like `AWS_BEARER_TOKEN_BEDROCK=…` / `PASSWORD=…` still do.
+
+## [0.6.8] — 2026-08-18
+
+### Changed
+- **Risks tab split into sub-tabs.** "Reused values" and "Shell history" are now
+  two sub-tabs inside Risks (the history section was easy to miss at the bottom
+  of the page). The history table now uses the same responsive `.cards` grid.
+
+### Fixed
+- **Shell-history scan false positives.** Vault-value matching now only fires on
+  **high-entropy** stored values (`len ≥ 12`, mixed alnum) and only on a full
+  token boundary — so a short label stored in a secret field (a project code,
+  tenant, hostname fragment) no longer matches as a substring across every
+  `cd`/`docker`/`git` command. Short/dictionary-like values are ignored.
+- **zsh timestamp noise.** The displayed command strips zsh's `EXTENDED_HISTORY`
+  metadata prefix (`: <ts>:<dur>;`) so the row shows the actual command, not the
+  `: 1772292826:0;` bookkeeping.
+
+## [0.6.7] — 2026-08-18
+
+### Changed
+- **Risks (leaks) table now matches the Secrets/Audit grid.** Converted the leak-group table to the same model-driven grid: sortable columns, drag-to-resize handles, per-column show/hide + reorder, and the `⚙` column menu now sits on the last header cell (was a `⋮` button floating in the toolbar above the table). Added responsive `.cards` layout parity.
+- Secrets header columns are now resizable (drag handle), matching Audit/Risks.
+- Audit header cells now show the pointer cursor on hover (added the `sortable` class), matching Secrets.
+- Removed the now-unused generic DOM-grid subsystem (`regrid`/`gridApply`/`gridColsMenu`) — all three tables use the model-driven pattern.
+
+## [0.6.6] — 2026-08-18
+
+### Changed
+- **Login CLI hint fits one line.** The command teaser dropped the repeated
+  `$ cer` prefixes (which wrapped to two lines) for a single, readable
+  `$ cer web · tui · mcp` — `cer` accented, modes in text colour, `·` separators
+  muted; pinned to one line (`white-space:nowrap`).
+
+## [0.6.5] — 2026-08-18
+
+### Added
+- **Shell history leak scan + purge.** New `concealer history [--purge]` command
+  and a **Shell history leaks** section in the Risks tab. Scans `~/.zsh_history`,
+  `~/.bash_history` (and `.histfile`/`.sh_history`/`.ksh_history`) for secret
+  values typed straight into the shell — matched three ways: **vault value**
+  (a stored secret's value appears verbatim in a command = confirmed leak),
+  **token patterns** (AWS/OpenAI/GitHub/Slack/etc. via the scan-folder regexes),
+  and **inline `KEY=VALUE`** env assignments that look secret. Values never leak:
+  the command line is returned masked. Purge (CLI `--purge`, or per-row select in
+  the web UI) removes the flagged lines after a `*.concealer.bak` backup, and
+  re-checks each line still contains a secret before deleting (won't nuke the
+  wrong line if history shifted). Audited as `history_scan` / `history_purge`.
+  API: `GET /api/history`, `POST /api/history/purge`.
+
+## [0.6.4] — 2026-08-18
+
+### Changed
+- **TUI shortcuts follow the function's first letter.** Copy is now **`c`**
+  (was `p`) and search is **`s`** (the old `/` still works — `s` is friendlier on
+  a Turkish keyboard). Help bar and help window updated.
+
+### Added
+- **TUI language toggle (TR / EN).** Press **`L`** to switch the whole TUI
+  between Turkish and English; the choice persists in `keys/config.json`
+  (`lang`). Default is taken from the OS locale (`LANG=tr*` → Turkish, else
+  English). All chrome, prompts, messages, and the help window are translated via
+  a curses-specific `_TUI_TR` table + `L()` helper.
+
 ## [0.6.3] — 2026-08-18
 
 ### Security
@@ -94,12 +214,14 @@ Audit grid parity, a Stats dashboard, themes, and a redaction login animation.
 
 ### Fixed
 - **TUI now renders in the VS Code integrated terminal** (borders/panels were
-  invisible there). Root cause: VS Code launches the shell with a non-UTF-8
-  locale (`LC_ALL/LANG=C`), so ncurses silently dropped the Unicode box-drawing
-  characters. `tui()` now forces a UTF-8 locale (`en_US.UTF-8`/`C.UTF-8`) before
-  curses starts, and if none is available falls back to an all-ASCII glyph set
-  (`+ - |`), so panels always draw. Also added `KEY_RESIZE` handling (refresh
-  geometry + full repaint) and made `put()` swallow encoding errors.
+  invisible there). VS Code's terminal (xterm.js) drops the Unicode box-drawing
+  glyphs (`┌ │ ─`) this UI draws with. The TUI now detects VS Code
+  (`TERM_PROGRAM=vscode`) and renders an all-ASCII glyph set (`+ - |`, `>`, `*`),
+  with a single transliteration choke-point in `put()` so no stray Unicode leaks
+  through; `CONCEALER_TUI_ASCII=1|0` forces the mode either way. Other terminals
+  (iTerm2, etc.) keep the Unicode box-drawing. Also: force a UTF-8 locale before
+  curses starts (belt-and-suspenders for text encoding), `KEY_RESIZE` handling
+  (refresh geometry + full repaint), and `put()` swallows encoding errors.
 
 ## [0.5.1] — 2026-08-18
 

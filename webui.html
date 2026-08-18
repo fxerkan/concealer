@@ -64,8 +64,10 @@ a{color:var(--acc);text-decoration:none}
 #login p{margin:0 0 8px;color:var(--mut)}
 /* CLI kimliği: kısa alias 'cer' — küçük terminal ipucu */
 #login .cli{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--mut);
-  margin:0 0 22px;padding:8px 11px;background:var(--bg);border:1px solid var(--line);border-radius:8px}
+  margin:0 0 22px;padding:8px 11px;background:var(--bg);border:1px solid var(--line);border-radius:8px;
+  text-align:center;white-space:nowrap;overflow-x:auto}
 #login .cli b{color:var(--acc);font-weight:600}
+#login .cli .m{color:var(--txt)}        /* alt komutlar (web/tui/mcp) — ·'lardan ayrışsın */
 #login .foot{margin:22px 0 0;font-size:12px;color:var(--mut);text-align:center}
 #login .foot a{color:var(--mut);text-decoration:none}#login .foot a:hover{color:var(--acc)}
 #login .foot .ac{color:var(--acc)}
@@ -301,7 +303,7 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
   <div class="card">
     <h1 class="brand"><svg viewBox="0 0 512 512" width="34" height="34" style="vertical-align:-8px;margin-right:4px"><rect width="512" height="512" rx="116" fill="#0a0b0d"/><rect x="12" y="12" width="488" height="488" rx="104" fill="none" stroke="#20242c" stroke-width="2"/><rect x="128" y="176" width="176" height="38" rx="19" fill="#272c35"/><rect x="128" y="232" width="256" height="52" rx="26" fill="#ffb020"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#272c35"/></svg>conceal<span class="ac">er</span></h1>
     <p data-i18n="login_sub">Lokal secret vault — master password ile aç</p>
-    <p class="cli">$ <b>cer</b> web</p>
+    <p class="cli">$ <b>cer</b> <span class="m">web</span> · <span class="m">tui</span> · <span class="m">mcp</span> · <span class="m">agent</span></p>
     <div class="pwrow">
       <input id="pw" type="password" data-i18n-ph="master_pw" placeholder="Master password" autofocus onkeydown="if(event.key==='Enter')unlock()">
       <button class="ghost" onclick="togglePw('pw',this)">👁</button>
@@ -424,19 +426,44 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
     </section>
 
     <section id="view-leaks" class="hidden">
-      <div class="toolbar">
-        <span class="mut" data-i18n="leaks_hint">Aynı değeri paylaşan (yeniden kullanılan) secret'lar — sızma riski skorlanır.</span>
-        <span class="grow"></span>
-        <button class="ghost" title="columns" onclick="gridColsMenu('leaks')">⋮</button>
-        <button onclick="loadLeaks()">↻</button>
+      <div class="tabs" style="width:max-content;margin-bottom:14px">
+        <button id="rtab-reuse" class="active" data-i18n="risk_reuse" onclick="riskTab('reuse')">Reused values</button>
+        <button id="rtab-hist" data-i18n="risk_hist" onclick="riskTab('hist')">Shell history</button>
       </div>
-      <table>
-        <thead><tr><th data-i18n="th_score">Score</th><th data-i18n="th_shared">Shared value</th>
-          <th data-i18n="th_uses">Uses</th><th data-i18n="th_projects">Projects</th>
-          <th data-i18n="th_envs">Envs</th><th data-i18n="th_records">Records</th></tr></thead>
-        <tbody id="lrows"></tbody>
-      </table>
-      <div class="count" id="lcount"></div>
+
+      <div id="risk-reuse">
+        <div class="toolbar">
+          <span class="mut" data-i18n="leaks_hint">Aynı değeri paylaşan (yeniden kullanılan) secret'lar — sızma riski skorlanır.</span>
+          <span class="grow"></span>
+          <button onclick="loadLeaks()">↻</button>
+        </div>
+        <div class="tablewrap">
+        <table class="cards" id="ltable">
+          <thead id="lhead"></thead>
+          <tbody id="lrows"></tbody>
+        </table>
+        </div>
+        <div class="count" id="lcount"></div>
+      </div>
+
+      <div id="risk-hist" class="hidden">
+        <div class="toolbar">
+          <span class="mut" data-i18n="hist_hint">bash/zsh history'sinde açıkça yazılmış secret/credential değerleri — history'den silinebilir.</span>
+          <span class="grow"></span>
+          <button class="b-import" id="hist_purge_btn" disabled onclick="purgeHistory()">🧹 <span data-i18n="hist_purge">Purge selected</span></button>
+          <button onclick="loadHistory()">↻</button>
+        </div>
+        <div class="tablewrap">
+        <table class="cards">
+          <thead><tr><th style="width:34px"><input type="checkbox" id="hist_all" onclick="histToggleAll(this.checked)"></th>
+            <th data-i18n="th_score">Score</th><th data-i18n="th_file">File</th>
+            <th data-i18n="th_shared">Value</th><th data-i18n="th_reason">Reason</th>
+            <th data-i18n="th_cmd">Command</th></tr></thead>
+          <tbody id="hrows"></tbody>
+        </table>
+        </div>
+        <div class="count" id="hcount"></div>
+      </div>
     </section>
 
     <section id="view-settings" class="hidden">
@@ -447,6 +474,11 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
           <div id="set_confirm" style="display:flex;flex-direction:column;gap:6px;padding-top:4px"></div></div>
       </div>
       <button class="primary" data-i18n="save" onclick="saveSettings()">Save</button>
+      <hr style="border-color:var(--line);margin:22px 0;max-width:680px">
+      <label class="fld" data-i18n="set_limits">MCP access limits (anti-bulk-exfiltration)</label>
+      <p class="mut" style="max-width:680px;margin:4px 0 10px" data-i18n="set_limits_hint">AI agents may only read secrets through a registered agent token. Per call caps a single response; the window quota caps how many distinct secrets an agent may reveal within the window — repeated queries can't reassemble the whole vault. Set the window quota to 0 to fully block an agent.</p>
+      <div id="limits_wrap" style="max-width:680px"></div>
+      <button class="primary" data-i18n="save" onclick="saveLimits()">Save</button>
       <hr style="border-color:var(--line);margin:22px 0;max-width:680px">
       <label class="fld" data-i18n="set_portability">Portability (move between machines)</label>
       <div class="toolbar" style="margin-top:8px">
@@ -473,7 +505,7 @@ let SPAGE=1; let SPAGE_SIZE=parseInt(localStorage.getItem('concealer_psize'))||2
 
 // ---------- i18n ----------
 const I18N={
- tr:{login_sub:"Lokal secret vault — master password ile aç",master_pw:"Master password",unlock:"Aç",
+ tr:{login_sub:"YZ kodlama çağı için yerel, tek dosyalı gizli bilgi yöneticisi.",master_pw:"Master password",unlock:"Aç",
   wrong_pw:"Yanlış master password.",secrets:"Sırlar",audit_log:"Denetim Kayıtları",lock:"🔒 Kilitle",filters:"Filtreler",search:"ara",
   search_secrets:"🔎 ara: ad, url, etiket, not…",all_types:"tüm tipler",new_secret:"+ Yeni Sır",
   th_name:"Ad",th_type:"Tip",th_scope:"Kapsam (tenant/proje/ortam/repo)",th_tags:"Etiketler",th_updated:"Güncellendi",th_actions:"İşlemler",
@@ -491,6 +523,11 @@ const I18N={
   leaks:"Riskler",leaks_hint:"Aynı değeri paylaşan (yeniden kullanılan) secret'lar — sızma riski skorlanır.",
   th_score:"Skor",th_shared:"Paylaşılan değer",th_uses:"Kullanım",th_projects:"Projeler",th_envs:"Ortamlar",th_records:"Kayıtlar",
   no_leaks:"paylaşılan değer yok 🎉",leak_groups:"grup",
+  risk_reuse:"Yeniden kullanım",risk_hist:"Shell history",
+  hist_title:"Shell history sızıntıları",hist_hint:"bash/zsh history'sinde açıkça yazılmış secret/credential değerleri — history'den silinebilir.",
+  hist_purge:"Seçilenleri sil",th_file:"Dosya",th_reason:"Neden",th_cmd:"Komut",
+  hist_none:"history'de secret yok 🎉",hist_found:"bulgu",
+  hist_confirm:"% satır shell history'den silinecek (yedek: *.concealer.bak). Devam?",hist_purged:"% satır history'den silindi",
   scan_folder:"Klasör Tara",scan_path:"Klasör yolu",browse:"Gözat",browse_use:"Bu klasörü seç",scan_history:"shell history'yi de tara (~/.zsh_history, ~/.bash_history)",
   scan_project_ph:"boş = klasör adı",scan_result_hint:"Bir yol gir ve 'Tara'ya bas.",scan_running:"taranıyor…",
   scan_found:"aday bulundu",scan_none:"aday sır bulunamadı",scan_btn:"Tara",scan_import_sel:"Seçilenleri Al",
@@ -499,6 +536,10 @@ const I18N={
   gen_b64:"base64url token",gen_length:"uzunluk",gen_classes:"karakter sınıfları",gen_result:"üretilen değer",
   gen_regen:"yeniden üret",gen_save:"concealer'a Kaydet",
   settings:"Ayarlar",settings_tab:"Ayarlar",confirm:"Onayla",set_idle:"Otomatik kilit (saniye)",set_confirm:"Şu işlemlerden önce master parola sor",
+  set_limits:"MCP erişim limitleri (toplu-sızma engeli)",
+  set_limits_hint:"AI ajanlar secret'ları yalnız kayıtlı bir agent token'ıyla okuyabilir. Çağrı başı tek yanıtı, pencere kotası ise bir ajanın pencere içinde açabileceği DISTINCT secret sayısını sınırlar — tekrarlı sorgularla tüm vault toplanamaz. Bir ajanı tamamen engellemek için pencere kotasını 0 yap.",
+  lim_who:"Kim",lim_default:"Varsayılan (tüm ajanlar)",lim_per_call:"Çağrı başı",lim_quota:"Pencere kotası (distinct)",lim_window:"Pencere (sn)",
+  lim_add:"Ajan limiti ekle",lim_add_ph:"ajan seç…",lim_remove:"override'ı kaldır",lim_no_agents:"Kayıtlı ajan yok — `concealer agent register <ad>` ile ekle.",
   set_portability:"Taşınabilirlik (makineler arası)",export_btn:"⬇ Dışa Aktar (.age)",import_btn:"⬆ İçe Aktar",
   set_export_hint:"Dışa aktarma tüm vault'u master parolayla (age) şifreler; başka makineye taşınabilir. İçe aktarma kayıtları bu vault'a birleştirir.",
   exported:"dışa aktarma indirildi",imp_pick:"önce .age dosyası seç",imp_fail:"içe aktarma başarısız",imported_n:(n,u)=>`+${n} yeni, ~${u} güncellendi`,
@@ -512,7 +553,7 @@ const I18N={
   ch_trend:"Etkinlik Trendi",ch_type:"Tipe göre",ch_platform:"Platform / Etiket",ch_project:"Projeye göre",
   ch_interface:"Arayüz (kaynak)",ch_action:"Eyleme göre",ch_actor:"Aktöre göre",ch_accessed:"En çok erişilen secret",
   ch_tenant:"Tenant'a göre",ch_env:"Ortama göre",ch_repo:"Repo'ya göre"},
- en:{login_sub:"Local secret vault — unlock with master password",master_pw:"Master password",unlock:"Unlock",
+ en:{login_sub:"Local‑only, single‑file secret manager for the AI‑coding era.",master_pw:"Master password",unlock:"Unlock",
   wrong_pw:"Wrong master password.",secrets:"Secrets",audit_log:"Audit Logs",lock:"🔒 Lock",filters:"Filters",search:"search",
   search_secrets:"🔎 search: name, url, tag, notes…",all_types:"all types",new_secret:"+ New Secret",
   th_name:"Name",th_type:"Type",th_scope:"Scope (tenant/project/env/repo)",th_tags:"Tags",th_updated:"Updated",th_actions:"Actions",
@@ -530,6 +571,11 @@ const I18N={
   leaks:"Risks",leaks_hint:"Secrets that share the same value (reuse) — leak risk is scored.",
   th_score:"Score",th_shared:"Shared value",th_uses:"Uses",th_projects:"Projects",th_envs:"Envs",th_records:"Records",
   no_leaks:"no shared values 🎉",leak_groups:"groups",
+  risk_reuse:"Reused values",risk_hist:"Shell history",
+  hist_title:"Shell history leaks",hist_hint:"secret/credential values typed in the clear into bash/zsh history — removable from history.",
+  hist_purge:"Purge selected",th_file:"File",th_reason:"Reason",th_cmd:"Command",
+  hist_none:"no secrets in history 🎉",hist_found:"found",
+  hist_confirm:"% line(s) will be removed from shell history (backup: *.concealer.bak). Continue?",hist_purged:"% line(s) removed from history",
   scan_folder:"Scan folder",scan_path:"Folder path",browse:"Browse",browse_use:"Use this folder",scan_history:"also scan shell history (~/.zsh_history, ~/.bash_history)",
   scan_project_ph:"empty = folder name",scan_result_hint:"Enter a path and press 'Scan'.",scan_running:"scanning…",
   scan_found:"candidates found",scan_none:"no candidate secrets found",scan_btn:"Scan",scan_import_sel:"Import selected",
@@ -538,6 +584,10 @@ const I18N={
   gen_b64:"base64url token",gen_length:"length",gen_classes:"character classes",gen_result:"generated value",
   gen_regen:"regenerate",gen_save:"Save to concealer",
   settings:"Settings",settings_tab:"Settings",confirm:"Confirm",set_idle:"Auto-lock (seconds)",set_confirm:"Ask master password before",
+  set_limits:"MCP access limits (anti-bulk-exfiltration)",
+  set_limits_hint:"AI agents may only read secrets through a registered agent token. Per call caps a single response; the window quota caps how many distinct secrets an agent may reveal within the window — repeated queries can't reassemble the whole vault. Set the window quota to 0 to fully block an agent.",
+  lim_who:"Who",lim_default:"Default (all agents)",lim_per_call:"Per call",lim_quota:"Window quota (distinct)",lim_window:"Window (sec)",
+  lim_add:"Add agent limit",lim_add_ph:"pick agent…",lim_remove:"remove override",lim_no_agents:"No registered agents — add one with `concealer agent register <name>`.",
   set_portability:"Portability (move between machines)",export_btn:"⬇ Export (.age)",import_btn:"⬆ Import",
   set_export_hint:"Export encrypts the whole vault with your master password (age); portable to another machine. Import merges records into this vault.",
   exported:"export downloaded",imp_pick:"pick a .age file first",imp_fail:"import failed",imported_n:(n,u)=>`+${n} new, ~${u} updated`,
@@ -710,7 +760,7 @@ function showTab(tab){
     $('#tab-'+x).classList.toggle('active',tab===x);
   });
   if(tab==='secrets'){ refreshFilterOptions(); loadSecrets(); } else if(tab==='audit')loadAudit();
-  else if(tab==='stats')loadStats(); else if(tab==='leaks')loadLeaks(); else loadSettings();
+  else if(tab==='stats')loadStats(); else if(tab==='leaks')riskTab(RISK_TAB); else loadSettings();
 }
 
 // ---------- master-parola onay modali ----------
@@ -728,6 +778,51 @@ async function loadSettings(){
   $('#set_idle').value=s.idle;
   $('#set_confirm').innerHTML=['export','delete','settings','create','update'].map(o=>
     `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="cop" value="${o}" ${s.confirm_ops.includes(o)?'checked':''} style="width:auto"> ${esc(actLabel(o))}</label>`).join('');
+  renderLimits(s);
+}
+function limRow(label,l,who){                  // who: '' = default, else agent label (deletable override)
+  const d=window.CFG.limits.default||{};
+  const g=k=>l[k]!=null?l[k]:'';
+  const ph=k=>who?`(${d[k]!=null?d[k]:''})`:'';   // agent satirinda bos = default'u kullan
+  return `<tr data-who="${esc(who)}">
+    <td>${esc(label)}</td>
+    <td><input type="number" min="1" max="1000" class="lim-per_call" value="${g('per_call')}" placeholder="${ph('per_call')}" style="width:90px"></td>
+    <td><input type="number" min="0" max="100000" class="lim-window_quota" value="${g('window_quota')}" placeholder="${ph('window_quota')}" style="width:90px"></td>
+    <td><input type="number" min="60" max="604800" class="lim-window_sec" value="${g('window_sec')}" placeholder="${ph('window_sec')}" style="width:110px"></td>
+    <td>${who?`<button class="ghost" onclick="this.closest('tr').remove()" title="${t('lim_remove')}">✕</button>`:''}</td></tr>`;
+}
+function renderLimits(s){
+  const agents=s.agents||[], ov=(s.limits.agents)||{};
+  const head=`<tr><th>${t('lim_who')}</th><th>${t('lim_per_call')}</th><th>${t('lim_quota')}</th><th>${t('lim_window')}</th><th></th></tr>`;
+  let rows=limRow(t('lim_default'),s.limits.default||{},'');
+  agents.forEach(a=>{ rows+=limRow(a, ov[a]||{}, a); });
+  const opts=agents.filter(a=>!(a in ov)).map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  $('#limits_wrap').innerHTML=`<table style="width:100%"><thead>${head}</thead><tbody id="lim_body">${rows}</tbody></table>`+
+    (opts?`<div class="toolbar" style="margin-top:8px"><select id="lim_add"><option value="">${t('lim_add_ph')}</option>${opts}</select>
+      <button onclick="addLimRow()">+ ${t('lim_add')}</button></div>`:
+      `<p class="mut" style="margin-top:8px">${agents.length?'':t('lim_no_agents')}</p>`);
+}
+function addLimRow(){
+  const sel=$('#lim_add'), a=sel.value; if(!a)return;
+  $('#lim_body').insertAdjacentHTML('beforeend',limRow(a,{},a));
+  sel.querySelector(`option[value="${CSS.escape(a)}"]`).remove(); sel.value='';
+}
+function saveLimits(){
+  const rows=[...document.querySelectorAll('#lim_body tr')];
+  const def={}, agents={};
+  rows.forEach(tr=>{
+    const who=tr.dataset.who, o={};
+    ['per_call','window_quota','window_sec'].forEach(k=>{
+      const v=tr.querySelector('.lim-'+k).value;
+      if(v!=='')o[k]=parseInt(v);
+    });
+    if(who)agents[who]=o; else Object.assign(def,o);
+  });
+  askPw(t('settings'),async pw=>{
+    const r=await api('/api/settings',{method:'POST',body:JSON.stringify({pw,limits:{default:def,agents}})});
+    if(r.status===403){toast(t('wrong_pw'));return;}
+    window.CFG=await r.json(); renderLimits(window.CFG); toast(t('saved'));
+  });
 }
 function saveSettings(){
   const idle=Math.max(30,Math.min(86400,parseInt($('#set_idle').value)||300));
@@ -765,18 +860,80 @@ function doImport(){
 
 // ---------- leaks / risk ----------
 const SEV_COLOR={high:'#f85149',med:'#e3b341',low:'#3fb950'};
+// leaks: model-driven grid (secrets/audit ile ayni: sort/resize/reorder/hide + ⚙-header)
+let LROWS=[], LC_SORT={k:null,dir:1};
+let RISK_TAB='reuse';
+function riskTab(which){
+  RISK_TAB=which;
+  $('#risk-reuse').classList.toggle('hidden',which!=='reuse');
+  $('#risk-hist').classList.toggle('hidden',which!=='hist');
+  $('#rtab-reuse').classList.toggle('active',which==='reuse');
+  $('#rtab-hist').classList.toggle('active',which==='hist');
+  if(which==='reuse')loadLeaks(); else loadHistory();
+}
 async function loadLeaks(){
-  const g=await (await api('/api/leaks')).json();
-  $('#lrows').innerHTML=g.map(x=>{const c=SEV_COLOR[x.severity]||'#9aa3b2';
+  LROWS=await (await api('/api/leaks')).json();
+  lRender();
+}
+function lColDefs(){ return [
+  {k:'score',    l:t('th_score'),    v:x=>x.score,                    r:x=>{const c=SEV_COLOR[x.severity]||'#9aa3b2';return `<span class="pill" style="color:${c};background:color-mix(in srgb,${c} 18%,transparent)">${esc(x.severity)} · ${x.score}</span>`;}},
+  {k:'shared',   l:t('th_shared'),   cls:'mono',        v:x=>x.mask||'',        r:x=>esc(x.mask)},
+  {k:'uses',     l:t('th_uses'),                        v:x=>x.count,           r:x=>`<b>${x.count}</b>`},
+  {k:'projects', l:t('th_projects'),                    v:x=>(x.projects||[]).join(','), r:x=>(x.projects||[]).map(tagChip).join('')||'<span class="mut">—</span>'},
+  {k:'envs',     l:t('th_envs'),                        v:x=>(x.envs||[]).join(','),     r:x=>(x.envs||[]).map(tagChip).join('')||'<span class="mut">—</span>'},
+  {k:'records',  l:t('th_records'),  cls:'mut mono', st:'font-size:12px', v:x=>(x.uses||[]).map(u=>u.name).join(','), r:x=>(x.uses||[]).map(u=>esc(u.name)+' @ '+esc(u.scope)).join('<br>')},
+]; }
+function lCols(){
+  const all=lColDefs(), byk=Object.fromEntries(all.map(c=>[c.k,c]));
+  const order=JSON.parse(localStorage.getItem('l_col_order')||'[]'), hidden=new Set(JSON.parse(localStorage.getItem('l_col_hidden')||'[]'));
+  const out=[]; order.forEach(k=>{ if(byk[k]){out.push(byk[k]);delete byk[k];} });
+  all.forEach(c=>{ if(byk[c.k])out.push(c); });
+  out.forEach(c=>c.hidden=hidden.has(c.k)); return out;
+}
+function lSort(k,ev){ if(ev&&(ev.target.classList.contains('rsz')||ev.target.classList.contains('colbtn')))return;
+  LC_SORT.dir=(LC_SORT.k===k)?-LC_SORT.dir:1; LC_SORT.k=k; lRender(); }
+function lRender(){
+  const cols=lCols(), vis=cols.filter(c=>!c.hidden);
+  $('#lhead').innerHTML='<tr>'+vis.map(c=>`<th class="sortable" onclick="lSort('${c.k}',event)">${esc(c.l)}<span class="sarr">${LC_SORT.k===c.k?(LC_SORT.dir>0?' ▲':' ▼'):''}</span><span class="rsz" onmousedown="gridRz(event,this.parentElement)"></span></th>`).join('')
+    +`<th style="width:38px;text-align:right"><span class="colbtn" title="${t('columns')}" onclick="event.stopPropagation();lColsMenu()">⚙</span></th></tr>`;
+  let rows=LROWS.slice();
+  if(LC_SORT.k){ const col=cols.find(c=>c.k===LC_SORT.k); if(col)rows.sort((a,b)=>gridCmp(col.v(a)+'',col.v(b)+'')*LC_SORT.dir); }
+  $('#lrows').innerHTML=rows.map(x=>'<tr>'+vis.map(c=>`<td class="${c.cls||''}" ${c.st?`style="${c.st}"`:''} data-label="${esc(c.l)}">${c.r(x)}</td>`).join('')
+    +`<td data-label=""></td></tr>`).join('') || `<tr><td colspan="${vis.length+1}" class="mut" style="text-align:center;padding:30px">${t('no_leaks')}</td></tr>`;
+  $('#lcount').textContent=LROWS.length+' '+t('leak_groups');
+}
+function lColsMenu(){ const cols=lCols(); modal('⚙ '+t('columns'),`<div id="lcolpick">${cols.map((c,i)=>lColRow(c,i,cols.length)).join('')}</div>`,[{x:t('close'),p:1,f:closeModal}]); }
+function lColRow(c,i,n){ return `<div class="colrow">
+  <label style="flex:1;display:flex;gap:8px;align-items:center"><input type="checkbox" ${c.hidden?'':'checked'} onchange="lColToggle('${c.k}',this.checked)" style="width:auto"> ${esc(c.l)}</label>
+  <button class="ghost" ${i===0?'disabled':''} onclick="lColMove('${c.k}',-1)">▲</button>
+  <button class="ghost" ${i===n-1?'disabled':''} onclick="lColMove('${c.k}',1)">▼</button></div>`; }
+function lRefreshColPick(){ const el=$('#lcolpick'); if(!el)return; const cols=lCols(); el.innerHTML=cols.map((c,i)=>lColRow(c,i,cols.length)).join(''); }
+function lColToggle(k,show){ const h=new Set(JSON.parse(localStorage.getItem('l_col_hidden')||'[]')); show?h.delete(k):h.add(k); localStorage.setItem('l_col_hidden',JSON.stringify([...h])); lRender(); lRefreshColPick(); }
+function lColMove(k,dir){ const keys=lCols().map(c=>c.k), i=keys.indexOf(k), j=i+dir; if(j<0||j>=keys.length)return; keys.splice(i,1); keys.splice(j,0,k); localStorage.setItem('l_col_order',JSON.stringify(keys)); lRender(); lRefreshColPick(); }
+let HIST=[];
+async function loadHistory(){
+  HIST=await (await api('/api/history')).json();
+  $('#hrows').innerHTML=HIST.map((x,i)=>{const c=SEV_COLOR[x.severity]||'#9aa3b2';
     return `<tr>
-      <td><span class="pill" style="color:${c};background:color-mix(in srgb,${c} 18%,transparent)">${x.severity} · ${x.score}</span></td>
-      <td class="mono">${esc(x.mask)}</td><td><b>${x.count}</b></td>
-      <td>${x.projects.map(tagChip).join('')||'<span class="mut">—</span>'}</td>
-      <td>${x.envs.map(tagChip).join('')||'<span class="mut">—</span>'}</td>
-      <td class="mut mono" style="font-size:12px">${x.uses.map(u=>esc(u.name)+' @ '+esc(u.scope)).join('<br>')}</td>
-    </tr>`;}).join('') || `<tr><td colspan="6" class="mut" style="text-align:center;padding:30px">${t('no_leaks')}</td></tr>`;
-  $('#lcount').textContent=g.length+' '+t('leak_groups');
-  regrid('leaks');
+      <td><input type="checkbox" class="hchk" data-i="${i}" onclick="histSync()"></td>
+      <td><span class="pill" style="color:${c};background:color-mix(in srgb,${c} 18%,transparent)">${x.severity}</span></td>
+      <td class="mut mono" style="font-size:12px">${esc(x.file)}:${x.line}</td>
+      <td class="mono">${esc(x.mask)}</td>
+      <td class="mut mono" style="font-size:12px">${x.reasons.map(esc).join(', ')}</td>
+      <td class="mut mono" style="font-size:12px;word-break:break-all">${esc(x.cmd)}</td>
+    </tr>`;}).join('') || `<tr><td colspan="6" class="mut" style="text-align:center;padding:30px">${t('hist_none')}</td></tr>`;
+  $('#hcount').textContent=HIST.length+' '+t('hist_found');
+  $('#hist_all').checked=false; histSync();
+}
+function histToggleAll(on){ document.querySelectorAll('.hchk').forEach(c=>c.checked=on); histSync(); }
+function histSync(){ $('#hist_purge_btn').disabled=!document.querySelector('.hchk:checked'); }
+async function purgeHistory(){
+  const sel=[...document.querySelectorAll('.hchk:checked')].map(c=>HIST[+c.dataset.i]);
+  if(!sel.length) return;
+  if(!confirm(t('hist_confirm').replace('%',sel.length))) return;
+  const r=await (await api('/api/history/purge',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({targets:sel.map(h=>({path:h.path,line:h.line}))})})).json();
+  toast(t('hist_purged').replace('%',r.removed)); loadHistory();
 }
 
 // ---------- scan folder ----------
@@ -901,48 +1058,13 @@ async function doDeploy(){
   const out=$('#dp_out'); if(out)out.value=r.text||'—';
 }
 
-// ---------- grid: sort / resize / kolon gizle-göster (tüm tablolar) ----------
-const GRID={};
-function gridState(id){ return GRID[id] || (GRID[id]={sort:null,dir:1,hidden:new Set(JSON.parse(localStorage.getItem('gh_'+id)||'[]'))}); }
-function gridHeads(id){ return [...document.querySelectorAll('#view-'+id+' thead th')]; }
-function regrid(id){   // her render sonrası çağrılır: başlıkları kur + durumu uygula
-  gridHeads(id).forEach((h,i)=>{
-    if(h.dataset.g)return; h.dataset.g=1; h.classList.add('sortable');
-    h.addEventListener('click',e=>{ if(!e.target.classList.contains('rsz'))gridSort(id,i); });
-    const g=document.createElement('span'); g.className='rsz';
-    g.addEventListener('mousedown',e=>gridRz(e,h)); h.appendChild(g);
-  });
-  gridApply(id);
-}
-function gridSort(id,i){ const st=gridState(id); st.dir=(st.sort===i)?-st.dir:1; st.sort=i; gridApply(id); }
-function gridApply(id){
-  const st=gridState(id), heads=gridHeads(id);
-  heads.forEach((h,i)=>{ h.style.display=st.hidden.has(i)?'none':'';
-    let a=h.querySelector('.sarr'); if(!a){a=document.createElement('span');a.className='sarr';h.insertBefore(a,h.querySelector('.rsz'));}
-    a.textContent = st.sort===i ? (st.dir>0?'▲':'▼') : ''; });
-  const tb=document.querySelector('#view-'+id+' tbody'); if(!tb)return;
-  let rows=[...tb.children];
-  rows.forEach(tr=>[...tr.children].forEach((td,i)=>td.style.display=st.hidden.has(i)?'none':''));
-  if(st.sort!=null && rows.length>1 && !rows[0].querySelector('[colspan]')){
-    rows.sort((a,b)=>gridCmp(gCell(a,st.sort),gCell(b,st.sort))*st.dir).forEach(r=>tb.appendChild(r));
-  }
-}
-function gCell(tr,i){ const c=tr.children[i]; return c?c.textContent.trim():''; }
+// ---------- grid ortak yardimcilari (secrets/audit/leaks model-driven gridleri kullanir) ----------
 function gridCmp(a,b){ const na=parseFloat(a.replace(/[^\d.\-]/g,'')),nb=parseFloat(b.replace(/[^\d.\-]/g,''));
   if(!isNaN(na)&&!isNaN(nb)&&/\d/.test(a)&&/\d/.test(b))return na-nb; return a.localeCompare(b,undefined,{numeric:true}); }
 function gridRz(e,h){ e.preventDefault(); e.stopPropagation(); const sx=e.pageX, sw=h.offsetWidth;
   const mv=ev=>h.style.width=Math.max(50,sw+ev.pageX-sx)+'px';
   const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);};
   document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); }
-function gridColsMenu(id){
-  const st=gridState(id);
-  const body=gridHeads(id).map((h,i)=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 0">
-    <input type="checkbox" ${st.hidden.has(i)?'':'checked'} onchange="gridToggle('${id}',${i},this.checked)" style="width:auto">
-    ${esc(h.textContent.replace(/[▲▼⚙]/g,'').trim())||'#'+ (i+1)}</label>`).join('');
-  modal('⋮ '+t('columns'),body,[{x:t('close'),p:1,f:closeModal}]);
-}
-function gridToggle(id,i,show){ const st=gridState(id); show?st.hidden.delete(i):st.hidden.add(i);
-  localStorage.setItem('gh_'+id,JSON.stringify([...st.hidden])); gridApply(id); }
 
 // ---------- secrets (model-driven grid: base + custom-field kolonlari, gizle/goster + sirala) ----------
 let _dt=null; function debouncedLoad(){ clearTimeout(_dt); SPAGE=1; _dt=setTimeout(loadSecrets,250); }
@@ -986,13 +1108,14 @@ function scCols(){
 }
 function scRender(){
   const cols=scCols(), vis=cols.filter(c=>!c.hidden);
-  $('#shead').innerHTML='<tr>'+vis.map(c=>`<th class="sortable" onclick="scSort('${c.k}')">${esc(c.l)}<span class="sarr">${SC_SORT.k===c.k?(SC_SORT.dir>0?' ▲':' ▼'):''}</span></th>`).join('')
+  $('#shead').innerHTML='<tr>'+vis.map(c=>`<th class="sortable" onclick="scSort('${c.k}',event)">${esc(c.l)}<span class="sarr">${SC_SORT.k===c.k?(SC_SORT.dir>0?' ▲':' ▼'):''}</span><span class="rsz" onmousedown="gridRz(event,this.parentElement)"></span></th>`).join('')
     +`<th style="text-align:right"><span>${t('th_actions')}</span><span class="colbtn" title="${t('columns')}" onclick="event.stopPropagation();scColsMenu()">⚙</span></th></tr>`;
   let rows=SROWS.slice();
   if(SC_SORT.k){ const col=cols.find(c=>c.k===SC_SORT.k); if(col)rows.sort((a,b)=>gridCmp(col.v(a)+'',col.v(b)+'')*SC_SORT.dir); }
   SROWS_SORTED=rows; renderSecretsPage(vis);
 }
-function scSort(k){ SC_SORT.dir=(SC_SORT.k===k)?-SC_SORT.dir:1; SC_SORT.k=k; scRender(); }
+function scSort(k,ev){ if(ev&&(ev.target.classList.contains('rsz')||ev.target.classList.contains('colbtn')))return;
+  SC_SORT.dir=(SC_SORT.k===k)?-SC_SORT.dir:1; SC_SORT.k=k; scRender(); }
 function renderSecretsPage(vis){
   vis=vis||scCols().filter(c=>!c.hidden);
   const rows=SROWS_SORTED.length||SROWS.length?SROWS_SORTED:SROWS, total=rows.length, pages=Math.max(1,Math.ceil(total/SPAGE_SIZE));
@@ -1213,7 +1336,7 @@ function aSort(k,ev){ if(ev&&(ev.target.classList.contains('rsz')||ev.target.cla
   AC_SORT.dir=(AC_SORT.k===k)?-AC_SORT.dir:1; AC_SORT.k=k; aRender(); }
 function aRender(){
   const cols=aCols(), vis=cols.filter(c=>!c.hidden);
-  $('#ahead').innerHTML='<tr>'+vis.map(c=>`<th onclick="aSort('${c.k}',event)">${esc(c.l)}<span class="sarr">${AC_SORT.k===c.k?(AC_SORT.dir>0?' ▲':' ▼'):''}</span><span class="rsz" onmousedown="gridRz(event,this.parentElement)"></span></th>`).join('')
+  $('#ahead').innerHTML='<tr>'+vis.map(c=>`<th class="sortable" onclick="aSort('${c.k}',event)">${esc(c.l)}<span class="sarr">${AC_SORT.k===c.k?(AC_SORT.dir>0?' ▲':' ▼'):''}</span><span class="rsz" onmousedown="gridRz(event,this.parentElement)"></span></th>`).join('')
     +`<th style="width:38px;text-align:right"><span class="colbtn" title="${t('columns')}" onclick="event.stopPropagation();aColsMenu()">⚙</span></th></tr>`;
   let rows=auditFiltered();
   if(AC_SORT.k){ const col=cols.find(c=>c.k===AC_SORT.k); if(col)rows.sort((a,b)=>gridCmp(col.v(a)+'',col.v(b)+'')*AC_SORT.dir); }
