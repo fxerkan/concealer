@@ -6,6 +6,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.8.1] — 2026-08-19
+
+### Fixed
+- **Audit Logs: long values no longer break the table.** A single very long
+  cell value (e.g. an `inject` record whose `key` is the comma-joined list of
+  every injected secret name) forced the table wider than the viewport, which
+  scrolled the whole page — including the fixed header. Cells now wrap
+  (`overflow-wrap:anywhere`) and the **Key**/**Detail** columns clamp to 255
+  chars with a `… ▾` expand toggle.
+
+### Added
+- **Audit Logs: Detail filter.** New multiselect filter on the Detail column
+  (alongside Source/Action/Actor/Key).
+- The **Key** filter dropdown now lists individual secret names (comma-joined
+  `inject` keys are split), and filtering matches rows by membership.
+
+### Changed
+- **Audit Logs: date filtering consolidated.** The separate quick-period row
+  and the two From/To inputs are merged into a single **Date range** dropdown
+  placed first in the filter panel (presets + custom From/To in one popup),
+  freeing horizontal room for the Key/Detail filters.
+
 ## [0.8.0] — 2026-08-18
 
 ### Added

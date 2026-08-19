@@ -91,6 +91,9 @@ main{padding:20px;max-width:none;margin:0 auto}
 table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px}
 /* not: table'da overflow:hidden YOK — sticky thead'i kirar (scroll-container olusturur) */
 th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+td{overflow-wrap:anywhere}   /* uzun/bosluksuz degerler tabloyu yatayda tasirmasin (header'i da kaydiriyordu) */
+.clamp .cf{white-space:pre-wrap}
+.cx{cursor:pointer;color:var(--acc);white-space:nowrap;font-size:12px}
 th{background:var(--th-bg);color:var(--th-fg);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid var(--line2)}
 tbody tr:nth-child(even){background:var(--zebra)}   /* zebra */
 tbody tr:hover{background:var(--panel2)}
@@ -377,16 +380,25 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
       <div class="subbar">
         <div class="subrow">
           <input class="search" id="aq" data-i18n-ph="search_audit" placeholder="ara…" oninput="debouncedAudit()">
-          <div class="periods" id="aperiods"></div>
           <button class="btn-filter" id="afilterbtn" onclick="toggleAuditFilters()"><span>⧩</span><span data-i18n="filters">Filters</span><span id="afiltcount" class="mut"></span></button>
         </div>
         <div class="filterpanel" id="afilterpanel">
+          <div class="msel" id="ms-a_dt">
+            <label class="fld" data-i18n="dt_lbl">Date range</label>
+            <button type="button" class="msel-btn" id="a_dt_btn" onclick="dtOpen(event)"><span id="a_dt_lbl">All</span><span class="arr">▾</span></button>
+            <div class="msel-pop hidden" id="pop-a_dt" onclick="event.stopPropagation()">
+              <div class="periods" id="aperiods" style="margin-bottom:8px"></div>
+              <label class="fld" data-i18n="from_lbl">From</label>
+              <input id="a_from" type="datetime-local" style="width:100%" onchange="setAuditRange()">
+              <label class="fld" style="margin-top:6px" data-i18n="to_lbl">To</label>
+              <input id="a_to" type="datetime-local" style="width:100%" onchange="setAuditRange()">
+            </div>
+          </div>
           <div class="msel" id="ms-a_source"></div>
           <div class="msel" id="ms-a_action"></div>
           <div class="msel" id="ms-a_actor"></div>
           <div class="msel" id="ms-a_key"></div>
-          <div><label class="fld" data-i18n="from_lbl">From</label><input id="a_from" type="datetime-local" onchange="setAuditRange()"></div>
-          <div><label class="fld" data-i18n="to_lbl">To</label><input id="a_to" type="datetime-local" onchange="setAuditRange()"></div>
+          <div class="msel" id="ms-a_detail"></div>
         </div>
         <div class="actionrow">
           <button data-i18n="verify_chain" onclick="verifyChain()">🔗 Verify chain</button>
@@ -579,7 +591,7 @@ const I18N={
   prev:"‹ önceki",next:"sonraki ›",page:(p,t,n)=>`sayfa ${p}/${t} · ${n} kayıt`,
   chain_ok:c=>`✓ bütünlük OK (${c})`,chain_bad:b=>`✗ kırık @ #${b}`,
   audit_rec:"Denetim kaydı",time:"zaman",detail:"detay",hash:"hash (HMAC)",
-  stats:"İstatistik",search_audit:"🔎 ara: eylem, anahtar, aktör, detay…",from_lbl:"Başlangıç",to_lbl:"Bitiş",
+  stats:"İstatistik",search_audit:"🔎 ara: eylem, anahtar, aktör, detay…",from_lbl:"Başlangıç",to_lbl:"Bitiş",dt_lbl:"Tarih aralığı",
   per_30m:"30 dk",per_1h:"1 sa",per_6h:"6 sa",per_24h:"1 gün",per_7d:"1 hafta",per_30d:"30 gün",per_all:"Tümü",no_data:"veri yok",
   kpi_secrets:"Sır",kpi_events:"Olay",kpi_access:"Erişim",kpi_actors:"Aktör",kpi_types:"Tip",
   ch_trend:"Etkinlik Trendi",ch_type:"Tipe göre",ch_platform:"Platform / Etiket",ch_project:"Projeye göre",
@@ -635,7 +647,7 @@ const I18N={
   prev:"‹ prev",next:"next ›",page:(p,t,n)=>`page ${p}/${t} · ${n} records`,
   chain_ok:c=>`✓ integrity OK (${c})`,chain_bad:b=>`✗ broken @ #${b}`,
   audit_rec:"Audit record",time:"time",detail:"detail",hash:"hash (HMAC)",
-  stats:"Stats",search_audit:"🔎 search: action, key, actor, detail…",from_lbl:"From",to_lbl:"To",
+  stats:"Stats",search_audit:"🔎 search: action, key, actor, detail…",from_lbl:"From",to_lbl:"To",dt_lbl:"Date range",
   per_30m:"30 min",per_1h:"1 h",per_6h:"6 h",per_24h:"1 day",per_7d:"1 week",per_30d:"30 days",per_all:"All",no_data:"no data",
   kpi_secrets:"Secrets",kpi_events:"Events",kpi_access:"Access",kpi_actors:"Actors",kpi_types:"Types",
   ch_trend:"Activity Trend",ch_type:"By type",ch_platform:"Platform / Tags",ch_project:"By project",
@@ -665,8 +677,8 @@ function setLang(l){
   applyStatic();
   if(!$('#app').classList.contains('hidden')){
     rebuildSelects(); FDIMS.forEach(renderMsel);
-    ['a_source','a_action','a_actor','a_key','st_source','st_actor','st_type','st_project'].forEach(renderMsel);
-    renderPeriods('#aperiods',APERIOD.k,'aPickPeriod'); renderPeriods('#stperiods',STPERIOD.k,'stPickPeriod');
+    ['a_source','a_action','a_actor','a_key','a_detail','st_source','st_actor','st_type','st_project'].forEach(renderMsel);
+    renderPeriods('#aperiods',APERIOD.k,'aPickPeriod'); renderPeriods('#stperiods',STPERIOD.k,'stPickPeriod'); dtSync();
     loadSecrets();
     if(!$('#view-audit').classList.contains('hidden'))loadAudit();
     else if(!$('#view-stats').classList.contains('hidden'))loadStats();
@@ -727,8 +739,8 @@ async function showApp(startSecs){
   TYPES=await (await api('/api/types')).json();
   window.CFG=await (await api('/api/settings')).json();
   rebuildSelects(); FOPTS.type=Object.keys(TYPES); FDIMS.forEach(renderMsel);
-  ['a_source','a_action','a_actor','a_key','st_source','st_actor','st_type','st_project'].forEach(renderMsel);
-  renderPeriods('#aperiods',APERIOD.k,'aPickPeriod'); renderPeriods('#stperiods',STPERIOD.k,'stPickPeriod');
+  ['a_source','a_action','a_actor','a_key','a_detail','st_source','st_actor','st_type','st_project'].forEach(renderMsel);
+  renderPeriods('#aperiods',APERIOD.k,'aPickPeriod'); renderPeriods('#stperiods',STPERIOD.k,'stPickPeriod'); dtSync();
   const wide=window.innerWidth>820;
   ['filter','afilter','stfilter'].forEach(p=>{ $('#'+p+'panel').classList.toggle('hidden',!wide); $('#'+p+'btn').classList.toggle('on',wide); });
   measureSticky();
@@ -1376,21 +1388,27 @@ function pagerHTML(page,pages,total,size,gotoName,sizeName){
 // ponytail: tum satirlar client'a cekilir (yerel arac); log cok buyurse server-side sayfalamaya don.
 let AROWS=[], AC_SORT={k:null,dir:1}, APAGE=1, APAGE_SIZE=parseInt(localStorage.getItem('concealer_apsize'))||25;
 let APERIOD=PERIODS.find(p=>p.k==='all');
-Object.assign(FILT,{a_source:new Set(),a_action:new Set(),a_actor:new Set(),a_key:new Set(),
+Object.assign(FILT,{a_source:new Set(),a_action:new Set(),a_actor:new Set(),a_key:new Set(),a_detail:new Set(),
   st_source:new Set(),st_actor:new Set(),st_type:new Set(),st_project:new Set()});
-Object.assign(FOPTS,{a_source:[],a_action:[],a_actor:[],a_key:[],st_source:[],st_actor:[],st_type:[],st_project:[]});
-Object.assign(MSEL_LABEL,{a_source:'th_source',a_action:'th_action',a_actor:'th_actor',a_key:'th_key',
+Object.assign(FOPTS,{a_source:[],a_action:[],a_actor:[],a_key:[],a_detail:[],st_source:[],st_actor:[],st_type:[],st_project:[]});
+Object.assign(MSEL_LABEL,{a_source:'th_source',a_action:'th_action',a_actor:'th_actor',a_key:'th_key',a_detail:'th_detail',
   st_source:'ch_interface',st_actor:'th_actor',st_type:'type',st_project:'ch_project',
   type:'type',tags:'tags',tenant:'ften',project:'fproj',environment:'fenv',repo:'frepo'});   // secrets filtre etiketleri
 MSEL_VLABEL.a_action=actLabel;   // action filtresi tablo/stats ile ayni cevrili etiketleri gosterir
-['a_source','a_action','a_actor','a_key'].forEach(d=>MSEL_ON[d]=()=>{updateAuditFilterCount();APAGE=1;aRender();});
+['a_source','a_action','a_actor','a_key','a_detail'].forEach(d=>MSEL_ON[d]=()=>{updateAuditFilterCount();APAGE=1;aRender();});
 ['st_source','st_actor','st_type','st_project'].forEach(d=>MSEL_ON[d]=()=>{updateStatsFilterCount();loadStats();});
 
 let _at=null; function debouncedAudit(){ clearTimeout(_at); _at=setTimeout(()=>{APAGE=1;aRender();},250); }
 function toggleAuditFilters(){ const p=$('#afilterpanel'); p.classList.toggle('hidden'); $('#afilterbtn').classList.toggle('on',!p.classList.contains('hidden')); }
-function updateAuditFilterCount(){ const n=['a_source','a_action','a_actor','a_key'].reduce((a,d)=>a+FILT[d].size,0); $('#afiltcount').textContent=n?'('+n+')':''; }
-function aPickPeriod(k){ APERIOD=PERIODS.find(p=>p.k===k); $('#a_from').value=''; $('#a_to').value=''; renderPeriods('#aperiods',k,'aPickPeriod'); APAGE=1; aRender(); }
-function setAuditRange(){ APERIOD=PERIODS.find(p=>p.k==='all'); renderPeriods('#aperiods','all','aPickPeriod'); APAGE=1; aRender(); }
+function updateAuditFilterCount(){ let n=['a_source','a_action','a_actor','a_key','a_detail'].reduce((a,d)=>a+FILT[d].size,0);
+  if($('#a_from')?.value||$('#a_to')?.value||(APERIOD&&APERIOD.k!=='all'))n++; $('#afiltcount').textContent=n?'('+n+')':''; }
+function aPickPeriod(k){ APERIOD=PERIODS.find(p=>p.k===k); $('#a_from').value=''; $('#a_to').value=''; renderPeriods('#aperiods',k,'aPickPeriod'); dtSync(); APAGE=1; aRender(); }
+function setAuditRange(){ APERIOD=PERIODS.find(p=>p.k==='all'); renderPeriods('#aperiods','all','aPickPeriod'); dtSync(); APAGE=1; aRender(); }
+function dtOpen(ev){ ev.stopPropagation(); document.querySelectorAll('.msel-pop').forEach(p=>{ if(p.id!=='pop-a_dt')p.classList.add('hidden'); }); $('#pop-a_dt').classList.toggle('hidden'); measureSticky(); }
+function dtSync(){ const b=$('#a_dt_btn'); if(!b)return; const f=$('#a_from').value, tv=$('#a_to').value; let on=false, txt=t('all');
+  if(f||tv){ on=true; const s=x=>x?x.replace('T',' '):'…'; txt=s(f)+' → '+s(tv); }
+  else if(APERIOD&&APERIOD.k!=='all'){ on=true; txt=t('per_'+APERIOD.k); }
+  $('#a_dt_lbl').textContent=txt; b.classList.toggle('has',on); updateAuditFilterCount(); }
 function auditFrom(){ if(APERIOD&&APERIOD.ms)return isoAgo(APERIOD.ms); if($('#a_from').value)return dtLocal($('#a_from').value); return null; }
 function auditTo(){ if($('#a_to').value)return dtLocal($('#a_to').value); return null; }
 async function loadAudit(){
@@ -1399,18 +1417,22 @@ async function loadAudit(){
   FOPTS.a_source=[...new Set(AROWS.map(r=>r.source).filter(Boolean))].sort();
   FOPTS.a_action=[...new Set(AROWS.map(r=>r.action).filter(Boolean))].sort();
   FOPTS.a_actor=[...new Set(AROWS.map(r=>r.actor).filter(Boolean))].sort();
-  FOPTS.a_key=[...new Set(AROWS.map(r=>r.key).filter(Boolean))].sort();
-  ['a_source','a_action','a_actor','a_key'].forEach(dm=>{ [...FILT[dm]].forEach(v=>{ if(!FOPTS[dm].includes(v))FILT[dm].delete(v); }); renderMsel(dm); });
+  FOPTS.a_key=[...new Set(AROWS.flatMap(r=>String(r.key||'').split(',')).filter(Boolean))].sort();   // inject kaydi virgullu → tek tek isim
+  FOPTS.a_detail=[...new Set(AROWS.map(r=>r.detail).filter(Boolean))].sort();
+  ['a_source','a_action','a_actor','a_key','a_detail'].forEach(dm=>{ [...FILT[dm]].forEach(v=>{ if(!FOPTS[dm].includes(v))FILT[dm].delete(v); }); renderMsel(dm); });
   updateAuditFilterCount(); aRender();
 }
+function clampCell(s){ s=String(s==null?'':s); if(s.length<=255) return esc(s);
+  return `<span class="clamp"><span class="ct">${esc(s.slice(0,255))}</span><span class="cf" hidden>${esc(s)}</span> <a class="cx" title="${s.length} chars" onclick="event.stopPropagation();clampTog(this)">… ▾</a></span>`; }
+function clampTog(a){ const w=a.parentNode, o=w.classList.toggle('open'); w.querySelector('.ct').hidden=o; w.querySelector('.cf').hidden=!o; a.textContent=o?'▴':'… ▾'; }
 function aColDefs(){ return [
   {k:'n',      l:'#',            cls:'mut',      v:r=>r.n,          r:r=>r.n},
   {k:'ts',     l:t('th_time'),   cls:'mono mut', v:r=>r.ts||'',     r:r=>fmtTs(r.ts)},
   {k:'source', l:t('th_source'),                 v:r=>r.source||'', r:r=>tagChip(r.source)},
   {k:'actor',  l:t('th_actor'),  cls:'mono mut', v:r=>r.actor||'',  r:r=>esc(r.actor||'')},
   {k:'action', l:t('th_action'),                 v:r=>r.action||'', r:r=>`<b>${esc(actLabel(r.action))}</b>`},
-  {k:'key',    l:t('th_key'),    cls:'mono',     v:r=>r.key||'',    r:r=>esc(r.key||'')},
-  {k:'detail', l:t('th_detail'), cls:'mut',      v:r=>r.detail||'', r:r=>esc(r.detail||'')},
+  {k:'key',    l:t('th_key'),    cls:'mono',     v:r=>r.key||'',    r:r=>clampCell(r.key)},
+  {k:'detail', l:t('th_detail'), cls:'mut',      v:r=>r.detail||'', r:r=>clampCell(r.detail)},
 ]; }
 function aCols(){
   const all=aColDefs(), byk=Object.fromEntries(all.map(c=>[c.k,c]));
@@ -1423,8 +1445,9 @@ function auditFiltered(){
   let rows=AROWS.slice();
   const q=($('#aq').value||'').toLowerCase();
   if(q)rows=rows.filter(r=>[r.source,r.actor,r.action,r.key,r.detail].some(x=>String(x||'').toLowerCase().includes(q)));
-  const fk={a_source:'source',a_action:'action',a_actor:'actor',a_key:'key'};
-  ['a_source','a_action','a_actor','a_key'].forEach(dm=>{ const s=FILT[dm]; if(s.size)rows=rows.filter(r=>s.has(String(r[fk[dm]]||''))); });
+  const fk={a_source:'source',a_action:'action',a_actor:'actor',a_detail:'detail'};
+  ['a_source','a_action','a_actor','a_detail'].forEach(dm=>{ const s=FILT[dm]; if(s.size)rows=rows.filter(r=>s.has(String(r[fk[dm]]||''))); });
+  if(FILT.a_key.size)rows=rows.filter(r=>String(r.key||'').split(',').some(k=>FILT.a_key.has(k)));   // virgullu key → uye eslesme
   const from=auditFrom(), to=auditTo();
   if(from)rows=rows.filter(r=>r.ts>=from);
   if(to)rows=rows.filter(r=>r.ts<=to);
@@ -1550,8 +1573,8 @@ function auditDetail(r){
     <div><label class="fld">${t('th_source')}</label><div>${esc(r.source)}</div></div>
     <div><label class="fld">${t('th_actor')}</label><div>${esc(r.actor||'—')}</div></div>
     <div><label class="fld">${t('th_action')}</label><div><b>${esc(actLabel(r.action))}</b></div></div>
-    <div><label class="fld">${t('th_key')}</label><div class="mono">${esc(r.key||'—')}</div></div>
-    <div class="full"><label class="fld">${t('detail')}</label><div>${esc(r.detail||'—')}</div></div>
+    <div><label class="fld">${t('th_key')}</label><div class="mono" style="overflow-wrap:anywhere">${esc(r.key||'—')}</div></div>
+    <div class="full"><label class="fld">${t('detail')}</label><div style="overflow-wrap:anywhere">${esc(r.detail||'—')}</div></div>
     <div class="full"><label class="fld">${t('hash')}</label><div class="mono" style="word-break:break-all;font-size:12px">${esc(r.hash)}</div></div>
     <div class="full"><label class="fld">prev</label><div class="mono mut" style="word-break:break-all;font-size:12px">${esc(r.prev)}</div></div>
     </div>`,[{x:t('close'),p:1,f:closeModal}]);

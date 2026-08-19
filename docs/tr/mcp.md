@@ -27,38 +27,92 @@ concealer, AI ajanlarının secret'ları hiç **görmeden** **kullanabilmesi** i
 
 ## Bir ajan kaydedin, ardından bağlayın
 
-Sertleştirilmiş (anahtarı diskte şifreli) bir kasada MCP sunucusu kilidi bir **token** ile açar; bu yüzden ona parolanız yerine bir ajan token'ı verin. Asla soru sormaz ve istediğiniz zaman iptal edebilirsiniz.
+Kurulum **her** MCP-uyumlu ajan için aynıdır — Claude Code, Codex, Gemini CLI, opencode, Cursor, Cline, Continue veya DeepSeek tabanlı bir istemci. İki adım:
+
+1. **Token üretin — ajan başına bir kez.** Sertleştirilmiş (anahtarı diskte şifreli) bir kasada MCP sunucusu kilidi parolanız yerine bir **token** ile açar. Asla soru sormaz ve istediğiniz zaman iptal edebilirsiniz. Audit log'un çağrıları doğru aktöre yazması ve her birini ayrı ayrı iptal edebilmeniz için **her araç için ayrı bir ajan** kaydedin.
+
+   ```bash
+   concealer agent register claude
+   ```
+
+   Bir kez master parolanızı sorar, ardından bir `export CONCEALER_TOKEN=…` satırı yazdırır. O token'ı kopyalayın — aşağıda `<token>` yerine yapıştıracaksınız.
+
+2. **concealer'ı bir stdio MCP sunucusu olarak ekleyin** — token'ı ortamında olacak şekilde ajanınızın yapılandırmasına. Ajanınızı seçin:
+
+> Örnekler `concealer`'ı `PATH`'inizden çağırır (Homebrew kurulumu). Ajanınız kabuk `PATH`'inizi devralmıyorsa mutlak yolu kullanın — örn. `/opt/homebrew/bin/concealer`.
+
+### Claude Code
 
 ```bash
-concealer agent register claude          # prompts master pw, prints a CONCEALER_TOKEN
+claude mcp add --scope user concealer --env CONCEALER_TOKEN=<token> -- concealer mcp
 ```
 
-Sunucuyu, o token'ı ortamına ekleyerek ajanınızın yapılandırmasına ekleyin. Örnek (Claude Code):
+### Codex CLI
 
 ```bash
-claude mcp add --scope user concealer \
-  --env CONCEALER_TOKEN=<token-from-above> \
-  -- /path/to/concealer/concealer mcp
+codex mcp add concealer --env CONCEALER_TOKEN=<token> -- concealer mcp
 ```
 
-Veya bir `.mcp.json` / istemci yapılandırmasında:
+Eşdeğer olarak, `~/.codex/config.toml` içinde:
 
-```json
+```toml
+[mcp_servers.concealer]
+command = "concealer"
+args = ["mcp"]
+env = { CONCEALER_TOKEN = "<token>" }
+```
+
+### Gemini CLI
+
+```bash
+gemini mcp add --scope user -e CONCEALER_TOKEN=<token> concealer concealer mcp
+```
+
+### opencode
+
+opencode'un `mcp add` komutu yalnızca **uzak** (`--url`) sunucu kaydeder — yerel bir komut alamaz, bu yüzden stdio sunucusunu yapılandırma dosyanıza `~/.config/opencode/opencode.jsonc` ekleyin:
+
+```jsonc
 {
-  "mcpServers": {
+  "mcp": {
     "concealer": {
-      "command": "/path/to/concealer/concealer",
-      "args": ["mcp"],
-      "env": { "CONCEALER_TOKEN": "<token-from-above>" }
+      "type": "local",
+      "command": ["concealer", "mcp"],
+      "enabled": true,
+      "env": { "CONCEALER_TOKEN": "<token>" }
     }
   }
 }
 ```
 
-İstediğiniz zaman iptal edin:
+`opencode mcp list` ile doğrulayın — concealer `✓ connected` görünmeli.
+
+### Cursor / Cline / Continue / DeepSeek ve diğer MCP istemcileri
+
+DeepSeek bir **modeldir**, ajan değil — herhangi bir MCP-uyumlu istemcinin içinde çalıştırın. Bu istemcilerin hepsi aynı stdio-sunucu JSON'unu okur. Bunu istemcinin MCP yapılandırmasına ekleyin (`.mcp.json`, `~/.cursor/mcp.json`, Cline/Continue ayarları vb.):
+
+```json
+{
+  "mcpServers": {
+    "concealer": {
+      "command": "concealer",
+      "args": ["mcp"],
+      "env": { "CONCEALER_TOKEN": "<token>" }
+    }
+  }
+}
+```
+
+### İptal
+
+Tek bir ajanı ya da tüm token'ları istediğiniz zaman iptal edin:
 
 ```bash
-concealer agent revoke claude        # or `all`
+concealer agent revoke claude
+```
+
+```bash
+concealer agent revoke all
 ```
 
 ---
