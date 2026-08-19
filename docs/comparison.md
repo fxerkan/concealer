@@ -47,6 +47,7 @@ The **Capability** and **concealer** columns stay pinned while you scroll right 
 .cmp-wrap{--cbg:#0d0f13;--chead:#1b1f27;--czA:#0c0e12;--czB:#101319;--ccer:#1a160c;--ccerhd:#2a2410;--cline:#242a33;--ctxt:#e8e8e6;--cstar:#ffb020;
   max-height:560px;overflow:auto;border:1px solid var(--cline);border-radius:12px;position:relative;margin:14px 0}
 html[data-cer-theme="light"] .cmp-wrap{--cbg:#fff;--chead:#eef0f3;--czA:#fff;--czB:#f6f7f9;--ccer:#fff6e2;--ccerhd:#ffe7bd;--cline:#e2e6eb;--ctxt:#1a1d23;--cstar:#b06f00}
+.cmp-wrap .table-wrapper{display:contents}
 .cmp{border-collapse:separate;border-spacing:0;min-width:1560px;font-size:12.5px;line-height:1.4;color:var(--ctxt);background:var(--cbg)}
 .cmp th,.cmp td{box-sizing:border-box;border-bottom:1px solid var(--cline);border-right:1px solid var(--cline);padding:9px 12px;text-align:left;vertical-align:top;white-space:nowrap}
 .cmp thead th{position:sticky;top:0;z-index:3;background:var(--chead);font-weight:700}
