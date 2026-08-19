@@ -56,10 +56,15 @@ header.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
 .pillrow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:0 0 26px}
 .pill{border:1px solid var(--line2);background:var(--panel);border-radius:999px;padding:5px 13px;font-size:12.5px;color:var(--mut);font-weight:600}
 .pill b{color:var(--acc)}
-/* install command */
-.install{display:inline-flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line2);
-  border-radius:12px;padding:12px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;
-  box-shadow:0 18px 50px rgba(0,0,0,.35);max-width:100%}
+/* install command — deliberately distinct from the animated background */
+.install{display:inline-flex;align-items:center;gap:12px;
+  background:linear-gradient(180deg,#15181e 0%,#0c0e12 100%);
+  border:1px solid var(--acc);border-radius:12px;padding:13px 16px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;
+  box-shadow:0 0 0 4px rgba(255,176,32,.10), 0 18px 50px rgba(0,0,0,.55);
+  backdrop-filter:blur(4px);max-width:100%}
+html[data-theme="light"] .install{background:linear-gradient(180deg,#1b1e24 0%,#0f1115 100%)}
+.install code{color:#e8e8e6}
 .install .p{color:var(--acc);font-weight:700}
 .install code{color:var(--txt);white-space:nowrap;overflow:auto}
 .install button{border:0;background:var(--acc);color:var(--ink);border-radius:7px;padding:6px 11px;font-weight:700;cursor:pointer;font-size:12.5px;flex:0 0 auto}
@@ -137,6 +142,24 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
 footer a{color:var(--mut)} footer a:hover{color:var(--acc)}
 footer .links{display:flex;gap:18px;flex-wrap:wrap}
 [hidden]{display:none!important}
+
+/* install popup modal */
+.modal{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.6);backdrop-filter:blur(3px)}
+.modal .box{background:var(--panel);border:1px solid var(--line2);border-radius:16px;padding:28px;
+  width:min(520px,92vw);box-shadow:0 30px 80px rgba(0,0,0,.6);position:relative}
+.modal h3{margin:0 0 6px;font-size:20px}
+.modal p{margin:0 0 16px;color:var(--mut);font-size:14px}
+.modal .cmd{display:flex;align-items:center;gap:10px;
+  background:linear-gradient(180deg,#15181e 0%,#0c0e12 100%);border:1px solid var(--acc);
+  border-radius:10px;padding:12px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px}
+.modal .cmd .p{color:var(--acc);font-weight:700}
+.modal .cmd code{color:#e8e8e6;flex:1;overflow:auto;white-space:nowrap}
+.modal .cmd button{border:0;background:var(--acc);color:var(--ink);border-radius:7px;padding:6px 11px;font-weight:700;cursor:pointer;font-size:12.5px;flex:0 0 auto}
+.modal .alt{margin:14px 0 0;font-size:13px;color:var(--mut)}
+.modal .alt a{font-weight:600}
+.modal .x{position:absolute;top:12px;right:14px;border:0;background:none;color:var(--mut);font-size:22px;line-height:1;cursor:pointer}
+.modal .x:hover{color:var(--txt)}
 </style>
 </head>
 <body>
@@ -148,7 +171,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
     <nav>
       <a class="lnk" data-collapse href="/concealer/getting-started" data-i18n="nav_docs">Docs</a>
       <a class="lnk" data-collapse href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener">GitHub</a>
-      <a class="lnk" data-collapse href="#install" data-i18n="nav_install">Install</a>
+      <button class="lnk" id="installbtn" data-collapse data-i18n="nav_install" style="border:0;background:none;font-family:inherit;cursor:pointer">Install</button>
       <button class="iconbtn" id="lang" title="Language">🌐 <span id="langlbl">EN</span></button>
       <button class="iconbtn" id="theme" title="Theme"><span id="themeico">🌙</span></button>
     </nav>
@@ -252,12 +275,12 @@ brew install fxerkan/tap/concealer
 <span class="c"># create the vault — prints recovery codes + a CLI token, once</span>
 concealer init
 
-<span class="c"># unlock your shell session (~8h token)</span>
-eval "$(concealer unlock)"
+<span class="c"># unlock your shell session (~8h token) — `cer` is the short alias for `concealer`</span>
+eval "$(cer unlock)"
 
 <span class="c"># store &amp; use a secret — the value never hits your terminal</span>
-concealer set --name OPENAI_API_KEY --project web --env prod <span class="a">'sk-DUMMY-123'</span>
-concealer run --project web --env prod npm run deploy
+cer set --name OPENAI_API_KEY --project web --env prod <span class="a">'sk-DUMMY-123'</span>
+cer run --project web --env prod npm run deploy
     </div>
     <p style="text-align:center;margin-top:20px"><a class="btn ghost" href="/concealer/getting-started" data-i18n="qs_more">Read the full guide →</a></p>
   </div>
@@ -289,6 +312,21 @@ concealer run --project web --env prod npm run deploy
     <a href="https://github.com/FiloSottile/age" target="_blank" rel="noopener">age</a>
   </div>
 </div></footer>
+
+<!-- ===== INSTALL POPUP ===== -->
+<div class="modal" id="installmodal" hidden>
+  <div class="box">
+    <button class="x" id="modalclose" aria-label="Close">×</button>
+    <h3 data-i18n="modal_h">Install concealer</h3>
+    <p data-i18n="modal_p">Homebrew pulls in sops, age and expect automatically.</p>
+    <div class="cmd">
+      <span class="p">$</span>
+      <code id="modalcmd">brew install fxerkan/tap/concealer</code>
+      <button id="modalcopy" data-i18n="copy">Copy</button>
+    </div>
+    <p class="alt" data-i18n="modal_alt">Prefer the manual route? See the <a href="/concealer/installation">Installation guide</a>.</p>
+  </div>
+</div>
 
 <script>
 /* ===== redaction animation (dummy secrets get concealed) — from the app's login screen ===== */
@@ -353,7 +391,9 @@ const I18N={
   s_tui_h:"Full terminal interface",s_tui_p:"Browse, search, add, delete and reveal secrets without leaving the terminal — arrow keys, instant filtering, type-aware editing.",
   s_mcp_h:"Agents use secrets, never see them",s_mcp_p:"Register an agent, hand it a revocable token, and it can inject a DB password to run a query — while the value stays redacted from its context. Every call is audited with source=mcp.",
   qs_eyebrow:"Quick start",qs_h:"Up and running in a minute",qs_more:"Read the full guide →",
-  cta_h:"Stop pasting keys into chat windows.",cta_p:"Local-only. Portable. Open source. Built for the AI-coding era.",cta_install:"Install now"},
+  cta_h:"Stop pasting keys into chat windows.",cta_p:"Local-only. Portable. Open source. Built for the AI-coding era.",cta_install:"Install now",
+  modal_h:"Install concealer",modal_p:"Homebrew pulls in sops, age and expect automatically.",
+  modal_alt:"Prefer the manual route? See the <a href=\"/concealer/installation\">Installation guide</a>."},
  tr:{nav_docs:"Dokümanlar",nav_install:"Kurulum",copy:"Kopyala",copied:"Kopyalandı ✓",
   hero_tag:"Yapay zekâ ile kodlama çağı için yerel, tek dosyalı gizli bilgi yöneticisi.",
   hero_sub:"SOPS + age ile şifreli. Bulut yok, telemetri yok, hesap yok. Ajanların gizli bilgileri <em>görmeden</em> <em>kullanır</em>.",
@@ -372,7 +412,9 @@ const I18N={
   s_tui_h:"Tam terminal arayüzü",s_tui_p:"Terminalden çıkmadan secret'ları gez, ara, ekle, sil ve göster — ok tuşları, anlık filtreleme, tipe duyarlı düzenleme.",
   s_mcp_h:"Ajanlar kullanır, asla görmez",s_mcp_p:"Bir ajan kaydet, iptal edilebilir bir token ver; DB parolasını enjekte edip sorgu çalıştırabilir — değer bağlamından maskeli kalır. Her çağrı source=mcp ile denetlenir.",
   qs_eyebrow:"Hızlı başlangıç",qs_h:"Bir dakikada çalışır durumda",qs_more:"Tüm rehberi oku →",
-  cta_h:"Anahtarları sohbet penceresine yapıştırmayı bırak.",cta_p:"Yalnızca yerel. Taşınabilir. Açık kaynak. YZ çağı için.",cta_install:"Şimdi kur"}
+  cta_h:"Anahtarları sohbet penceresine yapıştırmayı bırak.",cta_p:"Yalnızca yerel. Taşınabilir. Açık kaynak. YZ çağı için.",cta_install:"Şimdi kur",
+  modal_h:"concealer kurulumu",modal_p:"Homebrew; sops, age ve expect'i otomatik kurar.",
+  modal_alt:"Elle kurmak mı? <a href=\"/concealer/installation\">Kurulum rehberine</a> bak."}
 };
 function setLang(l){
   const d=I18N[l]||I18N.en;
@@ -383,12 +425,23 @@ function setLang(l){
 setLang(localStorage.getItem('concealer_lang')||'en');
 document.getElementById('lang').onclick=()=>setLang(html.getAttribute('lang')==='tr'?'en':'tr');
 
-/* ===== copy install command ===== */
-document.getElementById('copybtn').onclick=async e=>{
-  try{await navigator.clipboard.writeText(document.getElementById('installcmd').textContent);
-    const l=(localStorage.getItem('concealer_lang')||'en');e.target.textContent=I18N[l].copied;
-    setTimeout(()=>{e.target.textContent=I18N[l].copy;},1600);}catch(_){}
-};
+/* ===== copy helpers ===== */
+async function copyCmd(cmd,btn){
+  try{await navigator.clipboard.writeText(cmd);
+    const l=(localStorage.getItem('concealer_lang')||'en');btn.textContent=I18N[l].copied;
+    setTimeout(()=>{btn.textContent=I18N[l].copy;},1600);}catch(_){}
+}
+document.getElementById('copybtn').onclick=e=>copyCmd(document.getElementById('installcmd').textContent,e.target);
+document.getElementById('modalcopy').onclick=e=>copyCmd(document.getElementById('modalcmd').textContent,e.target);
+
+/* ===== install popup ===== */
+const modal=document.getElementById('installmodal');
+function openModal(){modal.hidden=false;}
+function closeModal(){modal.hidden=true;}
+document.getElementById('installbtn').onclick=openModal;
+document.getElementById('modalclose').onclick=closeModal;
+modal.onclick=e=>{if(e.target===modal)closeModal();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 </script>
 </body>
 </html>
