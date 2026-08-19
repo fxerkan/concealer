@@ -6,6 +6,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.0] — 2026-08-19
+
+### Added
+- **Collections.** An optional free‑form `collection` field on every record — a user‑defined
+  grouping axis independent of scope (`tenant/project/env/repo`) and tags. Nesting is a plain path
+  string (`backend/payments`); no separate folder model. Filtering matches a collection and its
+  sub‑paths. Available everywhere: CLI (`list --collection`, `mv`/`cp --to-collection`, `set
+  --collection`, `dims`), TUI (Collection facet + `M` move / `C` copy keys + editable in the edit
+  form), web (filter facet, Collection column, editor field with a datalist, per‑row **Move** /
+  **Copy** actions), and MCP (`list_secrets`/`set_secret` accept `collection`). See
+  `docs/feature-plan.md` for the scope‑vs‑collection‑vs‑tag distinction.
+- **Rotation policy.** An optional per‑record `rotation` policy (`every_days` + `mode:
+  generate|manual`). `concealer rotate --due [--dry]` rotates every overdue record whose mode is
+  `generate` and has a `value` field, and only *flags* `manual`/multi‑field records so it never
+  breaks a provider‑bound credential. Overdue records are badged in `list` and the web grid. Set a
+  policy with `set --rotate-days N [--rotate-mode manual]` or the web editor. **This rotates the
+  value in the vault only** — rotate it at the provider yourself (or consume the generated value via
+  `run_with_secrets`); it is not a provider integration. Run `rotate --due` from cron for
+  "automatic" rotation.
+- **Off‑machine audit anchor.** `concealer audit anchor [--file F] [--syslog] [--webhook U]` pushes
+  the current audit head (`{ts, seq, hash}` — no secret material) to an append‑only, off‑machine
+  sink. `audit verify` now compares the local chain against the last external anchor and reports
+  `reason: "external_anchor"` if they diverge — catching a full chain re‑forge that the on‑disk
+  `audit.key` otherwise permits. Configure once (persisted) and call from cron. New `COMPLIANCE.md`
+  maps concealer to the SOC 2 Trust Services Criteria and is explicit that certification is
+  organizational, not a tool feature.
+- **Guided `init`.** `init` now shows the concealer ASCII banner (accent‑colored on a TTY) and lays
+  its output out as numbered onboarding steps (set master password → save recovery codes → next
+  steps: token, web, first secret, agent registration, backup).
+
 ## [0.8.1] — 2026-08-19
 
 ### Fixed
