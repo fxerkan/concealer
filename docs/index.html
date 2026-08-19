@@ -45,7 +45,7 @@ header.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
 .iconbtn{border:1px solid var(--line2);background:var(--panel2);color:var(--txt);border-radius:8px;
   height:34px;padding:0 10px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .iconbtn:hover{border-color:var(--acc)}
-@media(max-width:720px){.nav a.lnk[data-collapse]{display:none}}
+@media(max-width:720px){.nav .lnk[data-collapse]{display:none}}
 
 /* ===== hero ===== */
 .hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
@@ -127,7 +127,7 @@ section{padding:64px 0}
 
 /* code block */
 .codeblk{background:#06070a;border:1px solid var(--line2);border-radius:12px;padding:18px 20px;overflow:auto;
-  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;line-height:1.7;color:#d7dbe3}
+  white-space:pre;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;line-height:1.7;color:#d7dbe3}
 html[data-theme="light"] .codeblk{background:#0d0f13;color:#d7dbe3}
 .codeblk .c{color:#6b7280}.codeblk .a{color:var(--acc2)}
 
@@ -268,8 +268,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <div class="eyebrow" data-i18n="qs_eyebrow">Quick start</div>
       <h2 data-i18n="qs_h">Up and running in a minute</h2>
     </div>
-    <div class="codeblk mono">
-<span class="c"># install (pulls in sops, age, expect)</span>
+    <div class="codeblk mono"><span class="c"># install (pulls in sops, age, expect)</span>
 brew install fxerkan/tap/concealer
 
 <span class="c"># create the vault — prints recovery codes + a CLI token, once</span>
@@ -280,8 +279,7 @@ eval "$(cer unlock)"
 
 <span class="c"># store &amp; use a secret — the value never hits your terminal</span>
 cer set --name OPENAI_API_KEY --project web --env prod <span class="a">'sk-DUMMY-123'</span>
-cer run --project web --env prod npm run deploy
-    </div>
+cer run --project web --env prod npm run deploy</div>
     <p style="text-align:center;margin-top:20px"><a class="btn ghost" href="/concealer/getting-started" data-i18n="qs_more">Read the full guide →</a></p>
   </div>
 </section>
@@ -308,8 +306,6 @@ cer run --project web --env prod npm run deploy
     <a href="/concealer/getting-started" data-i18n="nav_docs">Docs</a>
     <a href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener">GitHub</a>
     <a href="https://github.com/fxerkan/concealer/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
-    <a href="https://github.com/getsops/sops" target="_blank" rel="noopener">SOPS</a>
-    <a href="https://github.com/FiloSottile/age" target="_blank" rel="noopener">age</a>
     <a href="/concealer/comparison" data-i18n="nav_comparison">Comparison</a>
   </div>
 </div></footer>
