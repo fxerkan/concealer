@@ -39,6 +39,13 @@ Secret fields are marked 🔒; plain fields are shown as-is.
 
 `jdbc_url` is treated as secret because a connection string carries embedded credentials.
 
+Each type renders exactly the inputs it needs — a cloud credential carries its client/secret/URLs, a database its host/port/user/password, a website its URL/login, and `custom` any free-form key/value:
+
+![Cloud credential form]({{ site.baseurl }}/assets/secrets-cloud.png)
+![Database secret form]({{ site.baseurl }}/assets/secrets-db.png)
+![Website login form]({{ site.baseurl }}/assets/secrets-web.png)
+![Custom key/value secret form]({{ site.baseurl }}/assets/secrets-custom.png)
+
 ---
 
 ## No PII by design

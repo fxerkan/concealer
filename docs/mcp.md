@@ -15,6 +15,16 @@ concealer ships an MCP stdio server so AI agents can **use** secrets without eve
 
 ---
 
+**Agents list secret names — values stay hidden:**
+
+![Agent listing concealer secrets over MCP — names and scopes only, never values]({{ site.baseurl }}/assets/mcp-secret-list.gif)
+
+**And use a secret without ever seeing it** (here, injecting a Home Assistant token — redacted from the agent's context):
+
+![Claude Code injecting a Home Assistant token via concealer MCP — value redacted]({{ site.baseurl }}/assets/demo-ha-token.gif)
+
+---
+
 ## Register an agent, then wire it up
 
 On a hardened (key-at-rest) vault the MCP server unlocks with a **token**, so give it an agent token instead of your password. It never prompts and you can revoke it anytime.

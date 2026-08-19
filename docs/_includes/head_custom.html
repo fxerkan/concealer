@@ -1,0 +1,22 @@
+<style>
+  /* amber brand accent for the docs sidebar title's "er" (house rule) */
+  .site-title .ac{color:#0a0b0d;background:#ffb020;border-radius:4px;padding:0 .18em}
+  #cer-theme{position:fixed;top:12px;right:14px;z-index:1000;border:1px solid #2a2f38;
+    background:#161a20;color:#e8e8e6;border-radius:8px;height:32px;padding:0 12px;font-size:13px;
+    font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+  #cer-theme:hover{border-color:#ffb020}
+  @media(max-width:800px){#cer-theme{top:auto;bottom:12px}}
+</style>
+<script>
+  // dark/light toggle for the docs, using just-the-docs' theme API (persists to localStorage)
+  (function(){
+    function apply(t){ if(window.jtd&&jtd.setTheme)jtd.setTheme(t); localStorage.setItem('cer_docs_theme',t);
+      var b=document.getElementById('cer-theme'); if(b)b.textContent=t==='light'?'☀️ Light':'🌙 Dark'; }
+    document.addEventListener('DOMContentLoaded',function(){
+      var btn=document.createElement('button'); btn.id='cer-theme'; document.body.appendChild(btn);
+      var cur=localStorage.getItem('cer_docs_theme')||'concealer'; apply(cur);
+      btn.onclick=function(){ var now=(window.jtd&&jtd.getTheme&&jtd.getTheme())||cur;
+        apply(now==='light'?'concealer':'light'); cur=(cur==='light')?'concealer':'light'; };
+    });
+  })();
+</script>
