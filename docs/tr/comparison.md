@@ -44,9 +44,9 @@ Gösterge: ✅ evet · ⚠️ kısmen / uyarılarla · ❌ hayır · — yok vey
 **Yetenek** ve **concealer** sütunları, diğer her aracı görmek için sağa kaydırırken sabit kalır; kalan satırlar için tablonun içinde aşağı kaydırın. ★ ile işaretlenen satırlar, **bu tablodaki başka hiçbir aracın eşleşmediği** yeteneklerdir.
 
 <style>
-.cmp-wrap{--cbg:#0d0f13;--chead:#1b1f27;--czA:#0c0e12;--czB:#101319;--ccer:#1a160c;--ccerhd:#2a2410;--cline:#242a33;--ctxt:#e8e8e6;--cstar:#ffb020;
+.cmp-wrap{--cbg:#0d0f13;--chead:#1b1f27;--czA:#0c0e12;--czB:#101319;--ccer:#1a160c;--ccerhd:#2a2410;--cline:#242a33;--ctxt:#e8e8e6;--cstar:#ffb020;--cuniqcap:#1c1810;
   max-height:560px;overflow:auto;border:1px solid var(--cline);border-radius:12px;position:relative;margin:14px 0}
-html[data-cer-theme="light"] .cmp-wrap{--cbg:#fff;--chead:#eef0f3;--czA:#fff;--czB:#f6f7f9;--ccer:#fff6e2;--ccerhd:#ffe7bd;--cline:#e2e6eb;--ctxt:#1a1d23;--cstar:#b06f00}
+html[data-cer-theme="light"] .cmp-wrap{--cbg:#fff;--chead:#eef0f3;--czA:#fff;--czB:#f6f7f9;--ccer:#fff6e2;--ccerhd:#ffe7bd;--cline:#e2e6eb;--ctxt:#1a1d23;--cstar:#b06f00;--cuniqcap:#fff7ea}
 .cmp-wrap .table-wrapper{display:contents}
 .cmp{border-collapse:separate;border-spacing:0;min-width:1560px;font-size:12.5px;line-height:1.4;color:var(--ctxt);background:var(--cbg)}
 .cmp th,.cmp td{box-sizing:border-box;border-bottom:1px solid var(--cline);border-right:1px solid var(--cline);padding:9px 12px;text-align:left;vertical-align:top;white-space:nowrap}
@@ -58,7 +58,7 @@ html[data-cer-theme="light"] .cmp-wrap{--cbg:#fff;--chead:#eef0f3;--czA:#fff;--c
 .cmp .cer{position:sticky;left:216px;z-index:2;width:190px;min-width:190px;max-width:190px;white-space:normal;background:var(--ccer)!important}
 .cmp thead th.cer{z-index:5;background:var(--ccerhd)!important}
 .cmp tbody tr.u td{background:rgba(255,176,32,.07)}
-.cmp tbody tr.u .cap{box-shadow:inset 4px 0 0 var(--cstar)}
+.cmp tbody tr.u .cap{box-shadow:inset 4px 0 0 var(--cstar);background:var(--cuniqcap)}
 .cmp .star{color:var(--cstar);font-weight:800;margin-left:4px}
 .cmp small{opacity:.8}
 .cmp-tools{display:flex;justify-content:flex-end;margin:6px 0 -6px}
