@@ -29,6 +29,12 @@
         ],
         "createdAt": "2026-08-18T13:02:04.063Z",
         "reason": "concealer decided: Matrix theme phosphor text-shadow is the literal intent of a user-requested CRT theme; header amber halo is sanctioned house branding per CLAUDE.md"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "drop-shadow(0 14px 34px rgba(255,176,32,.28))",
+        "createdAt": "2026-08-19T06:55:27.127Z",
+        "reason": "pre-existing concealer brand glow on logo mark; house accent styling, not introduced by this change"
       }
     ]
   }

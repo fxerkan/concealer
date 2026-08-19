@@ -1,16 +1,12 @@
 <!doctype html><html><head><meta charset="utf-8">
 <style>
   html,body{margin:0;padding:0}
+  body{display:inline-block}
   *{box-sizing:border-box}
-  .hero{width:1280px;height:640px;position:relative;overflow:hidden;
+  .hero{display:inline-block;position:relative;overflow:hidden;
     background:radial-gradient(900px 520px at 84% -14%,#181a12 0%,#101116 40%,#0a0b0d 100%);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;color:#e8e8e6}
-  /* faint redacted-document texture: dim bars in the clear top-right band */
-  .lines{position:absolute;right:64px;top:40px;width:440px;opacity:.6}
-  .lines i{display:block;height:16px;border-radius:8px;background:#14171d;margin-bottom:16px}
-  .lines i:nth-child(1){width:70%}.lines i:nth-child(2){width:92%}
-  .lines i:nth-child(3){width:58%}.lines i:nth-child(4){width:80%}.lines i:nth-child(5){width:44%}
-  .wrap{position:relative;z-index:2;padding:96px 90px;display:flex;flex-direction:column;height:100%;justify-content:center}
+  .wrap{position:relative;z-index:2;padding:20px;display:flex;flex-direction:column}
   .row{display:flex;align-items:center;gap:26px}
   .mark{width:120px;height:120px;filter:drop-shadow(0 14px 34px rgba(255,176,32,.28))}
   h1{font-size:96px;margin:0;font-weight:700;letter-spacing:-3px;
@@ -28,7 +24,6 @@
 </style></head>
 <body>
 <div class="hero">
-  <div class="lines"><i></i><i></i><i></i><i></i><i></i></div>
   <div class="wrap">
     <div class="row">
       <svg class="mark" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
@@ -40,9 +35,9 @@
       </svg>
       <h1>conceal<span class="ac">er</span></h1>
     </div>
-    <p class="sub">Local-only secret manager over SOPS + age</p>
-    <p class="tag">Typed secrets · scopes · web UI · MCP server · tamper-evident audit</p>
-    <p class="cli">$ <b>cer</b> web<span style="color:#2a2f38">&nbsp;·&nbsp;</span><b>cer</b> add<span style="color:#2a2f38">&nbsp;·&nbsp;</span><b>cer</b> run</p>
+    <p class="sub">Local‑only, single‑file secret manager for the AI‑coding era.</p>
+    <p class="tag" style="font-style:italic">No cloud, no telemetry, no account.</p>
+    <p class="cli">$ <b>cer</b> web<span style="color:#2a2f38">&nbsp;·&nbsp;</span>$ <b>cer</b> tui<span style="color:#2a2f38">&nbsp;·&nbsp;</span>$ <b>cer</b> agent<span style="color:#2a2f38">&nbsp;·&nbsp;</span>$ <b>cer</b> mcp</p>
     <div class="chips">
       <span class="chip"><b>◼</b> encrypted vault</span>
       <span class="chip"><b>◼</b> deploy to AWS / k8s / env</span>
