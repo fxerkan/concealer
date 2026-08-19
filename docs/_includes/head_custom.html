@@ -23,6 +23,6 @@
       btn.onclick=function(){ var now=(window.jtd&&jtd.getTheme&&jtd.getTheme())||cur;
         apply(now==='light'?'concealer':'light'); };
     }
-    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init); else init();
+    init();  // self-defers via the document.body guard until the DOM is ready
   })();
 </script>
