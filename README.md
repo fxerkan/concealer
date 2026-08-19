@@ -1,18 +1,18 @@
 <p align="center">
-  <img src="assets/hero.png" alt="concealer — local-only secret manager over SOPS + age" width="820">
+  <img src="assets/hero.png" alt="concealer — Local‑only, single‑file secret manager for the AI‑coding era" width="820">
 </p>
 
 # conceal**er**
 
 > **Local‑only, single‑file secret manager for the AI‑coding era.**
 > Encrypted with [SOPS](https://github.com/getsops/sops) + [age](https://github.com/FiloSottile/age).
-> No cloud, no telemetry, no account. Master password + recovery codes. CLI · Web UI · MCP.
+> No cloud, no telemetry, no account. CLI · Web UI · MCP · TUI.
 
-<sub>Version **0.5.1** · pre‑1.0 (stays in `0.x` until the first full public release) · see [CHANGELOG](CHANGELOG.md)</sub>
+<sub>see [CHANGELOG](CHANGELOG.md)</sub>
 
 `concealer` is a thin, auditable wrapper around two battle‑tested tools — it does **not** implement its own cryptography. Everything is encrypted by `sops`/`age`; concealer only adds the UX: typed secrets, scoping, tags, a professional web UI, tamper‑evident audit logs, and an MCP server so AI agents can *use* secrets without ever *seeing* them.
 
-**Agents use a secret (Home Assistant token) without ever seeing it:**
+**Agents use a secret (token) without ever seeing it:**
 
 <p align="center">
   <img src="assets/demo-ha-token.gif" alt="Claude Code injecting a Home Assistant token via concealer MCP — the value is redacted from its context" width="820">
@@ -23,7 +23,7 @@
 
 ## Why does this exist? (the motivation)
 
-Modern coding assistants — Claude Code, Codex, Gemini CLI, opencode, Cursor — are wonderful, but they read your project files. That means the moment an API key lands in a `.env`, a `credentials.json`, or gets pasted into a chat, it can be:
+Modern coding assistants — Claude Code, Codex, Gemini CLI, opencode, Cursor — are wonderful, but they read your project files. That means the moment an API key lands in a `.env`, a `credentials.json`, or gets pasted into a chat *(unfortunately, we've all done this at least once)*, it can be:
 
 - read by the agent and sent to a model provider,
 - captured in logs/telemetry of whatever tool you're using,
@@ -65,8 +65,8 @@ Why this stack: SOPS is a CNCF project used by thousands of teams; age is a mode
 ```
 ┌─────────────┐   CLI / Web UI / MCP        ┌──────────────────────┐
 │  concealer  │ ─────────────────────────▶  │ secrets.enc.yaml     │
-│ (1 script)  │   load → dict → save         │ (SOPS + age, on disk)│
-└─────┬───────┘                              └──────────────────────┘
+│ (1 script)  │   load → dict → save        │ (SOPS + age, on disk)│
+└─────┬───────┘                             └──────────────────────┘
       │ delegates all crypto; key stays in memory (SOPS_AGE_KEY)
       ▼
    sops ── age ── keys/age-key.txt.age    (age key, master-password wrapped — the ONLY key at rest)
@@ -136,9 +136,11 @@ concealer audit verify                                         # chain + tail-an
 ### Unlock, tokens & recovery
 ```bash
 eval "$(concealer unlock)"          # human: master password → CONCEALER_TOKEN (TTL, ~8h) in your shell
+
 concealer agent register claude     # agent: master password → long-lived, revocable token for MCP env
 concealer agent list                # show tokens (label, source, expiry/revoked)
 concealer agent revoke claude       # (or `all`) revoke a token
+
 concealer harden                    # migrate an old plaintext-key vault to key-at-rest
 concealer passwd                    # change master password — needs current pw + a recovery code
 concealer recover                   # forgot the master password? recover with a recovery code
@@ -175,15 +177,17 @@ Each type has its own **type‑aware form** so you only enter the fields that ma
 Each type renders exactly the inputs it needs — an API key is a single value, a cloud credential carries its client/secret/URLs, a database its host/port/user/password, a website its URL/login:
 
 <p align="center">
-  <img src="assets/secrets-cloud.png" alt="Cloud credential form" width="410">
+  <img src="assets/secrets-cloud.png" alt="Cloud credential form" width="450">
   <img src="assets/secrets-db.png" alt="Database secret form" width="410">
   <br>
+  <img src="assets/secrets-custom.png" alt="Custom key/value secret form" width="450">  
   <img src="assets/secrets-web.png" alt="Website login form" width="410">
-  <img src="assets/secrets-custom.png" alt="Custom key/value secret form" width="410">
   <br><sub>Type‑aware entry: cloud tokens · database connections · website logins · free‑form custom fields. Secret fields are masked; plain fields (host, url, username) stay readable and become optional table columns.</sub>
 </p>
 
-### Web UI — `concealer web`
+
+
+### Web UI — `concealer web` - `cer web`
 Opens **http://127.0.0.1:8787** (localhost only). Features:
 - **TR / EN** interface toggle (top‑right)
 - Full **CRUD** with type‑aware forms · responsive (phone/tablet) layout
@@ -200,12 +204,15 @@ Opens **http://127.0.0.1:8787** (localhost only). Features:
   <br><sub><b>Audit Logs</b> — every read/write/copy/inject is HMAC‑chained; verify integrity or export to CSV/JSON.</sub>
 </p>
 <p align="center">
-  <img src="assets/app-risks.png" alt="Risk view: reused secret values scored by leak risk" width="410">
-  <img src="assets/app-scan-folder.png" alt="Scan a folder or shell history for leaked secrets" width="410">
-  <br><sub><b>Risks</b> — finds the same value reused across projects and scores the blast radius. &nbsp;·&nbsp; <b>Scan folder</b> — sweep a directory (or shell history) for stray secrets and import them, tagged by origin.</sub>
+  <img src="assets/app-risks.png" alt="Risk view: reused secret values scored by leak risk" width="640">
+  <br><sub><b>Risks</b> — finds the same value reused across projects and scores the blast radius. </sub>
+</p>
+<p align="center">
+  <img src="assets/app-scan-folder.png" alt="Scan a folder or shell history for leaked secrets" width="640">
+  <br><sub><b>Scan folder</b> — sweep a directory (or shell history) for stray secrets and import them, tagged by origin.</sub>
 </p>
 
-### MCP (AI agents) — `concealer mcp`
+### MCP (AI agents) — `concealer mcp` - `cer mcp`
 Register once, available in every session. On a hardened (key‑at‑rest) vault the
 MCP server unlocks with a token, so **give it an agent token instead of your
 password** — it never prompts and you can revoke it anytime:
@@ -268,8 +275,15 @@ concealer recover    # asks for a recovery code, restores access, sets a new mas
 ## License
 MIT.
 
----
+## Thanks
 
 **concealer** *is glue over [SOPS](https://github.com/getsops/sops) and [age](https://github.com/FiloSottile/age). All the hard cryptography is theirs; the laziness is mine.*
+
+* SOPS
+* age
+* secretctl
+  
+---
+
 
 Developed by [FXerkan](https://fxerkan.com) - Code more, worry less.
