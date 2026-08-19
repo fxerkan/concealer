@@ -66,11 +66,11 @@ header.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
 html[data-theme="light"] .install{background:linear-gradient(180deg,#1b1e24 0%,#0f1115 100%)}
 .install code{color:#e8e8e6}
 .install .p{color:var(--acc);font-weight:700}
-.install code{color:var(--txt);white-space:nowrap;overflow:auto}
+.install code{color:#e8e8e6;white-space:nowrap;overflow:auto}
 .install button{border:0;background:var(--acc);color:var(--ink);border-radius:7px;padding:6px 11px;font-weight:700;cursor:pointer;font-size:12.5px;flex:0 0 auto}
 .install button:active{transform:translateY(1px)}
 .ctarow{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:26px}
-.btn{border-radius:10px;padding:12px 22px;font-weight:700;font-size:15px;cursor:pointer;border:1px solid var(--line2);display:inline-flex;align-items:center;gap:8px}
+.btn{border-radius:10px;padding:12px 22px;font-weight:700;font-size:15px;cursor:pointer;border:1px solid var(--line2);display:inline-flex;align-items:center;gap:8px;font-family:inherit;line-height:1}
 .btn.primary{background:var(--acc);color:var(--ink);border-color:var(--acc);box-shadow:0 10px 30px var(--glow)}
 .btn.primary:hover{background:var(--acc2)}
 .btn.ghost{background:transparent;color:var(--txt)}
@@ -293,7 +293,7 @@ cer run --project web --env prod npm run deploy
     <p data-i18n="cta_p">Local-only. Portable. Open source. Built for the AI-coding era.</p>
   </div>
   <div class="ctarow" style="margin:0">
-    <a class="btn primary" href="#install" data-i18n="cta_install">Install now</a>
+    <button class="btn primary" id="installbtn2" data-i18n="cta_install">Install now</button>
     <a class="btn ghost" href="/concealer/getting-started" data-i18n="nav_docs">Docs</a>
   </div>
 </div></div>
@@ -310,6 +310,7 @@ cer run --project web --env prod npm run deploy
     <a href="https://github.com/fxerkan/concealer/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
     <a href="https://github.com/getsops/sops" target="_blank" rel="noopener">SOPS</a>
     <a href="https://github.com/FiloSottile/age" target="_blank" rel="noopener">age</a>
+    <a href="/concealer/comparison" data-i18n="nav_comparison">Comparison</a>
   </div>
 </div></footer>
 
@@ -373,7 +374,7 @@ document.getElementById('theme').onclick=()=>setTheme(html.getAttribute('data-th
 
 /* ===== language toggle (EN/TR, persists like the app: concealer_lang) ===== */
 const I18N={
- en:{nav_docs:"Docs",nav_install:"Install",copy:"Copy",copied:"Copied ✓",
+ en:{nav_docs:"Docs",nav_install:"Install",nav_comparison:"Comparison",copy:"Copy",copied:"Copied ✓",
   hero_tag:"The local-only secret manager for the AI-coding era.",
   hero_sub:"Encrypted with SOPS + age. No cloud, no telemetry, no account. Your agents <em>use</em> secrets without ever <em>seeing</em> them.",
   pill_local:"🔒 Local-only",pill_ai:"🤖 AI-safe by design",pill_oss:"⭐ Open source (MIT)",
@@ -394,7 +395,7 @@ const I18N={
   cta_h:"Stop pasting keys into chat windows.",cta_p:"Local-only. Portable. Open source. Built for the AI-coding era.",cta_install:"Install now",
   modal_h:"Install concealer",modal_p:"Homebrew pulls in sops, age and expect automatically.",
   modal_alt:"Prefer the manual route? See the <a href=\"/concealer/installation\">Installation guide</a>."},
- tr:{nav_docs:"Dokümanlar",nav_install:"Kurulum",copy:"Kopyala",copied:"Kopyalandı ✓",
+ tr:{nav_docs:"Dokümanlar",nav_install:"Kurulum",nav_comparison:"Karşılaştırma",copy:"Kopyala",copied:"Kopyalandı ✓",
   hero_tag:"Yapay zekâ ile kodlama çağı için yerel, tek dosyalı gizli bilgi yöneticisi.",
   hero_sub:"SOPS + age ile şifreli. Bulut yok, telemetri yok, hesap yok. Ajanların gizli bilgileri <em>görmeden</em> <em>kullanır</em>.",
   pill_local:"🔒 Yalnızca yerel",pill_ai:"🤖 Tasarımca YZ-güvenli",pill_oss:"⭐ Açık kaynak (MIT)",
@@ -439,6 +440,7 @@ const modal=document.getElementById('installmodal');
 function openModal(){modal.hidden=false;}
 function closeModal(){modal.hidden=true;}
 document.getElementById('installbtn').onclick=openModal;
+document.getElementById('installbtn2').onclick=openModal;
 document.getElementById('modalclose').onclick=closeModal;
 modal.onclick=e=>{if(e.target===modal)closeModal();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
