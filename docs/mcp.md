@@ -27,38 +27,92 @@ concealer ships an MCP stdio server so AI agents can **use** secrets without eve
 
 ## Register an agent, then wire it up
 
-On a hardened (key-at-rest) vault the MCP server unlocks with a **token**, so give it an agent token instead of your password. It never prompts and you can revoke it anytime.
+The setup is the same for **any** MCP-capable agent — Claude Code, Codex, Gemini CLI, opencode, Cursor, Cline, Continue, or a DeepSeek-based client. Two steps:
+
+1. **Mint a token — once per agent.** On a hardened (key-at-rest) vault the MCP server unlocks with a **token** instead of your password. It never prompts and you can revoke it anytime. Register **one agent per tool** so the audit log attributes calls to the right actor and you can revoke each independently.
+
+   ```bash
+   concealer agent register claude
+   ```
+
+   It prompts for your master password once, then prints an `export CONCEALER_TOKEN=…` line. Copy that token — you paste it as `<token>` below.
+
+2. **Add concealer as a stdio MCP server** in your agent's config, with the token in its environment. Pick your agent:
+
+> The examples call `concealer` on your `PATH` (Homebrew install). If your agent doesn't inherit your shell `PATH`, use the absolute path instead — e.g. `/opt/homebrew/bin/concealer`.
+
+### Claude Code
 
 ```bash
-concealer agent register claude          # prompts master pw, prints a CONCEALER_TOKEN
+claude mcp add --scope user concealer --env CONCEALER_TOKEN=<token> -- concealer mcp
 ```
 
-Add the server to your agent's config with that token in its environment. Example (Claude Code):
+### Codex CLI
 
 ```bash
-claude mcp add --scope user concealer \
-  --env CONCEALER_TOKEN=<token-from-above> \
-  -- /path/to/concealer/concealer mcp
+codex mcp add concealer --env CONCEALER_TOKEN=<token> -- concealer mcp
 ```
 
-Or in an `.mcp.json` / client config:
+Equivalently, in `~/.codex/config.toml`:
 
-```json
+```toml
+[mcp_servers.concealer]
+command = "concealer"
+args = ["mcp"]
+env = { CONCEALER_TOKEN = "<token>" }
+```
+
+### Gemini CLI
+
+```bash
+gemini mcp add --scope user -e CONCEALER_TOKEN=<token> concealer concealer mcp
+```
+
+### opencode
+
+opencode's `mcp add` command only registers **remote** (`--url`) servers — it can't take a local command, so add the stdio server in your config file `~/.config/opencode/opencode.jsonc`:
+
+```jsonc
 {
-  "mcpServers": {
+  "mcp": {
     "concealer": {
-      "command": "/path/to/concealer/concealer",
-      "args": ["mcp"],
-      "env": { "CONCEALER_TOKEN": "<token-from-above>" }
+      "type": "local",
+      "command": ["concealer", "mcp"],
+      "enabled": true,
+      "env": { "CONCEALER_TOKEN": "<token>" }
     }
   }
 }
 ```
 
-Revoke anytime:
+Verify with `opencode mcp list` — concealer should show `✓ connected`.
+
+### Cursor / Cline / Continue / DeepSeek and other MCP clients
+
+DeepSeek is a **model**, not an agent — run it inside any MCP-capable client. These clients all read the same stdio-server JSON. Add this to the client's MCP config (`.mcp.json`, `~/.cursor/mcp.json`, Cline/Continue settings, etc.):
+
+```json
+{
+  "mcpServers": {
+    "concealer": {
+      "command": "concealer",
+      "args": ["mcp"],
+      "env": { "CONCEALER_TOKEN": "<token>" }
+    }
+  }
+}
+```
+
+### Revoke
+
+Revoke a single agent, or every token, anytime:
 
 ```bash
-concealer agent revoke claude        # or `all`
+concealer agent revoke claude
+```
+
+```bash
+concealer agent revoke all
 ```
 
 ---

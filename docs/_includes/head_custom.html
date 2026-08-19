@@ -49,10 +49,27 @@
     });
     var si=document.getElementById('search-input');if(si)si.placeholder="concealer'da ara";
   }
+  /* Copy button → command only: strip trailing inline "# ..." comments so a pasted line runs clean.
+     Only the theme's copy button uses clipboard.writeText; text-selection (Ctrl-C) uses the copy
+     event and is left untouched. Conservative: needs content + space before "# " → keeps shebangs
+     (#!...), full-line # comments, and URL fragments (http://x#y). */
+  function stripInlineComments(t){
+    return t.split('\n').map(function(l){
+      return l.replace(/^(.*\S)[ \t]+#[ \t].*$/, '$1');
+    }).join('\n');
+  }
+  function cleanCopy(){
+    if(!navigator.clipboard||!navigator.clipboard.writeText)return;
+    var orig=navigator.clipboard.writeText.bind(navigator.clipboard);
+    navigator.clipboard.writeText=function(t){
+      try{if(typeof t==='string')t=stripInlineComments(t);}catch(e){}
+      return orig(t);
+    };
+  }
   function init(){
     if(document.getElementById('cer-theme'))return;
     if(!document.body){setTimeout(init,50);return;}
-    wordmark();trSidebar();
+    wordmark();trSidebar();cleanCopy();
     /* theme */
     var tb=document.createElement('button');tb.id='cer-theme';document.body.appendChild(tb);
     var cur=localStorage.getItem('cer_docs_theme');if(cur!=='light'&&cur!=='default')cur='default';

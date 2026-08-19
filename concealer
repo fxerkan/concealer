@@ -15,7 +15,7 @@ import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse
 import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil
 from datetime import datetime, timezone, timedelta
 
-VERSION = "0.8.0"   # 0.x boyunca ilerler; 1.0 = tam canli/yayin surumu icin ayrilmistir
+VERSION = "0.8.1"   # 0.x boyunca ilerler; 1.0 = tam canli/yayin surumu icin ayrilmistir
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Depo checkout'u: vault script'in yaninda yasar → BASE'i koru (mevcut kurulumlar bozulmasin).
