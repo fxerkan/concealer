@@ -9,17 +9,21 @@
 </style>
 <script>
 /* dark/light toggle for the docs via just-the-docs' jtd theme API; persists to localStorage.
-   NOTE: no // line comments here — this include is minified onto one line, which would
-   turn any // comment into an end-of-script comment. Block comments only. */
+   Built stylesheets are just-the-docs-default.css (our amber "dark") and just-the-docs-light.css.
+   So the theme names must be 'default' and 'light' — NOT the scss filename 'concealer'.
+   NOTE: block comments only — this include is minified onto one line; a // comment would
+   swallow the rest of the script. */
 (function(){
   function init(){
     if(document.getElementById('cer-theme'))return;
     if(!document.body){setTimeout(init,50);return;}
     var btn=document.createElement('button');btn.id='cer-theme';document.body.appendChild(btn);
-    var cur=localStorage.getItem('cer_docs_theme')||'concealer';
-    function apply(t){cur=t;if(window.jtd&&jtd.setTheme)jtd.setTheme(t);localStorage.setItem('cer_docs_theme',t);btn.textContent=(t==='light')?'☀️ Light':'🌙 Dark';}
-    (function ready(n){if(window.jtd&&jtd.setTheme){apply(cur);}else if(n>0){setTimeout(function(){ready(n-1);},50);}else{btn.textContent=(cur==='light')?'☀️ Light':'🌙 Dark';}})(40);
-    btn.onclick=function(){var now=(window.jtd&&jtd.getTheme&&jtd.getTheme())||cur;apply(now==='light'?'concealer':'light');};
+    var cur=localStorage.getItem('cer_docs_theme')||'default';
+    function paint(){btn.textContent=(cur==='light')?'☀️ Light':'🌙 Dark';}
+    function apply(t){cur=t;if(window.jtd&&jtd.setTheme)jtd.setTheme(t);localStorage.setItem('cer_docs_theme',t);paint();}
+    paint();
+    (function ready(n){if(window.jtd&&jtd.setTheme){apply(cur);}else if(n>0){setTimeout(function(){ready(n-1);},50);}})(60);
+    btn.onclick=function(){apply(cur==='light'?'default':'light');};
   }
   init();
 })();
