@@ -27,7 +27,7 @@
     "CLI Reference":"CLI Referansı","Secret Types":"Secret Türleri","Web UI":"Web Arayüzü",
     "TUI":"TUI","MCP for AI Agents":"AI Ajanları için MCP","Tokens & Recovery":"Token'lar & Kurtarma",
     "Security Model":"Güvenlik Modeli","Portability & Backup":"Taşınabilirlik & Yedekleme",
-    "🏠 Home":"🏠 Ana Sayfa"
+    "Comparison":"Karşılaştırma","🏠 Home":"🏠 Ana Sayfa"
   };
   function isTR(){return location.pathname.indexOf('/concealer/tr/')===0;}
   function counterpart(){
@@ -57,7 +57,7 @@
     var tb=document.createElement('button');tb.id='cer-theme';document.body.appendChild(tb);
     var cur=localStorage.getItem('cer_docs_theme');if(cur!=='light'&&cur!=='default')cur='default';
     function paint(){tb.textContent=(cur==='light')?'☀️ Light':'🌙 Dark';}
-    function apply(t){cur=t;if(window.jtd&&jtd.setTheme)jtd.setTheme(t);localStorage.setItem('cer_docs_theme',t);paint();}
+    function apply(t){cur=t;if(window.jtd&&jtd.setTheme)jtd.setTheme(t);document.documentElement.setAttribute('data-cer-theme',t);localStorage.setItem('cer_docs_theme',t);paint();}
     paint();
     (function ready(n){if(window.jtd&&jtd.setTheme){apply(cur);}else if(n>0){setTimeout(function(){ready(n-1);},50);}})(60);
     tb.onclick=function(){apply(cur==='light'?'default':'light');};
