@@ -11,11 +11,11 @@ Depo (tek sifreli JSON, sops YAML olarak saklar):
 Audit: keys/audit.log (JSONL, HMAC-zincirli, tamper-evident). Sadece anahtar
 ISIMLERI ve eylemleri tutar, secret DEGERLERINI tutmaz.
 """
-import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse, html, getpass, time
+import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse, urllib.request, html, getpass, time
 import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil
 from datetime import datetime, timezone, timedelta
 
-VERSION = "0.8.1"   # 0.x boyunca ilerler; 1.0 = tam canli/yayin surumu icin ayrilmistir
+VERSION = "0.9.0"   # 0.x boyunca ilerler; 1.0 = tam canli/yayin surumu icin ayrilmistir
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Depo checkout'u: vault script'in yaninda yasar → BASE'i koru (mevcut kurulumlar bozulmasin).
@@ -49,7 +49,9 @@ FLAGS = {"--tenant": "tenant", "--project": "project", "--env": "environment",
 # window_quota=0 => o ajan tamamen engellenir. agents[label] ile ajan-bazli override.
 _DEFAULT_LIMITS = {"per_call": 10, "window_quota": 25, "window_sec": 3600}
 _DEFAULT_CFG = {"idle": 300, "confirm_ops": ["export", "delete", "settings"],
-                "limits": {"default": dict(_DEFAULT_LIMITS), "agents": {}}}
+                "limits": {"default": dict(_DEFAULT_LIMITS), "agents": {}},
+                # audit_anchor: head hash'i MAKINE-DISI append-only hedefe iter (tam yeniden-forge tespiti)
+                "audit_anchor": {"file": "", "webhook": "", "syslog": False}}
 def load_cfg():
     cfg = dict(_DEFAULT_CFG)
     if os.path.exists(CONFIG):
@@ -63,7 +65,7 @@ def save_cfg(cfg):
     os.chmod(CONFIG, 0o600)
 CFG = load_cfg()
 def _cfg_persist():   # ayar POST'larindan cagrilir: idle/confirm_ops/limits'i kalici yaz
-    save_cfg({k: CFG[k] for k in ("idle", "confirm_ops", "limits") if k in CFG})
+    save_cfg({k: CFG[k] for k in ("idle", "confirm_ops", "limits", "audit_anchor") if k in CFG})
 
 def _clean_limit(v):
     """Web'den gelen limit sozlugunu sinirla/temizle (per_call>=1, quota>=0 ⇒ 0=engelle)."""
@@ -194,6 +196,8 @@ def norm(e):
         e["id"] = hashlib.sha1((e.get("name", "") + "".join(e.get(x, "") for x in DIMS)
                                 + now_iso()).encode()).hexdigest()[:12]
     e.setdefault("field_meta", {})   # {fname: {"secret":bool,"mask":"partial"|"full"}} — kayda ozel gizlilik
+    e.setdefault("collection", "")   # serbest gruplama yolu ("a/b" ic ice); scope'tan bagimsiz — bkz. feature-plan
+    e.setdefault("rotation", {})     # {"every_days":int,"last":iso,"mode":"generate"|"manual"} — bos = politika yok
     e.setdefault("created", now_iso()); e.setdefault("updated", e["created"])
     return e
 
@@ -202,14 +206,19 @@ def by_id(d, sid): return next((e for e in secs(d) if e["id"] == sid), None)
 def matches(e, sel): return all(str(e.get(k, "")) in v.split(",") for k, v in sel.items())  # v = tekli veya virgullu coklu secim
 def label(e): return "/".join(e.get(k, "") or "*" for k in DIMS)
 
-def filt(d, sel=None, tag=None, term=None, typ=None):
+def filt(d, sel=None, tag=None, term=None, typ=None, coll=None):
     out = []
     for e in secs(d):
         if sel and not matches(e, sel): continue
         if tag and not any(tg in e["tags"] for tg in tag.split(",")): continue   # coklu tag: herhangi biri eslesirse
         if typ and e["type"] not in typ.split(","): continue
+        if coll is not None:   # collection filtresi: tam ya da alt-yol ("a" -> "a", "a/b"). "" -> collection'sizlar
+            c = e.get("collection", "")
+            if coll == "":
+                if c: continue
+            elif not (c == coll or c.startswith(coll + "/")): continue
         if term:
-            hay = json.dumps({k: e.get(k) for k in DIMS + ["name", "tags", "url", "notes", "type"]}).lower()
+            hay = json.dumps({k: e.get(k) for k in DIMS + ["name", "tags", "url", "notes", "type", "collection"]}).lower()
             hay += " " + " ".join(e["fields"].keys()).lower()
             if term.lower() not in hay: continue
         out.append(e)
@@ -222,7 +231,21 @@ def entry_public(e, reveal=False):
         sec = rec_field_secret(e, fn)   # kayit-farkinda: override + jdbc/dsn kimlik sezgisi
         fields[fn] = {"secret": sec, "value": fv} if (reveal or not sec) else {"secret": True, "mask": rec_mask(e, fn, fv)}
     pub = {k: e.get(k) for k in ["id", "name", "type"] + DIMS + ["tags", "url", "notes", "created", "updated"]}
-    pub["fields"] = fields; pub["field_meta"] = e.get("field_meta") or {}; return pub
+    pub["fields"] = fields; pub["field_meta"] = e.get("field_meta") or {}
+    pub["collection"] = e.get("collection", ""); pub["rotation"] = e.get("rotation") or {}
+    pub["overdue"] = rotation_overdue(e); return pub
+
+def rotation_overdue(e):
+    """Rotasyon vadesi gecti mi → gecen gun sayisi (>=0) ya da None (politika yok)."""
+    r = e.get("rotation") or {}
+    days = r.get("every_days")
+    if not days: return None
+    base = r.get("last") or e.get("updated") or e.get("created")
+    try: last = datetime.fromisoformat(base)
+    except Exception: return None
+    if last.tzinfo is None: last = last.replace(tzinfo=timezone.utc)
+    over = (datetime.now(timezone.utc) - last).days - int(days)
+    return over if over >= 0 else None
 
 # ---------------- audit (HMAC zinciri) ----------------
 def _audit_key():
@@ -260,6 +283,38 @@ def _write_anchor(seq, h):
 def _read_anchor():
     try: return json.load(open(AUDITHEAD))
     except Exception: return None
+
+def anchor_push(file=None, webhook=None, syslog=None, persist=False):
+    """Mevcut audit head'ini (seq+hash) MAKINE-DISI append-only hedeflere iter.
+    Yerel audit.head root ile yeniden yazilabilir; disaridaki kopya (uzak syslog / baska makinedeki
+    dosya / webhook) chain'in TAM yeniden-forge'unu tespit edilebilir kilar. Deger/secret sizmaz —
+    yalniz seq + zincir hash'i gider. Cron'dan periyodik cagrilmasi hedeflenir."""
+    anc = _read_anchor()
+    if not anc: return None, []   # henuz audit yok
+    cfg = CFG.get("audit_anchor") or {}
+    file = cfg.get("file") if file is None else file
+    webhook = cfg.get("webhook") if webhook is None else webhook
+    syslog = cfg.get("syslog") if syslog is None else syslog
+    if persist:
+        CFG["audit_anchor"] = {"file": file or "", "webhook": webhook or "", "syslog": bool(syslog)}
+        _cfg_persist()
+    rec = {"ts": now_iso(), "seq": anc["seq"], "hash": anc["hash"]}
+    line = json.dumps(rec); sent = []
+    if file:
+        try:
+            with open(os.path.expanduser(file), "a") as f: f.write(line + "\n")
+            sent.append("file")
+        except OSError as ex: sys.stderr.write(f"anchor file hatasi: {ex}\n")
+    if syslog:
+        try: subprocess.run(["logger", "-t", "concealer-audit", line], check=False); sent.append("syslog")
+        except OSError as ex: sys.stderr.write(f"anchor syslog hatasi: {ex}\n")
+    if webhook:
+        try:
+            req = urllib.request.Request(webhook, data=line.encode(), headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=5); sent.append("webhook")
+        except Exception as ex: sys.stderr.write(f"anchor webhook hatasi: {ex}\n")
+    audit("audit_anchor", key=f"seq={rec['seq']}", source="cli", detail=",".join(sent))
+    return rec, sent
 
 def audit(action, key="", source="cli", detail="", actor=None):
     # actor: eylemi yapan aktor (agent adi vb). CONCEALER_ACTOR env'inden gelir.
@@ -302,6 +357,22 @@ def audit_verify():
     anc = _read_anchor()   # capa: son hash/seq eslesmezse kuyruk silinmis demektir
     if bad is None and anc and (anc.get("hash") != prev or (last_seq and anc.get("seq") != last_seq)):
         res.update(ok=False, reason="truncated", broken_at=n + 1)
+    # harici capa: makine-disi dosyadaki son head, chain'in o seq'teki hash'iyle uyusmali.
+    # yerel audit.key/head root ile yeniden yazilsa bile bu kopya tam yeniden-forge'u yakalar.
+    ext = (CFG.get("audit_anchor") or {}).get("file")
+    if res.get("ok") and ext and os.path.exists(os.path.expanduser(ext)):
+        try:
+            last_ext = None
+            with open(os.path.expanduser(ext)) as f:
+                for ln in f:
+                    ln = ln.strip()
+                    if ln: last_ext = json.loads(ln)
+            if last_ext:
+                seqmap = {r.get("seq"): r["hash"] for r in audit_rows() if r.get("seq") is not None}
+                es = last_ext.get("seq")
+                if es not in seqmap or seqmap[es] != last_ext.get("hash"):
+                    res.update(ok=False, reason="external_anchor", broken_at=es)
+        except Exception: pass   # dosya okunamiyor/bozuk → yerel dogrulamayi bloklama
     return res
 
 _ACCESS_ACTS = {"reveal", "copy", "get", "inject", "create", "update", "rotate", "set_secret"}
@@ -893,9 +964,24 @@ def detect(dim):
     return ""
 
 # ---------------- kurulum / parola ----------------
+def _tty(): return sys.stdout.isatty()
+def _c(s, code):   # ANSI renk yalniz TTY'de; pipe/redirect'te duz metin
+    return f"\033[{code}m{s}\033[0m" if _tty() else s
+def _banner():
+    # init/onboarding basligi: UTF-8 blok logo (accent amber), degilse duz. "er" marka accent'i:
+    # tum logo accent renginde basilir (blok sanatta tek harf renklendirmek pratik degil).
+    utf8 = (sys.stdout.encoding or "").lower().startswith("utf")
+    art = _LOGO if utf8 else ["concealer"]
+    for ln in art: print(_c(ln, "38;5;214;1"))   # amber, bold
+    print(_c("  local-only secret manager  ·  SOPS + age  ·  v" + VERSION, "38;5;214"))
+    print()
+
 def init(force=False):
     if os.path.exists(KEY) and not force:
         sys.exit(f"zaten kurulu: {KEY}\nyeniden kurmak icin: concealer init --force")
+    _banner()
+    print(_c("Kasa kuruluyor…", "1") + f"  ({HOME})\n")
+    print(_c("Adim 1/2", "38;5;214;1") + " — bir master password belirle (kasayi bu acar; kaybolursa recovery kodu gerekir).")
     os.makedirs(os.path.dirname(KEY), exist_ok=True)
     for f in (KEY, PUBKEY, BACKUP, MASTER):
         if os.path.exists(f): os.remove(f)
@@ -917,15 +1003,20 @@ def init(force=False):
     save({"secrets": []}); audit("init", source="cli")
     with open(os.path.join(HOME, ".gitignore"), "w") as f:
         f.write("keys/age-key.txt\nkeys/audit.key\nkeys/audit.head\nkeys/recovery.json\nkeys/agents.json\nkeys/ratestate.json\nkeys/backup.json\n")
-    print(f"kuruldu: {HOME}\n  public key: {pub}\n  web: concealer web")
+    print("\n" + _c("Adim 2/2", "38;5;214;1") + " — kurtarma kodlarini kaydet (asagida, YALNIZ bir kez gosterilir).")
     _print_codes(codes)
     # key-at-rest: age private key'i diskten kaldir (yalniz sifreli BACKUP kalir).
     os.remove(KEY); audit("harden", source="cli")
     tok = mint_token(keytext, "cli", "cli", ttl=TOKEN_TTL)
-    print("KEY-AT-REST acik: age private key artik diskte DUZ METIN degil.")
-    print("CLI icin baslangic token'i (shell'ine ekle, ~%dh gecerli):" % (TOKEN_TTL // 3600))
-    print(f'  export CONCEALER_TOKEN={tok}')
-    print("  (yenilemek: eval \"$(concealer unlock)\" | ajan icin: concealer agent register <ad>)")
+    print("\n" + _c("✓ Kuruldu.", "38;5;40;1") + f"  KEY-AT-REST acik — age private key artik diskte duz metin DEGIL.")
+    print(f"  public key: {pub}\n")
+    print(_c("Sonraki adimlar:", "1"))
+    print("  1) CLI token'ini shell'ine ekle (~%dh gecerli, yenile: eval \"$(concealer unlock)\"):" % (TOKEN_TTL // 3600))
+    print("     " + _c(f"export CONCEALER_TOKEN={tok}", "38;5;214"))
+    print("  2) Web arayuzu (master password ile acilir):   " + _c("concealer web", "38;5;214"))
+    print("  3) Ilk secret'i ekle:   " + _c('concealer set --name GITHUB_TOKEN --project myapp ghp_...', "38;5;214"))
+    print("  4) AI agent'a erisim ver (MCP):   " + _c("concealer agent register <ad>", "38;5;214"))
+    print("  5) Otomatik yedek kur:   " + _c("concealer backup --dir <klasor>", "38;5;214") + "  (ayrinti: web → Settings)")
 
 def passwd():
     if not os.path.exists(BACKUP): sys.exit("once 'concealer init' calistir.")
@@ -1275,8 +1366,8 @@ def _tui_main(scr, data):
     # ---- filtre / veri ----
     def facets():
         d = st["d"]; out = []
-        for dim, lbl in [("type", "Type"), ("project", "Project"), ("environment", "Env"),
-                         ("tenant", "Tenant"), ("repo", "Repo"), ("tags", "Tags")]:
+        for dim, lbl in [("type", "Type"), ("collection", "Collection"), ("project", "Project"),
+                         ("environment", "Env"), ("tenant", "Tenant"), ("repo", "Repo"), ("tags", "Tags")]:
             vals = {}
             for e in secs(d):
                 if dim == "tags":
@@ -1294,6 +1385,9 @@ def _tui_main(scr, data):
         typ = ",".join(sorted(st["active"].get("type", []))) or None
         tag = ",".join(sorted(st["active"].get("tags", []))) or None
         st["rows"] = filt(d, sel or None, tag, st["term"] or None, typ)
+        cs = st["active"].get("collection")   # collection faseti coklu-secim: alt-yol dahil OR
+        if cs: st["rows"] = [e for e in st["rows"]
+                             if any(e.get("collection", "") == c or e.get("collection", "").startswith(c + "/") for c in cs)]
         st["sel"] = min(st["sel"], max(0, len(st["rows"]) - 1)); st["top"] = 0
         reset_detail()
         st["fitems"] = facets()   # her zaman guncel tut (dar terminalde de toggle calissin)
@@ -1407,6 +1501,7 @@ def _tui_main(scr, data):
             ("m", L("Secrets panel: reveal / hide ALL fields of the record")),
             ("c  u  w", L("copy value · username · url  (clipboard clears in 45s)")),
             ("a  e  d  r", L("add · edit · delete · rotate (random)")),
+            ("M  C", L("move to collection · copy to collection")),
             ("", ""),
             ("R  Ctrl-L", L("reload vault   ·   force redraw")),
             ("L", L("toggle language (TR / EN)")),
@@ -1468,7 +1563,8 @@ def _tui_main(scr, data):
         tgt = by_id(st["d"], e0["id"]); tgt.setdefault("field_meta", {}); i = 0
         while True:
             meta = [("name", tgt["name"]), ("type", tgt["type"]),
-                    ("tags", ",".join(tgt["tags"])), ("project", tgt.get("project", "")),
+                    ("tags", ",".join(tgt["tags"])), ("collection", tgt.get("collection", "")),
+                    ("project", tgt.get("project", "")),
                     ("environment", tgt.get("environment", "")), ("tenant", tgt.get("tenant", "")),
                     ("repo", tgt.get("repo", "")), ("url", tgt.get("url", "")),
                     ("notes", tgt.get("notes", ""))]
@@ -1501,6 +1597,7 @@ def _tui_main(scr, data):
                 if nv is None: continue
                 if k == "tags": tgt["tags"] = [t for t in nv.split(",") if t.strip()]
                 elif k == "type": tgt["type"] = nv if nv in TYPES else tgt["type"]
+                elif k == "collection": tgt["collection"] = nv.strip().strip("/")
                 else: tgt[k] = nv
             else:                 # field satiri: deger mi gorunurluk mu duzenlenecek
                 act = pick(k, [L("edit value"), L("set visibility"), L("cancel")], 0)
@@ -1526,8 +1623,34 @@ def _tui_main(scr, data):
         if not f: st["msg"] = L("no secret field to rotate"); return
         if not confirm(L("Rotate '%s' → random value?", e["name"])): st["msg"] = L("rotate cancelled"); return
         tgt = by_id(st["d"], e["id"]); tgt["fields"][f] = _secrets.token_urlsafe(32)
-        tgt["updated"] = now_iso(); save(st["d"]); audit("rotate", key=e["name"], source="tui")
+        tgt["updated"] = now_iso()
+        if tgt.get("rotation", {}).get("every_days"): tgt["rotation"]["last"] = tgt["updated"]  # saati sifirla
+        save(st["d"]); audit("rotate", key=e["name"], source="tui")
         reload_(L("rotated: %s", e["name"]))
+
+    def move_flow():   # collection'a tasi (bos = kokten cikar; yeni yol yazinca collection olusur)
+        e = cur()
+        if not e: return
+        nv = prompt(L("Move to collection  (blank = none)"), e.get("collection", ""))
+        if nv is None: st["msg"] = L("move cancelled"); return
+        tgt = by_id(st["d"], e["id"]); tgt["collection"] = nv.strip().strip("/"); tgt["updated"] = now_iso()
+        save(st["d"]); audit("update", key=e["name"], source="tui", detail=f"collection={tgt['collection'] or '-'}")
+        reload_(L("moved: %s", e["name"]))
+
+    def copy_flow():   # kaydi kopyala (yeni id + istege bagli yeni ad + hedef collection)
+        e = cur()
+        if not e: return
+        nn = prompt(L("Copy — new name"), e["name"] + "_copy")
+        if not nn: st["msg"] = L("copy cancelled"); return
+        nc = prompt(L("Copy — into collection  (blank = none)"), e.get("collection", ""))
+        if nc is None: st["msg"] = L("copy cancelled"); return
+        src = by_id(st["d"], e["id"])
+        ne = norm({k: (list(v) if isinstance(v, list) else dict(v) if isinstance(v, dict) else v)
+                   for k, v in src.items() if k != "id"})
+        ne["name"] = nn; ne["collection"] = nc.strip().strip("/"); ne["created"] = ne["updated"] = now_iso()
+        secs(st["d"]).append(ne); save(st["d"])
+        audit("create", key=nn, source="tui", detail=f"cp collection={ne['collection'] or '-'}")
+        reload_(L("copied: %s", nn))
 
     # ---- ekran cizimi ----
     def draw():
@@ -1762,6 +1885,8 @@ def _tui_main(scr, data):
         elif c == ord("e"): edit_flow()
         elif c == ord("d"): delete_flow()
         elif c == ord("r"): rotate_flow()
+        elif c == ord("M"): move_flow()
+        elif c == ord("C"): copy_flow()
         elif c == ord("c"): copy_value()
         elif c == ord("u"): copy_field({"username", "user", "member_id"}, "username")
         elif c == ord("w"): copy_field({"url", "web_url", "auth_url"}, "url")
@@ -1833,8 +1958,10 @@ def _sel(a):
 def _print(rows):
     print(f"{'name':22} {'type':9} {'tenant':8} {'project':12} {'env':8} {'repo':14} tags")
     for e in rows:
+        over = rotation_overdue(e); od = f"  ⟳{over}g gecikmis" if over is not None else ""
+        col = f"  📁{e['collection']}" if e.get("collection") else ""
         print(f"{e['name']:22} {e['type']:9} {e['tenant']:8} {e['project']:12} "
-              f"{e['environment']:8} {e['repo']:14} {','.join(e['tags'])}")
+              f"{e['environment']:8} {e['repo']:14} {','.join(e['tags'])}{col}{od}")
 
 def _mkhelp():
     R = lambda syn, desc: f"  {syn:<46}{desc}"
@@ -1861,6 +1988,9 @@ def _mkhelp():
         R("set --name N [--type T] <value | k=v ...>", "create/update (add --tags a,b for tags)"),
         R("rm --name N [scope]", "delete a record"),
         R("rotate --name N [new-value]", "rotate the value (random if none given)"),
+        R("rotate --due [--dry]", "rotate every record whose rotation policy is overdue (cron-friendly)"),
+        R("mv --name N [scope] --to-collection C", "move a record into a collection"),
+        R("cp --name N [scope] --to-collection C [--as NEW]", "copy a record into a collection (new id)"),
         R("dims", "show the scope (tenant/project/env/repo) values in use"),
         R("leaks", "find reused (shared) secret values"),
         R("history [--purge]", "find (and optionally delete) secrets left in shell history"),
@@ -1875,6 +2005,7 @@ def _mkhelp():
         R("import <bundle.age|.cer>", "import a bundle / restore a .cer backup"),
         R("backup [--dir D]", "write a .cer vault backup (uses the Settings backup password; for cron/launchd)"),
         R("audit [verify]", "HMAC-chained audit log (verify: integrity check)"),
+        R("audit anchor [--file F][--syslog][--webhook U]", "push head hash to an off-machine sink (tamper-evidence)"),
         R("config [key [val]]", "runtime settings (idle, confirm_ops)"),
         R("tui", "interactive terminal UI (arrow keys, search, add/del/reveal)"),
         R("web [port]", "serve the web UI + JSON API (default 8787)"),
@@ -1940,9 +2071,9 @@ def cli(argv):
         return print(f"backup: {path}")
     if cmd == "tui": return tui()
     if cmd == "list":
-        tag = _flag(a, "--tag"); sel = _sel(a); typ = sel.pop("type", None)
+        tag = _flag(a, "--tag"); coll = _flag(a, "--collection"); sel = _sel(a); typ = sel.pop("type", None)
         actor = _cli_actor()
-        rows, note = rate_gate(actor, filt(load(), sel, tag, a[0] if a else None, typ))
+        rows, note = rate_gate(actor, filt(load(), sel, tag, a[0] if a else None, typ, coll))
         audit("list", source="cli", detail=json.dumps(sel), actor=actor)
         _print(rows)
         if note: sys.stderr.write(note.lstrip("\n") + "\n")
@@ -1957,8 +2088,19 @@ def cli(argv):
         for dim in DIMS:
             vals = sorted({e.get(dim, "") for e in secs(d) if e.get(dim)})
             print(f"{dim:12}: {', '.join(vals) or '-'}")
+        colls = sorted({e.get("collection", "") for e in secs(d) if e.get("collection")})
+        print(f"{'collection':12}: {', '.join(colls) or '-'}")
     elif cmd == "audit":
         if a and a[0] == "verify": print(audit_verify()); return
+        if a and a[0] == "anchor":
+            aa = a[1:]; persist = any(f in aa for f in ("--file", "--webhook", "--syslog"))
+            file = _flag(aa, "--file"); webhook = _flag(aa, "--webhook")
+            syslog = True if "--syslog" in aa else None
+            rec, sent = anchor_push(file=file, webhook=webhook, syslog=syslog, persist=persist)
+            if not rec: return print("audit henuz bos — anchor yok.")
+            print(f"anchor: seq={rec['seq']} hash={rec['hash'][:16]}…  gonderildi: {','.join(sent) or '(hedef yok)'}")
+            if not sent: print("  ipucu: hedef ver → concealer audit anchor --file ~/anchors.log [--syslog] [--webhook URL]")
+            return
         for r in audit_rows()[-40:]:
             who = f"[{r['actor']}] " if r.get("actor") else ""
             print(f"{r['ts']:20} {r['source']:6} {r['action']:10} {r['key']:24} {who}{r.get('detail','')}")
@@ -1975,7 +2117,13 @@ def cli(argv):
         else:
             for fn, fv in e["fields"].items(): print(f"{fn}={fv}")
     elif cmd in ("set", "add"):
-        tags = _flag(a, "--tags"); sel = _sel(a); typ = sel.pop("type", "api_key")
+        tags = _flag(a, "--tags"); coll = _flag(a, "--collection")
+        rdays = _flag(a, "--rotate-days"); rmode = _flag(a, "--rotate-mode")
+        sel = _sel(a); typ = sel.pop("type", "api_key")
+        rot = None
+        if rdays is not None:
+            try: rot = {"every_days": max(0, int(rdays)), "mode": rmode or "generate", "last": now_iso()}
+            except ValueError: sys.exit("--rotate-days sayi olmali")
         if "name" not in sel: sys.exit("--name gerekli")
         if not a: sys.exit("deger gerekli (api_key icin) veya field=val ciftleri")
         d = load(); ident = {dim: sel.get(dim, "") for dim in DIMS}; ident["name"] = sel["name"]
@@ -1991,24 +2139,66 @@ def cli(argv):
         if hit:
             hit["fields"].update(fields); hit["updated"] = now_iso()
             if tags is not None: hit["tags"] = [t for t in tags.split(",") if t]
+            if coll is not None: hit["collection"] = coll.strip().strip("/")
+            if rot is not None: hit["rotation"] = rot
             act = "update"
         else:
             e = dict(ident); e["type"] = typ; e["fields"] = fields
             e["tags"] = [t for t in (tags or "").split(",") if t]
+            if coll is not None: e["collection"] = coll.strip().strip("/")
+            if rot is not None: e["rotation"] = rot
             secs(d).append(norm(e)); act = "create"
         save(d); audit(act, key=sel["name"], source="cli", detail=label(ident))
         print(f"{act}: {sel['name']} @ {label(ident)}")
     elif cmd == "rotate":
+        if "--due" in a:   # toplu: politikasi vadesi gecmis kayitlar (cron dostu). generate → yeni deger, manual → yalniz uyar
+            dry = "--dry" in a; d = load(); did = 0; flagged = 0
+            for e in secs(d):
+                over = rotation_overdue(e)
+                if over is None: continue
+                mode = (e.get("rotation") or {}).get("mode", "generate")
+                if mode == "generate" and "value" in e.get("fields", {}):
+                    if not dry:
+                        e["fields"]["value"] = _secrets.token_urlsafe(32)
+                        e["rotation"]["last"] = e["updated"] = now_iso()
+                        audit("rotate", key=e["name"], source="cli", detail="auto")
+                    did += 1; print(f"{'[dry] ' if dry else ''}rotate: {e['name']} @ {label(e)} ({over}g gecikmis)")
+                else:   # manual ya da 'value' alani yok (cok-alanli kimlik) → deger kirmadan uyar
+                    flagged += 1; print(f"UYAR: {e['name']} @ {label(e)} ({over}g gecikmis) — elle dondur ({mode})")
+            if did and not dry: save(d)
+            return print(f"\n{did} dondurudu, {flagged} elle-dondurme bekliyor." + (" (dry-run: yazilmadi)" if dry else ""))
         d = load(); hits = [e for e in secs(d) if matches(e, _sel(list(a)))]
         if len(hits) != 1: sys.exit(f"{len(hits)} kayit eslesti, tekillestir.")
         val = a[0] if a and not a[0].startswith("--") else _secrets.token_urlsafe(32)
-        hits[0]["fields"]["value"] = val; hits[0]["updated"] = now_iso(); save(d)
+        hits[0]["fields"]["value"] = val; hits[0]["updated"] = now_iso()
+        if hits[0].get("rotation", {}).get("every_days"): hits[0]["rotation"]["last"] = hits[0]["updated"]  # saati sifirla
+        save(d)
         audit("rotate", key=hits[0]["name"], source="cli"); print(f"rotate: {hits[0]['name']} -> {mask(val)}")
     elif cmd == "rm":
         d = load(); hits = [e for e in secs(d) if matches(e, _sel(a))]
         if len(hits) != 1: sys.exit(f"{len(hits)} kayit eslesti, tekillestir.")
         secs(d).remove(hits[0]); save(d)
         audit("delete", key=hits[0]["name"], source="cli"); print(f"rm: {hits[0]['name']}")
+    elif cmd in ("mv", "cp"):   # collection'a tasi (mv: alani guncelle) / kopyala (cp: klon + yeni id)
+        to = _flag(a, "--to-collection"); newname = _flag(a, "--as")
+        if to is None: sys.exit("--to-collection gerekli")
+        to = to.strip().strip("/")
+        d = load(); hits = [e for e in secs(d) if matches(e, _sel(list(a)))]
+        if len(hits) != 1: sys.exit(f"{len(hits)} kayit eslesti, tekillestir.")
+        e = hits[0]
+        if cmd == "mv":
+            e["collection"] = to; e["updated"] = now_iso(); save(d)
+            audit("update", key=e["name"], source="cli", detail=f"collection={to or '-'}")
+            print(f"mv: {e['name']} -> 📁{to or '(root)'}")
+        else:
+            ne = norm({k: (list(v) if isinstance(v, list) else dict(v) if isinstance(v, dict) else v)
+                       for k, v in e.items() if k != "id"})   # derin-ish kopya, id'yi dusur → norm yeni id uretir
+            ne["collection"] = to
+            if newname: ne["name"] = newname
+            ne["created"] = ne["updated"] = now_iso()
+            secs(d).append(ne); save(d)
+            audit("create", key=ne["name"], source="cli", detail=f"cp collection={to or '-'}")
+            print(f"cp: {e['name']} -> {ne['name']} @ 📁{to or '(root)'} (id {ne['id']})")
     elif cmd == "run":
         sel = _sel(a)
         for dim in ("repo", "project"): sel.setdefault(dim, detect(dim))
@@ -2136,7 +2326,7 @@ def serve_web(port):
             if not valid(self._tok() or ""): return self._json({"error": "locked"}, 401)
             if path == "/api/secrets":
                 d = load(); sel = {dim: q[dim] for dim in DIMS if q.get(dim)}
-                rows = filt(d, sel, q.get("tag"), q.get("q"), q.get("type"))
+                rows = filt(d, sel, q.get("tag"), q.get("q"), q.get("type"), q.get("collection"))
                 acc = last_access()
                 out = []
                 for e in rows:
@@ -2336,7 +2526,7 @@ def serve_web(port):
                 sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
                 if not e: return self._json({"error": "yok"}, 404)
                 b = self._body(); ne = _entry_from_body(b)
-                for k in ["name", "type"] + DIMS + ["tags", "url", "notes", "fields"]: e[k] = ne[k]
+                for k in ["name", "type"] + DIMS + ["tags", "url", "notes", "fields", "collection", "rotation"]: e[k] = ne[k]
                 e["updated"] = now_iso(); save(d)
                 audit("update", key=e["name"], source="web", detail=label(e))
                 return self._json({"ok": True})
@@ -2364,7 +2554,9 @@ def _entry_from_body(b):
     e = {"name": b.get("name", ""), "type": b.get("type", "api_key"),
          "tags": [t.strip() for t in (b.get("tags") or []) if (t or "").strip()] if isinstance(b.get("tags"), list)
                  else [t.strip() for t in str(b.get("tags", "")).split(",") if t.strip()],
-         "url": b.get("url", ""), "notes": b.get("notes", ""), "fields": _clean_fields(b.get("fields", {}))[0]}
+         "url": b.get("url", ""), "notes": b.get("notes", ""), "fields": _clean_fields(b.get("fields", {}))[0],
+         "collection": (b.get("collection") or "").strip().strip("/"),
+         "rotation": b.get("rotation") if isinstance(b.get("rotation"), dict) else {}}
     for dim in DIMS: e[dim] = b.get(dim, "")
     if "id" in b: e["id"] = b["id"]
     return e
@@ -2372,8 +2564,9 @@ def _entry_from_body(b):
 # ---------------- MCP ----------------
 _DIMPROPS = {d: {"type": "string"} for d in DIMS}
 MCP_TOOLS = [
-    {"name": "list_secrets", "description": "Secret'lari tip+boyut+tag ile listeler (deger vermez).",
-     "inputSchema": {"type": "object", "properties": {**_DIMPROPS, "tag": {"type": "string"}, "type": {"type": "string"}}}},
+    {"name": "list_secrets", "description": "Secret'lari tip+boyut+tag+collection ile listeler (deger vermez).",
+     "inputSchema": {"type": "object", "properties": {**_DIMPROPS, "tag": {"type": "string"}, "type": {"type": "string"},
+        "collection": {"type": "string", "description": "collection yolu ile daralt (alt-yollar dahil)"}}}},
     {"name": "search_secrets", "description": "name/boyut/tag/url/notes icinde arar (deger vermez).",
      "inputSchema": {"type": "object", "properties": {"term": {"type": "string"}}, "required": ["term"]}},
     {"name": "run_with_secrets", "description": "Komutu boyutlara uyan secret'lar env'e enjekte edilerek calistirir. Deger sizmaz; cikti maskelenir.",
@@ -2385,6 +2578,7 @@ MCP_TOOLS = [
         "fields": {"type": "object", "description": "cok alanli tipler icin {field: value}"},
         "tags": {"type": "array", "items": {"type": "string"}}, "url": {"type": "string"},
         "notes": {"type": "string"}, "actor": {"type": "string", "description": "eylemi yapan agent kimligi"},
+        "collection": {"type": "string", "description": "serbest gruplama yolu (opsiyonel)"},
         **_DIMPROPS}, "required": ["name"]}},
 ]
 def _fmt(rows): return "\n".join(f"{e['name']:22} {e['type']:9} {label(e):22} [{','.join(e['tags'])}]" for e in rows) or "(bos)"
@@ -2396,7 +2590,7 @@ def _mcp_call(name, args):
                 "Once vault sahibi: `concealer agent register <ad>` ve uretilen CONCEALER_TOKEN'i MCP env'ine koy.")
     if name == "list_secrets":
         sel = {d: args[d] for d in DIMS if args.get(d)}
-        rows = filt(load(), sel, args.get("tag"), None, args.get("type"))
+        rows = filt(load(), sel, args.get("tag"), None, args.get("type"), args.get("collection"))
         allowed, note = rate_gate(agent, rows)
         audit("list", source="mcp", detail=json.dumps(sel), actor=agent)
         return _fmt(allowed) + note
@@ -2424,11 +2618,13 @@ def _mcp_call(name, args):
             if "tags" in args: hit["tags"] = [t for t in (args["tags"] or []) if t]
             if "url" in args: hit["url"] = args["url"]
             if "notes" in args: hit["notes"] = args["notes"]
+            if "collection" in args: hit["collection"] = (args["collection"] or "").strip().strip("/")
             act = "update"
         else:
             e = dict(ident); e["type"] = args.get("type", "api_key"); e["fields"] = fields
             e["tags"] = [t for t in (args.get("tags") or []) if t]
             e["url"] = args.get("url", ""); e["notes"] = args.get("notes", "")
+            e["collection"] = (args.get("collection") or "").strip().strip("/")
             secs(d).append(norm(e)); act = "create"
         save(d); audit(act, key=args["name"], source="mcp", detail=label(ident), actor=actor)
         return f"{act}: {args['name']} @ {label(ident)}"

@@ -139,7 +139,7 @@ body.cmp-open .cmp-wrap.cmp-full .cmp{font-size:13.5px}
 - **Dynamic secrets & leases.** No short‑lived DB creds minted on demand. → HashiCorp Vault.
 - **Automatic rotation & CI/CD sync fabric.** Manual rotation only. → Doppler / Infisical / Vault Secrets Sync.
 - **Consumer UX.** No mobile app, no browser autofill, no passkeys. → 1Password / Bitwarden / Keeper.
-- **Compliance posture at scale.** No FedRAMP/SOC2 attestations. Audit log’s ceiling is documented (an FS‑root attacker with `audit.key` can re‑forge). → Keeper / Vault / cloud KMS.
+- **Compliance posture at scale.** No FedRAMP/SOC2 attestations (those are *organizational* — earned by the entity operating a tool, not shipped by the tool; see [`COMPLIANCE.md`](../COMPLIANCE.md)). The audit log’s local ceiling — an FS‑root attacker with `audit.key` can re‑forge — is now mitigated by off‑machine anchor push (`audit anchor` → append‑only file/syslog/webhook), which `audit verify` checks to catch a full re‑forge. → Keeper / Vault / cloud KMS for turnkey attestations.
 
 ---
 

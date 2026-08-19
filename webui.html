@@ -107,6 +107,8 @@ th .colbtn:hover{color:var(--acc);background:var(--panel)}
 tr:last-child td{border-bottom:0}
 .chip{display:inline-block;background:var(--chip);color:#bcd;border-radius:20px;padding:2px 9px;font-size:11px;margin:1px 2px}
 .type-badge{font-size:11px;padding:3px 9px;border-radius:6px;font-weight:600;background:#242a33;color:#c6ccd6}
+.ovd{font-size:11px;padding:2px 7px;border-radius:6px;font-weight:600;background:#3a2410;color:var(--warn);white-space:nowrap}
+.coll{white-space:nowrap}
 .t-api_key{background:#132534;color:#8fd0ff}.t-database{background:#241d33;color:#c3a6ff}
 .t-website{background:#12301f;color:#86e6a8}.t-login{background:#12301f;color:#86e6a8}.t-custom{background:#2e2612;color:#ffcf7a}
 .t-access_token,.t-jwt,.t-oauth{background:#132534;color:#8fd0ff}
@@ -354,6 +356,7 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
         </div>
         <div class="filterpanel" id="filterpanel">
           <div class="msel" id="ms-type"></div>
+          <div class="msel" id="ms-collection"></div>
           <div class="msel" id="ms-tenant"></div>
           <div class="msel" id="ms-project"></div>
           <div class="msel" id="ms-environment"></div>
@@ -532,11 +535,11 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
 const IDLE = parseInt("__IDLE__") || 300;
 const CLIP_CLEAR = 20;
 const DIMS=['tenant','project','environment','repo'];
-const FDIMS=['type','tenant','project','environment','repo','tags'];   // filter dropdown alanlari
+const FDIMS=['type','collection','tenant','project','environment','repo','tags'];   // filter dropdown alanlari
 let TYPES={}, idleLeft=IDLE, idleTimer=null, LANG='tr';
 // coklu-secim filtre durumu + secenekler + istemci-tarafi sayfalama
-const FILT={type:new Set(),tenant:new Set(),project:new Set(),environment:new Set(),repo:new Set(),tags:new Set()};
-const FOPTS={type:[],tenant:[],project:[],environment:[],repo:[],tags:[]};
+const FILT={type:new Set(),collection:new Set(),tenant:new Set(),environment:new Set(),project:new Set(),repo:new Set(),tags:new Set()};
+const FOPTS={type:[],collection:[],tenant:[],project:[],environment:[],repo:[],tags:[]};
 let SPAGE=1; let SPAGE_SIZE=parseInt(localStorage.getItem('concealer_psize'))||25; let SROWS=[];
 
 // ---------- i18n ----------
@@ -551,6 +554,9 @@ const I18N={
   idle_lock:"⏱ oto-kilit",idle_locked:"Boşta kalma — kilitlendi",
   name_req:"ad gerekli",save:"Kaydet",cancel:"İptal",close:"Kapat",fields:"alanlar",notes:"notlar",
   add_field:"+ alan ekle",field:"alan",value:"değer",type:"tip",scope:"kapsam",tags:"etiketler",url:"url",
+  collection:"Koleksiyon",th_collection:"Koleksiyon",rotation:"Rotasyon",rot_days:"Her (gün)",rot_mode:"Mod",
+  rot_generate:"otomatik üret",rot_manual:"elle",rot_none:"politika yok",overdue:"gecikmiş",rot_overdue_d:d=>`${d} gün gecikmiş`,
+  move_to:"Koleksiyona taşı",copy_to:"Kopyala",coll_root:"(kök)",copied:"kopyalandı",moved:"taşındı",
   new_secret_title:"+ Yeni Sır",edit_title:"✏️ Düzenle",
   all_actions:"tüm eylemler",all_sources:"tüm kaynaklar",key_filter:"anahtar filtre",verify_chain:"🔗 Zincir doğrula",
   th_time:"Zaman (UTC)",th_source:"Kaynak",th_action:"Eylem",th_key:"Anahtar",th_detail:"Detay",
@@ -607,6 +613,9 @@ const I18N={
   idle_lock:"⏱ auto-lock",idle_locked:"Idle — locked",
   name_req:"name required",save:"Save",cancel:"Cancel",close:"Close",fields:"fields",notes:"notes",
   add_field:"+ add field",field:"field",value:"value",type:"type",scope:"scope",tags:"tags",url:"url",
+  collection:"Collection",th_collection:"Collection",rotation:"Rotation",rot_days:"Every (days)",rot_mode:"Mode",
+  rot_generate:"auto-generate",rot_manual:"manual",rot_none:"no policy",overdue:"overdue",rot_overdue_d:d=>`${d} days overdue`,
+  move_to:"Move to collection",copy_to:"Copy",coll_root:"(root)",copied:"copied",moved:"moved",
   new_secret_title:"+ New Secret",edit_title:"✏️ Edit",
   all_actions:"all actions",all_sources:"all sources",key_filter:"key filter",verify_chain:"🔗 Verify chain",
   th_time:"Time (UTC)",th_source:"Source",th_action:"Action",th_key:"Key",th_detail:"Detail",
@@ -802,6 +811,7 @@ async function refreshFilterOptions(){
   const rows=await (await api('/api/secrets')).json();
   DIMS.forEach(d=>FOPTS[d]=[...new Set(rows.map(e=>e[d]).filter(Boolean))].sort());
   FOPTS.type=[...new Set(rows.map(e=>e.type).filter(Boolean))].sort();
+  FOPTS.collection=[...new Set(rows.map(e=>e.collection).filter(Boolean))].sort();
   FOPTS.tags=[...new Set(rows.flatMap(e=>e.tags||[]))].sort();
   FDIMS.forEach(d=>{ [...FILT[d]].forEach(v=>{ if(!FOPTS[d].includes(v))FILT[d].delete(v); }); renderMsel(d); });
   updateFilterCount();
@@ -1188,8 +1198,9 @@ async function loadSecrets(){
 }
 // --- kolon modeli ---
 function scBaseCols(){ return [
-  {k:'name',    l:t('th_name'),    cls:'mono', v:e=>e.name, r:e=>`<b>${esc(e.name)}</b>${e.url?` <a href="${esc(e.url)}" target="_blank">↗</a>`:''}`},
+  {k:'name',    l:t('th_name'),    cls:'mono', v:e=>e.name, r:e=>`<b>${esc(e.name)}</b>${e.url?` <a href="${esc(e.url)}" target="_blank">↗</a>`:''}${e.overdue!=null?` <span class="ovd" title="${esc(t('rot_overdue_d',e.overdue))}">⟳ ${t('overdue')}</span>`:''}`},
   {k:'type',    l:t('th_type'),    v:e=>e.type, r:e=>`<span class="type-badge t-${e.type}">${esc(e.type)}</span>`},
+  {k:'collection',l:t('th_collection'),cls:'mut mono',v:e=>e.collection||'',r:e=>e.collection?`<span class="coll">📁 ${esc(e.collection)}</span>`:'<span class="mut">—</span>'},
   {k:'scope',   l:t('th_scope'),   cls:'mut mono', v:e=>DIMS.map(d=>e[d]||'*').join('/'), r:e=>DIMS.map(d=>esc(e[d]||'*')).join(' / ')},
   {k:'tags',    l:t('th_tags'),    v:e=>(e.tags||[]).join(','), r:e=>(e.tags||[]).map(tagChip).join('')},
   {k:'updated', l:t('th_updated'), cls:'mut', v:e=>e.updated||'', r:e=>fmtTs(e.updated)},
@@ -1257,6 +1268,8 @@ function rowMenu(ev,id,name){
   ev.stopPropagation(); closeRowMenu();
   const m=document.createElement('div'); m.className='rowmenu'; m.id='rowmenu';
   m.innerHTML=`<button onclick="closeRowMenu();openEditor('${id}')">✏️ ${t('edit')}</button>
+    <button onclick="closeRowMenu();moveSecret('${id}')">📁 ${t('move_to')}</button>
+    <button onclick="closeRowMenu();copySecret('${id}')">⧉ ${t('copy_to')}</button>
     <button onclick="closeRowMenu();openDeploy('${id}')">${t('deploy_btn')}</button>
     <button class="danger" onclick="closeRowMenu();delSecret('${id}','${esc(name)}')">🗑 ${t('del')}</button>`;
   document.body.appendChild(m);
@@ -1288,6 +1301,22 @@ async function delSecret(id,name){
     if(r.status===403){toast(t('wrong_pw'));return;} toast(t('deleted')); refreshFilterOptions(); loadSecrets(); };
   if((window.CFG&&window.CFG.confirm_ops||[]).includes('delete')) askPw(t('del'),send); else send();
 }
+// collection'a tasi/kopyala: tam kaydi cek (fields degerleriyle), collection'i degistirip PUT/yeni-form
+function _revealFields(e){ const fv={}; Object.entries(e.fields).forEach(([k,f])=>fv[k]=f.value??''); return fv; }
+async function moveSecret(id){
+  const e=await (await api('/api/secret/'+id+'?reveal=1&intent=edit')).json();
+  const nc=prompt(t('move_to'),e.collection||''); if(nc===null)return;
+  const b={name:e.name,type:e.type,tenant:e.tenant,project:e.project,environment:e.environment,repo:e.repo,
+    url:e.url,notes:e.notes,tags:e.tags||[],fields:_revealFields(e),rotation:e.rotation||{},
+    collection:nc.trim().replace(/^\/+|\/+$/g,'')};
+  await api('/api/secret/'+id,{method:'PUT',body:JSON.stringify(b)}); toast(t('moved')); refreshFilterOptions(); loadSecrets();
+}
+async function copySecret(id){
+  const e=await (await api('/api/secret/'+id+'?reveal=1&intent=edit')).json();
+  openEditor(null,{type:e.type,tenant:e.tenant,project:e.project,environment:e.environment,repo:e.repo,
+    url:e.url,notes:e.notes,tags:e.tags||[],collection:e.collection||'',rotation:e.rotation||{},
+    name:e.name+'_copy',fields:_revealFields(e)});
+}
 
 async function viewSecret(id){
   const e=await (await api('/api/secret/'+id+'?reveal=1&intent=view')).json();
@@ -1313,7 +1342,7 @@ function copyText(v,name,field){ doCopy(v); fetch('/api/copy',{method:'POST',bod
 function doCopy(v){ navigator.clipboard.writeText(v).then(()=>{ toast(t('copied')); setTimeout(()=>navigator.clipboard.writeText('').catch(()=>{}),CLIP_CLEAR*1000); }).catch(()=>toast(t('copy_fail'))); }
 
 async function openEditor(id, preset){
-  let e={name:'',type:'api_key',tenant:'',project:'',environment:'',repo:'',tags:[],url:'',notes:'',fields:{}};
+  let e={name:'',type:'api_key',tenant:'',project:'',environment:'',repo:'',tags:[],url:'',notes:'',fields:{},collection:'',rotation:{}};
   if(id){ e=await (await api('/api/secret/'+id+'?reveal=1&intent=edit')).json(); const fv={}; Object.entries(e.fields).forEach(([k,f])=>fv[k]=f.value??''); e.fields=fv; }
   else if(preset){ Object.assign(e, preset); }
   const body=`<div class="grid">
@@ -1325,10 +1354,17 @@ async function openEditor(id, preset){
     <div class="field"><label class="fld">${t('frepo')}</label><input id="e_repo" value="${esc(e.repo)}"></div>
     <div class="field full"><label class="fld">${t('url')}</label><input id="e_url" value="${esc(e.url)}" placeholder="https://…"></div>
     <div class="field full"><label class="fld">${t('tags')}</label><input id="e_tags" value="${esc((e.tags||[]).join(', '))}" placeholder="ai, prod"></div>
+    <div class="field full"><label class="fld">${t('collection')}</label>
+      <input id="e_collection" list="dl_collection" value="${esc(e.collection||'')}" placeholder="backend/payments">
+      <datalist id="dl_collection">${(FOPTS.collection||[]).map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+    <div class="field"><label class="fld">${t('rotation')} — ${t('rot_days')}</label><input id="e_rotdays" type="number" min="0" value="${esc(String((e.rotation||{}).every_days||''))}" placeholder="0 = ${t('rot_none')}"></div>
+    <div class="field"><label class="fld">${t('rot_mode')}</label><select id="e_rotmode">
+      <option value="generate" ${((e.rotation||{}).mode||'generate')==='generate'?'selected':''}>${t('rot_generate')}</option>
+      <option value="manual" ${(e.rotation||{}).mode==='manual'?'selected':''}>${t('rot_manual')}</option></select></div>
     </div><label class="fld">${t('fields')}</label><div id="e_fields"></div>
     <div class="field"><label class="fld">${t('notes')}</label><textarea id="e_notes">${esc(e.notes)}</textarea></div>`;
   modal(id?t('edit_title'):t('new_secret_title'),body,[{x:t('save'),p:1,f:()=>saveSecret(id)},{x:t('cancel'),f:closeModal}]);
-  window._editFields=e.fields; renderFields();
+  window._editFields=e.fields; window._editRotLast=(e.rotation||{}).last||''; renderFields();
 }
 function renderFields(){
   const type=$('#e_type').value,cont=$('#e_fields'),cur=window._editFields||{};
@@ -1349,9 +1385,12 @@ async function saveSecret(id){
   const type=$('#e_type').value; let fields={};
   if(type==='custom')document.querySelectorAll('#e_fields .kv').forEach(r=>{const k=r.querySelector('.kv-k').value.trim();if(k)fields[k]=r.querySelector('.kv-v').value;});
   else document.querySelectorAll('#e_fields input[data-f]').forEach(i=>fields[i.dataset.f]=i.value);
+  const rd=parseInt($('#e_rotdays').value)||0;
+  const rotation=rd>0?{every_days:rd,mode:$('#e_rotmode').value,last:(window._editRotLast||new Date().toISOString())}:{};
   const b={name:$('#e_name').value.trim(),type,tenant:$('#e_tenant').value.trim(),project:$('#e_project').value.trim(),
     environment:$('#e_environment').value.trim(),repo:$('#e_repo').value.trim(),url:$('#e_url').value.trim(),
-    notes:$('#e_notes').value,tags:$('#e_tags').value.split(',').map(s=>s.trim()).filter(Boolean),fields};
+    notes:$('#e_notes').value,tags:$('#e_tags').value.split(',').map(s=>s.trim()).filter(Boolean),fields,
+    collection:$('#e_collection').value.trim().replace(/^\/+|\/+$/g,''),rotation};
   if(!b.name){toast(t('name_req'));return;}
   if(id)await api('/api/secret/'+id,{method:'PUT',body:JSON.stringify(b)}); else await api('/api/secrets',{method:'POST',body:JSON.stringify(b)});
   closeModal(); toast(id?t('updated'):t('created')); refreshFilterOptions(); loadSecrets();
@@ -1393,7 +1432,7 @@ Object.assign(FILT,{a_source:new Set(),a_action:new Set(),a_actor:new Set(),a_ke
 Object.assign(FOPTS,{a_source:[],a_action:[],a_actor:[],a_key:[],a_detail:[],st_source:[],st_actor:[],st_type:[],st_project:[]});
 Object.assign(MSEL_LABEL,{a_source:'th_source',a_action:'th_action',a_actor:'th_actor',a_key:'th_key',a_detail:'th_detail',
   st_source:'ch_interface',st_actor:'th_actor',st_type:'type',st_project:'ch_project',
-  type:'type',tags:'tags',tenant:'ften',project:'fproj',environment:'fenv',repo:'frepo'});   // secrets filtre etiketleri
+  type:'type',tags:'tags',collection:'collection',tenant:'ften',project:'fproj',environment:'fenv',repo:'frepo'});   // secrets filtre etiketleri
 MSEL_VLABEL.a_action=actLabel;   // action filtresi tablo/stats ile ayni cevrili etiketleri gosterir
 ['a_source','a_action','a_actor','a_key','a_detail'].forEach(d=>MSEL_ON[d]=()=>{updateAuditFilterCount();APAGE=1;aRender();});
 ['st_source','st_actor','st_type','st_project'].forEach(d=>MSEL_ON[d]=()=>{updateStatsFilterCount();loadStats();});
