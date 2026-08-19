@@ -4,20 +4,27 @@ remote_theme: just-the-docs/just-the-docs
 baseurl: "/concealer"
 url: "https://fxerkan.github.io"
 
+logo: "/assets/logo.svg"
+favicon_ico: "/assets/logo.svg"
+
 # just-the-docs
+color_scheme: concealer
 search_enabled: true
 search:
   heading_level: 3
   previews: 3
-color_scheme: dark
 heading_anchors: true
 
 aux_links:
+  "🏠 Home":
+    - "https://fxerkan.github.io/concealer/"
   "GitHub":
     - "https://github.com/fxerkan/concealer"
-aux_links_new_tab: true
+  "Homebrew":
+    - "https://github.com/fxerkan/homebrew-tap"
+aux_links_new_tab: false
 
-footer_content: 'Developed by <a href="https://fxerkan.com">FXerkan</a> — Code more, worry less. MIT License.'
+footer_content: 'Developed by <a href="https://fxerkan.com">FXerkan</a> — Code more, worry less. · MIT License'
 
 # GitHub Pages / Jekyll
 plugins:

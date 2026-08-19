@@ -24,6 +24,8 @@ concealer web 8080       # custom port
 
 Binds to `127.0.0.1` **only** — it is a single-user local convenience, not a hardened multi-user server. Unlock in the browser with the master password.
 
+![concealer Web UI — searchable, scoped secrets]({{ site.baseurl }}/assets/app-secrets.png)
+
 ---
 
 ## Features
@@ -40,6 +42,18 @@ Binds to `127.0.0.1` **only** — it is a single-user local convenience, not a h
 - **Risks** view — finds the same value reused across projects and scores the blast radius.
 - **Scan folder** — sweep a directory (or shell history) for stray secrets and import them, tagged by origin, with a server-side folder browser and OS-native picker.
 - **Settings** — idle timeout, which operations require confirmation, and **per-agent MCP rate limits** (see [MCP]({{ site.baseurl }}/mcp)).
+
+---
+
+![Audit log viewer with chain verification]({{ site.baseurl }}/assets/app-audit-logs.png)
+
+The **Risks** view finds the same value reused across projects and scores the blast radius:
+
+![Risk view — reused secret values scored by leak risk]({{ site.baseurl }}/assets/app-risks.png)
+
+**Scan folder** sweeps a directory (or shell history) for stray secrets and imports them, tagged by origin:
+
+![Scan a folder or shell history for leaked secrets]({{ site.baseurl }}/assets/app-scan-folder.png)
 
 ---
 

@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>concealer — local-only secret manager for the AI-coding era</title>
+<meta name="description" content="Local-only, single-file secret manager for the AI-coding era. Encrypted with SOPS + age. No cloud, no telemetry, no account. CLI · Web UI · TUI · MCP.">
+<link rel="icon" href="/concealer/assets/logo.svg">
+<meta property="og:title" content="concealer — secret manager for the AI-coding era">
+<meta property="og:description" content="Local-only, single-file secret manager. Encrypted with SOPS + age. Agents use secrets without ever seeing them.">
+<meta property="og:image" content="/concealer/assets/hero.png">
+<style>
+/* ===== theme (mirrors the app's webui palette) ===== */
+:root, html[data-theme="dark"]{
+  --bg:#0a0b0d; --panel:#101216; --panel2:#161a20; --line:#1c1f26; --line2:#2a2f38;
+  --txt:#e8e8e6; --mut:#8a909b; --acc:#ffb020; --acc2:#ffc247; --ok:#7ee787; --bad:#ff6b6b;
+  --ink:#0a0b0d; --glow:rgba(255,176,32,.22);
+}
+html[data-theme="light"]{
+  --bg:#f4f5f7; --panel:#ffffff; --panel2:#eef0f3; --line:#e2e6eb; --line2:#c8ced7;
+  --txt:#1a1d23; --mut:#5b6472; --acc:#c47a00; --acc2:#a86800; --ok:#1a7f37; --bad:#d1242f;
+  --ink:#ffffff; --glow:rgba(196,122,0,.18);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  line-height:1.55;-webkit-font-smoothing:antialiased;transition:background .25s,color .25s}
+a{color:var(--acc);text-decoration:none}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.wrap{max-width:1080px;margin:0 auto;padding:0 22px}
+/* brand: conceal + amber-boxed "er" (house rule) */
+.brand{font-weight:700;letter-spacing:-.3px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;display:inline-flex;align-items:center}
+.brand .ac{display:inline-block;color:var(--ink);background:var(--acc);border-radius:4px;padding:0 .18em;margin-left:.05em;box-shadow:0 2px 8px var(--glow)}
+.brand img{height:1.5em;width:1.5em;margin-right:.5em;border-radius:7px}
+
+/* ===== top nav ===== */
+header.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
+  background:color-mix(in srgb,var(--bg) 82%,transparent);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;gap:14px;height:60px}
+.nav .brand{font-size:20px}
+.nav nav{margin-left:auto;display:flex;align-items:center;gap:6px}
+.nav a.lnk{color:var(--mut);font-weight:600;font-size:14px;padding:8px 12px;border-radius:8px}
+.nav a.lnk:hover{color:var(--txt);background:var(--panel2)}
+.iconbtn{border:1px solid var(--line2);background:var(--panel2);color:var(--txt);border-radius:8px;
+  height:34px;padding:0 10px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.iconbtn:hover{border-color:var(--acc)}
+@media(max-width:720px){.nav a.lnk[data-collapse]{display:none}}
+
+/* ===== hero ===== */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.hero .wrap{position:relative;z-index:2;padding:76px 22px 66px;text-align:center}
+.hero h1{font-size:clamp(40px,7vw,76px);margin:0 0 6px;letter-spacing:-1.5px;line-height:1}
+.hero .tag{font-size:clamp(17px,2.4vw,23px);color:var(--txt);font-weight:600;margin:14px 0 4px}
+.hero .sub{color:var(--mut);max-width:640px;margin:8px auto 26px;font-size:16px}
+.pillrow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:0 0 26px}
+.pill{border:1px solid var(--line2);background:var(--panel);border-radius:999px;padding:5px 13px;font-size:12.5px;color:var(--mut);font-weight:600}
+.pill b{color:var(--acc)}
+/* install command */
+.install{display:inline-flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line2);
+  border-radius:12px;padding:12px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;
+  box-shadow:0 18px 50px rgba(0,0,0,.35);max-width:100%}
+.install .p{color:var(--acc);font-weight:700}
+.install code{color:var(--txt);white-space:nowrap;overflow:auto}
+.install button{border:0;background:var(--acc);color:var(--ink);border-radius:7px;padding:6px 11px;font-weight:700;cursor:pointer;font-size:12.5px;flex:0 0 auto}
+.install button:active{transform:translateY(1px)}
+.ctarow{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+.btn{border-radius:10px;padding:12px 22px;font-weight:700;font-size:15px;cursor:pointer;border:1px solid var(--line2);display:inline-flex;align-items:center;gap:8px}
+.btn.primary{background:var(--acc);color:var(--ink);border-color:var(--acc);box-shadow:0 10px 30px var(--glow)}
+.btn.primary:hover{background:var(--acc2)}
+.btn.ghost{background:transparent;color:var(--txt)}
+.btn.ghost:hover{border-color:var(--acc)}
+
+/* ===== redaction animation background (from the app's login screen) ===== */
+.loginbg{position:absolute;inset:0;overflow:hidden;z-index:1;pointer-events:none;user-select:none;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--mut);opacity:.22}
+.loginbg .frag{position:absolute;white-space:nowrap;opacity:0;will-change:transform,opacity;
+  animation:fraglife var(--dur,10s) ease-in-out var(--del,0s) infinite}
+.loginbg .k{color:var(--acc2)} .loginbg .s{color:var(--mut)}
+.rx{position:relative;color:var(--txt);border-radius:3px}
+.rx::after{content:"";position:absolute;inset:-1px -3px;background:var(--acc);border-radius:3px;will-change:transform;
+  transform:scaleX(0);transform-origin:left center;animation:rxwipe var(--dur,10s) ease var(--del,0s) infinite}
+.rx::before{content:"";position:absolute;left:-3px;right:-3px;top:50%;height:2px;background:var(--ink);
+  transform:scaleX(0);transform-origin:left center;z-index:1;opacity:0;will-change:transform;animation:rxstrike var(--dur,10s) linear var(--del,0s) infinite}
+@keyframes fraglife{0%{opacity:0;transform:translateY(7px)}9%{opacity:1;transform:translateY(0)}55%{opacity:1;transform:translateY(0)}70%{opacity:0;transform:translateY(-7px)}100%{opacity:0;transform:translateY(-7px)}}
+@keyframes rxwipe{0%,27%{transform:scaleX(0)}40%,100%{transform:scaleX(1)}}
+@keyframes rxstrike{0%,29%{transform:scaleX(0);opacity:0}34%{opacity:.9}40%,100%{transform:scaleX(1);opacity:.9}}
+@keyframes fraglife-soft{0%{opacity:0}12%{opacity:1}56%{opacity:1}72%{opacity:0}100%{opacity:0}}
+@keyframes rxfade{0%,30%{opacity:0}42%,100%{opacity:1}}
+@media(prefers-reduced-motion:reduce){
+  .loginbg .frag{animation-name:fraglife-soft;transform:none}
+  .rx::after{transform:scaleX(1);animation-name:rxfade}.rx::before{display:none}
+}
+
+/* ===== sections ===== */
+section{padding:64px 0}
+.sec-h{text-align:center;margin:0 auto 40px;max-width:640px}
+.sec-h h2{font-size:clamp(26px,4vw,38px);margin:0 0 10px;letter-spacing:-.6px}
+.sec-h p{color:var(--mut);margin:0;font-size:16px}
+.eyebrow{color:var(--acc);font-weight:700;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px}
+
+/* features grid */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+@media(max-width:860px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px;transition:border-color .2s,transform .2s}
+.card:hover{border-color:var(--line2);transform:translateY(-2px)}
+.card .ico{width:40px;height:40px;border-radius:10px;background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:14px;border:1px solid var(--line2)}
+.card h3{margin:0 0 8px;font-size:18px}
+.card p{margin:0;color:var(--mut);font-size:14.5px}
+
+/* interfaces / screenshots */
+.shot{display:grid;grid-template-columns:1.05fr 1fr;gap:34px;align-items:center;margin:0 0 60px}
+.shot:nth-child(even){grid-template-columns:1fr 1.05fr}
+.shot:nth-child(even) .txt{order:2}
+@media(max-width:820px){.shot,.shot:nth-child(even){grid-template-columns:1fr}.shot:nth-child(even) .txt{order:0}}
+.shot .txt .eyebrow{margin-bottom:6px}
+.shot .txt h3{font-size:24px;margin:0 0 10px;letter-spacing:-.4px}
+.shot .txt p{color:var(--mut);margin:0 0 12px}
+.shot .txt code{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-size:13px;color:var(--txt)}
+.shot figure{margin:0;border:1px solid var(--line2);border-radius:12px;overflow:hidden;background:var(--panel);box-shadow:0 22px 60px rgba(0,0,0,.4)}
+.shot figure img{display:block;width:100%;height:auto}
+
+/* code block */
+.codeblk{background:#06070a;border:1px solid var(--line2);border-radius:12px;padding:18px 20px;overflow:auto;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;line-height:1.7;color:#d7dbe3}
+html[data-theme="light"] .codeblk{background:#0d0f13;color:#d7dbe3}
+.codeblk .c{color:#6b7280}.codeblk .a{color:var(--acc2)}
+
+/* strip / cta */
+.strip{background:var(--panel);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.strip .wrap{display:flex;gap:20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:40px 22px}
+.strip h2{margin:0;font-size:26px;letter-spacing:-.5px}
+.strip p{margin:6px 0 0;color:var(--mut)}
+
+footer{border-top:1px solid var(--line);color:var(--mut);font-size:14px}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:32px 22px}
+footer a{color:var(--mut)} footer a:hover{color:var(--acc)}
+footer .links{display:flex;gap:18px;flex-wrap:wrap}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- ===== NAV ===== -->
+<header class="nav">
+  <div class="wrap">
+    <span class="brand"><img src="/concealer/assets/logo.svg" alt="">conceal<span class="ac">er</span></span>
+    <nav>
+      <a class="lnk" data-collapse href="/concealer/getting-started" data-i18n="nav_docs">Docs</a>
+      <a class="lnk" data-collapse href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener">GitHub</a>
+      <a class="lnk" data-collapse href="#install" data-i18n="nav_install">Install</a>
+      <button class="iconbtn" id="lang" title="Language">🌐 <span id="langlbl">EN</span></button>
+      <button class="iconbtn" id="theme" title="Theme"><span id="themeico">🌙</span></button>
+    </nav>
+  </div>
+</header>
+
+<!-- ===== HERO ===== -->
+<div class="hero">
+  <div class="loginbg" id="loginbg" aria-hidden="true"></div>
+  <div class="wrap">
+    <h1 class="brand" style="justify-content:center">conceal<span class="ac">er</span></h1>
+    <p class="tag" data-i18n="hero_tag">The local-only secret manager for the AI-coding era.</p>
+    <p class="sub" data-i18n="hero_sub">Encrypted with SOPS + age. No cloud, no telemetry, no account. Your agents <em>use</em> secrets without ever <em>seeing</em> them.</p>
+    <div class="pillrow">
+      <span class="pill" data-i18n="pill_local">🔒 Local-only</span>
+      <span class="pill" data-i18n="pill_ai">🤖 AI-safe by design</span>
+      <span class="pill" data-i18n="pill_oss">⭐ Open source (MIT)</span>
+      <span class="pill">🧩 CLI · Web · TUI · MCP</span>
+    </div>
+    <div id="install" class="install">
+      <span class="p">$</span>
+      <code id="installcmd">brew install fxerkan/tap/concealer</code>
+      <button id="copybtn" data-i18n="copy">Copy</button>
+    </div>
+    <div class="ctarow">
+      <a class="btn primary" href="/concealer/getting-started" data-i18n="cta_start">Get started →</a>
+      <a class="btn ghost" href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener">★ <span data-i18n="cta_star">Star on GitHub</span></a>
+    </div>
+  </div>
+</div>
+
+<!-- ===== WHY / FEATURES ===== -->
+<section>
+  <div class="wrap">
+    <div class="sec-h">
+      <div class="eyebrow" data-i18n="feat_eyebrow">Why concealer</div>
+      <h2 data-i18n="feat_h">Built for how we code now</h2>
+      <p data-i18n="feat_p">Coding assistants read your files. The moment a key lands in a <code>.env</code> it can leak. concealer keeps secrets encrypted, scoped, and out of every transcript.</p>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="ico">🤖</div><h3 data-i18n="f1_h">AI-era by design</h3><p data-i18n="f1_p">An MCP server lets agents list names and inject values into a command's environment — plaintext is redacted from everything they see. Registration + rate limits stop bulk exfiltration.</p></div>
+      <div class="card"><div class="ico">🧳</div><h3 data-i18n="f2_h">Portable, not machine-bound</h3><p data-i18n="f2_p">The vault decrypts on any machine with just the master password — not tied to a Keychain or TPM. Copy the files, type the password, done.</p></div>
+      <div class="card"><div class="ico">⭐</div><h3 data-i18n="f3_h">Open source & inspectable</h3><p data-i18n="f3_p">One readable Python script, MIT-licensed. No black box, no account, no telemetry — verify with a firewall that nothing phones home.</p></div>
+      <div class="card"><div class="ico">🔐</div><h3 data-i18n="f4_h">SOPS + age crypto</h3><p data-i18n="f4_p">All encryption is delegated to battle-tested tools: AES-256-GCM over age X25519. The age private key never touches disk in plaintext — key-at-rest.</p></div>
+      <div class="card"><div class="ico">🧾</div><h3 data-i18n="f5_h">Tamper-evident audit</h3><p data-i18n="f5_p">Every read, write, copy and inject is appended to an HMAC-chained log with a monotonic seq and a tail anchor. Names and actions only — never values.</p></div>
+      <div class="card"><div class="ico">🎯</div><h3 data-i18n="f6_h">One place, many projects</h3><p data-i18n="f6_p">Disambiguate the same value across repos by tenant / project / environment / repo. The most-specific scope wins at inject time.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== INTERFACES / SCREENSHOTS ===== -->
+<section class="strip"><div class="wrap" style="display:block">
+  <div class="sec-h" style="margin-bottom:34px">
+    <div class="eyebrow" data-i18n="ui_eyebrow">Four ways in</div>
+    <h2 data-i18n="ui_h">CLI · Web UI · TUI · MCP</h2>
+    <p data-i18n="ui_p">The same encrypted vault, however you like to work.</p>
+  </div>
+
+  <div class="shot">
+    <div class="txt">
+      <div class="eyebrow">Web UI</div>
+      <h3 data-i18n="s_web_h">A professional local console</h3>
+      <p data-i18n="s_web_p">Type-aware forms, searchable multi-select filters, per-secret deploy renderers, clipboard copy with auto-clear, and a tamper-evident audit viewer. Bilingual (TR/EN), dark/light/matrix themes, localhost only.</p>
+      <p><code>concealer web</code> → http://127.0.0.1:8787</p>
+    </div>
+    <figure><img src="/concealer/assets/app-secrets.png" alt="concealer Web UI — searchable, scoped secrets" loading="lazy"></figure>
+  </div>
+
+  <div class="shot">
+    <div class="txt">
+      <div class="eyebrow">TUI</div>
+      <h3 data-i18n="s_tui_h">Full terminal interface</h3>
+      <p data-i18n="s_tui_p">Browse, search, add, delete and reveal secrets without leaving the terminal — arrow keys, instant filtering, type-aware editing.</p>
+      <p><code>concealer tui</code></p>
+    </div>
+    <figure><img src="/concealer/assets/tui-secrets.png" alt="concealer TUI — terminal secret browser" loading="lazy"></figure>
+  </div>
+
+  <div class="shot">
+    <div class="txt">
+      <div class="eyebrow">MCP · Agents</div>
+      <h3 data-i18n="s_mcp_h">Agents use secrets, never see them</h3>
+      <p data-i18n="s_mcp_p">Register an agent, hand it a revocable token, and it can inject a DB password to run a query — while the value stays redacted from its context. Every call is audited with source=mcp.</p>
+      <p><code>concealer agent register claude</code></p>
+    </div>
+    <figure><img src="/concealer/assets/mcp-secret-list.gif" alt="Agent listing concealer secrets over MCP — names only, never values" loading="lazy"></figure>
+  </div>
+</div></section>
+
+<!-- ===== QUICK START ===== -->
+<section>
+  <div class="wrap">
+    <div class="sec-h">
+      <div class="eyebrow" data-i18n="qs_eyebrow">Quick start</div>
+      <h2 data-i18n="qs_h">Up and running in a minute</h2>
+    </div>
+    <div class="codeblk mono">
+<span class="c"># install (pulls in sops, age, expect)</span>
+brew install fxerkan/tap/concealer
+
+<span class="c"># create the vault — prints recovery codes + a CLI token, once</span>
+concealer init
+
+<span class="c"># unlock your shell session (~8h token)</span>
+eval "$(concealer unlock)"
+
+<span class="c"># store &amp; use a secret — the value never hits your terminal</span>
+concealer set --name OPENAI_API_KEY --project web --env prod <span class="a">'sk-DUMMY-123'</span>
+concealer run --project web --env prod npm run deploy
+    </div>
+    <p style="text-align:center;margin-top:20px"><a class="btn ghost" href="/concealer/getting-started" data-i18n="qs_more">Read the full guide →</a></p>
+  </div>
+</section>
+
+<!-- ===== CTA STRIP ===== -->
+<div class="strip"><div class="wrap">
+  <div>
+    <h2 data-i18n="cta_h">Stop pasting keys into chat windows.</h2>
+    <p data-i18n="cta_p">Local-only. Portable. Open source. Built for the AI-coding era.</p>
+  </div>
+  <div class="ctarow" style="margin:0">
+    <a class="btn primary" href="#install" data-i18n="cta_install">Install now</a>
+    <a class="btn ghost" href="/concealer/getting-started" data-i18n="nav_docs">Docs</a>
+  </div>
+</div></div>
+
+<!-- ===== FOOTER ===== -->
+<footer><div class="wrap">
+  <div>
+    <span class="brand" style="font-size:16px">conceal<span class="ac">er</span></span>
+    <div style="margin-top:8px">Developed by <a href="https://fxerkan.com" target="_blank" rel="noopener">FXerkan</a> — Code more, worry less. · MIT</div>
+  </div>
+  <div class="links">
+    <a href="/concealer/getting-started" data-i18n="nav_docs">Docs</a>
+    <a href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://github.com/fxerkan/concealer/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+    <a href="https://github.com/getsops/sops" target="_blank" rel="noopener">SOPS</a>
+    <a href="https://github.com/FiloSottile/age" target="_blank" rel="noopener">age</a>
+  </div>
+</div></footer>
+
+<script>
+/* ===== redaction animation (dummy secrets get concealed) — from the app's login screen ===== */
+const SNIPPETS=[
+ ['<span class="k">const</span> OPENAI_API_KEY = <span class="s">"</span>','sk-DUMMY-9f2aE7b1c04d8x21Qv7Kp','<span class="s">"</span>'],
+ ['<span class="k">export</span> AWS_SECRET_ACCESS_KEY=<span class="s">"</span>','wJalrXUtnFEMI-DUMMY-EXAMPLEKEY','<span class="s">"</span>'],
+ ['db.password = <span class="s">"</span>','P@ssw0rd-DUMMY-8f21b','<span class="s">"</span>'],
+ ['Authorization: Bearer ','eyJhbGciOiJIUzI1NiJ9.DUMMY.sig',''],
+ ['GITHUB_TOKEN=','ghp_DUMMY0000example0000token00',''],
+ ['STRIPE_KEY=','sk_live_DUMMY_51HxAqRedactedXyz',''],
+ ['<span class="k">private_key</span>: <span class="s">"</span>','-----BEGIN KEY----- DUMMY','<span class="s">"</span>'],
+ ['DATABASE_URL=postgres://user:','DUMMY-pw-2931','@db:5432'],
+ ['SLACK_TOKEN=','xoxb-DUMMY-000000-slacktoken',''],
+ ['<span class="k">let</span> jwt = <span class="s">"</span>','eyJ0eXAiOiJKV1QifQ.DUMMY.h4x','<span class="s">"</span>'],
+ ['redis://:','DUMMY-r3d1s-pw@cache:6379',''],
+ ['GOOGLE_API_KEY=<span class="s">"</span>','AIza-DUMMY-SyD3xampleKeyXyz','<span class="s">"</span>'],
+ ['ssh-rsa ','AAAAB3NzaC1yc2E-DUMMY-key','== user@host'],
+ ['client_secret=','DUMMY-oauth-7c1f9b2a',''],
+];
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const _rnd=(a,b)=>a+Math.random()*(b-a);
+function place(f){f.style.top=_rnd(4,90).toFixed(1)+'%';f.style.left=_rnd(1,74).toFixed(1)+'%';}
+(function(){
+  const bg=document.getElementById('loginbg');const N=24,frags=[];
+  for(let i=0;i<N;i++){
+    const s=SNIPPETS[i%SNIPPETS.length];
+    const dur=_rnd(8,15).toFixed(2), del=(-_rnd(0,parseFloat(dur))).toFixed(2);
+    const f=document.createElement('div');f.className='frag';
+    f.style.cssText=`--dur:${dur}s;--del:${del}s`;
+    f.innerHTML=`${s[0]}<span class="rx">${esc(s[1])}</span>${s[2]}`;
+    place(f);
+    f.addEventListener('animationiteration',e=>{if(e.animationName.indexOf('fraglife')===0)place(f);});
+    frags.push(f);
+  }
+  bg.replaceChildren(...frags);
+})();
+
+/* ===== theme toggle (persists like the app: concealer_theme) ===== */
+const html=document.documentElement;
+function setTheme(t){html.setAttribute('data-theme',t);localStorage.setItem('concealer_theme',t);
+  document.getElementById('themeico').textContent=t==='light'?'☀️':'🌙';}
+setTheme(localStorage.getItem('concealer_theme')||'dark');
+document.getElementById('theme').onclick=()=>setTheme(html.getAttribute('data-theme')==='light'?'dark':'light');
+
+/* ===== language toggle (EN/TR, persists like the app: concealer_lang) ===== */
+const I18N={
+ en:{nav_docs:"Docs",nav_install:"Install",copy:"Copy",copied:"Copied ✓",
+  hero_tag:"The local-only secret manager for the AI-coding era.",
+  hero_sub:"Encrypted with SOPS + age. No cloud, no telemetry, no account. Your agents <em>use</em> secrets without ever <em>seeing</em> them.",
+  pill_local:"🔒 Local-only",pill_ai:"🤖 AI-safe by design",pill_oss:"⭐ Open source (MIT)",
+  cta_start:"Get started →",cta_star:"Star on GitHub",
+  feat_eyebrow:"Why concealer",feat_h:"Built for how we code now",
+  feat_p:"Coding assistants read your files. The moment a key lands in a .env it can leak. concealer keeps secrets encrypted, scoped, and out of every transcript.",
+  f1_h:"AI-era by design",f1_p:"An MCP server lets agents list names and inject values into a command's environment — plaintext is redacted from everything they see. Registration + rate limits stop bulk exfiltration.",
+  f2_h:"Portable, not machine-bound",f2_p:"The vault decrypts on any machine with just the master password — not tied to a Keychain or TPM. Copy the files, type the password, done.",
+  f3_h:"Open source & inspectable",f3_p:"One readable Python script, MIT-licensed. No black box, no account, no telemetry — verify with a firewall that nothing phones home.",
+  f4_h:"SOPS + age crypto",f4_p:"All encryption is delegated to battle-tested tools: AES-256-GCM over age X25519. The age private key never touches disk in plaintext — key-at-rest.",
+  f5_h:"Tamper-evident audit",f5_p:"Every read, write, copy and inject is appended to an HMAC-chained log with a monotonic seq and a tail anchor. Names and actions only — never values.",
+  f6_h:"One place, many projects",f6_p:"Disambiguate the same value across repos by tenant / project / environment / repo. The most-specific scope wins at inject time.",
+  ui_eyebrow:"Four ways in",ui_h:"CLI · Web UI · TUI · MCP",ui_p:"The same encrypted vault, however you like to work.",
+  s_web_h:"A professional local console",s_web_p:"Type-aware forms, searchable multi-select filters, per-secret deploy renderers, clipboard copy with auto-clear, and a tamper-evident audit viewer. Bilingual (TR/EN), dark/light/matrix themes, localhost only.",
+  s_tui_h:"Full terminal interface",s_tui_p:"Browse, search, add, delete and reveal secrets without leaving the terminal — arrow keys, instant filtering, type-aware editing.",
+  s_mcp_h:"Agents use secrets, never see them",s_mcp_p:"Register an agent, hand it a revocable token, and it can inject a DB password to run a query — while the value stays redacted from its context. Every call is audited with source=mcp.",
+  qs_eyebrow:"Quick start",qs_h:"Up and running in a minute",qs_more:"Read the full guide →",
+  cta_h:"Stop pasting keys into chat windows.",cta_p:"Local-only. Portable. Open source. Built for the AI-coding era.",cta_install:"Install now"},
+ tr:{nav_docs:"Dokümanlar",nav_install:"Kurulum",copy:"Kopyala",copied:"Kopyalandı ✓",
+  hero_tag:"Yapay zekâ ile kodlama çağı için yerel, tek dosyalı gizli bilgi yöneticisi.",
+  hero_sub:"SOPS + age ile şifreli. Bulut yok, telemetri yok, hesap yok. Ajanların gizli bilgileri <em>görmeden</em> <em>kullanır</em>.",
+  pill_local:"🔒 Yalnızca yerel",pill_ai:"🤖 Tasarımca YZ-güvenli",pill_oss:"⭐ Açık kaynak (MIT)",
+  cta_start:"Başla →",cta_star:"GitHub'da yıldızla",
+  feat_eyebrow:"Neden concealer",feat_h:"Bugün nasıl kodluyorsak ona göre",
+  feat_p:"Kodlama asistanları dosyalarını okur. Bir anahtar .env'e düştüğü an sızabilir. concealer gizli bilgileri şifreli, kapsamlı ve her transkriptin dışında tutar.",
+  f1_h:"Tasarımca YZ çağı",f1_p:"MCP sunucusu; ajanların adları listelemesine ve değerleri bir komutun ortamına enjekte etmesine izin verir — düz metin gördükleri her şeyden maskelenir. Kayıt + hız limitleri toplu sızmayı durdurur.",
+  f2_h:"Taşınabilir, makineye bağlı değil",f2_p:"Kasa yalnızca master password ile herhangi bir makinede çözülür — Keychain/TPM'e bağlı değil. Dosyaları kopyala, parolayı gir, tamam.",
+  f3_h:"Açık kaynak & incelenebilir",f3_p:"Tek, okunabilir bir Python betiği, MIT lisanslı. Kara kutu yok, hesap yok, telemetri yok — hiçbir yere veri göndermediğini güvenlik duvarıyla doğrulayabilirsin.",
+  f4_h:"SOPS + age şifreleme",f4_p:"Tüm şifreleme denenmiş araçlara devredilir: age X25519 üzerinde AES-256-GCM. age özel anahtarı diske asla düz metin yazılmaz — key-at-rest.",
+  f5_h:"Kurcalamaya-dayanıklı denetim",f5_p:"Her okuma, yazma, kopyalama ve enjeksiyon; monoton seq ve kuyruk çıpası olan HMAC-zincirli bir günlüğe eklenir. Yalnız ad ve eylem — değer asla.",
+  f6_h:"Tek yer, çok proje",f6_p:"Aynı değeri repolar arasında tenant / project / environment / repo ile ayrıştır. Enjeksiyonda en spesifik kapsam kazanır.",
+  ui_eyebrow:"Dört giriş yolu",ui_h:"CLI · Web UI · TUI · MCP",ui_p:"Aynı şifreli kasa, nasıl çalışmak istersen.",
+  s_web_h:"Profesyonel yerel konsol",s_web_p:"Tipe duyarlı formlar, aranabilir çoklu-seçim filtreleri, secret başına deploy şablonları, otomatik-temizlenen panoya kopyalama ve kurcalamaya-dayanıklı denetim görüntüleyici. İki dilli (TR/EN), koyu/açık/matrix temalar, yalnız localhost.",
+  s_tui_h:"Tam terminal arayüzü",s_tui_p:"Terminalden çıkmadan secret'ları gez, ara, ekle, sil ve göster — ok tuşları, anlık filtreleme, tipe duyarlı düzenleme.",
+  s_mcp_h:"Ajanlar kullanır, asla görmez",s_mcp_p:"Bir ajan kaydet, iptal edilebilir bir token ver; DB parolasını enjekte edip sorgu çalıştırabilir — değer bağlamından maskeli kalır. Her çağrı source=mcp ile denetlenir.",
+  qs_eyebrow:"Hızlı başlangıç",qs_h:"Bir dakikada çalışır durumda",qs_more:"Tüm rehberi oku →",
+  cta_h:"Anahtarları sohbet penceresine yapıştırmayı bırak.",cta_p:"Yalnızca yerel. Taşınabilir. Açık kaynak. YZ çağı için.",cta_install:"Şimdi kur"}
+};
+function setLang(l){
+  const d=I18N[l]||I18N.en;
+  document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.getAttribute('data-i18n');if(d[k]!=null)el.innerHTML=d[k];});
+  document.getElementById('langlbl').textContent=(l==='tr')?'TR':'EN';
+  html.setAttribute('lang',l);localStorage.setItem('concealer_lang',l);
+}
+setLang(localStorage.getItem('concealer_lang')||'en');
+document.getElementById('lang').onclick=()=>setLang(html.getAttribute('lang')==='tr'?'en':'tr');
+
+/* ===== copy install command ===== */
+document.getElementById('copybtn').onclick=async e=>{
+  try{await navigator.clipboard.writeText(document.getElementById('installcmd').textContent);
+    const l=(localStorage.getItem('concealer_lang')||'en');e.target.textContent=I18N[l].copied;
+    setTimeout(()=>{e.target.textContent=I18N[l].copy;},1600);}catch(_){}
+};
+</script>
+</body>
+</html>
