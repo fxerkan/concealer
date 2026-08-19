@@ -1,6 +1,11 @@
 <style>
-  /* amber brand accent for any "er" suffix in the docs (house rule) */
-  .site-title .ac{color:#0a0b0d;background:#ffb020;border-radius:4px;padding:0 .18em}
+  /* show the "concealer" wordmark next to the logo (just-the-docs hides the title when a logo is set) */
+  .site-title{display:inline-flex!important;align-items:center;gap:10px}
+  .site-title .site-logo{flex:0 0 auto}
+  .cer-wm{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;font-size:20px;
+    letter-spacing:-.3px;color:inherit}
+  /* amber brand accent for the "er" suffix (house rule) */
+  .cer-wm .ac,.site-title .ac{color:#0a0b0d;background:#ffb020;border-radius:4px;padding:0 .16em;margin-left:.04em}
   #cer-theme{position:fixed;top:12px;right:14px;z-index:2000;border:1px solid #2a2f38;
     background:#161a20;color:#e8e8e6;border-radius:8px;height:32px;padding:0 12px;font-size:13px;
     font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}
@@ -14,9 +19,14 @@
    NOTE: block comments only — this include is minified onto one line; a // comment would
    swallow the rest of the script. */
 (function(){
+  function wordmark(){
+    var st=document.querySelector('.site-title');
+    if(st&&!st.querySelector('.cer-wm')){var w=document.createElement('span');w.className='cer-wm';w.innerHTML='conceal<span class="ac">er</span>';st.appendChild(w);}
+  }
   function init(){
     if(document.getElementById('cer-theme'))return;
     if(!document.body){setTimeout(init,50);return;}
+    wordmark();
     var btn=document.createElement('button');btn.id='cer-theme';document.body.appendChild(btn);
     var cur=localStorage.getItem('cer_docs_theme');if(cur!=='light'&&cur!=='default')cur='default';
     function paint(){btn.textContent=(cur==='light')?'☀️ Light':'🌙 Dark';}

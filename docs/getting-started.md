@@ -56,8 +56,11 @@ After `init` the plaintext age key is removed from disk — only encrypted, pass
 CLI commands that touch secrets need an unlock token in your environment. Either paste the line `init` printed, or mint a fresh one:
 
 ```bash
-eval "$(concealer unlock)"     # asks the master password, exports CONCEALER_TOKEN (~8h TTL)
+eval "$(cer unlock)"           # asks the master password, exports CONCEALER_TOKEN (~8h TTL)
 ```
+
+{: .note }
+> From here on we use the short alias **`cer`** (a symlink to `concealer`) — every command works under either name. Pick whichever you like.
 
 The token value lives **only** in your shell environment (`CONCEALER_TOKEN`). The vault stores just its hash. See [Tokens & Recovery]({{ site.baseurl }}/tokens-recovery).
 
@@ -67,10 +70,10 @@ The token value lives **only** in your shell environment (`CONCEALER_TOKEN`). Th
 
 ```bash
 # a simple API key (type defaults to api_key)
-concealer set --name OPENAI_API_KEY --project web --env prod 'sk-DUMMY-123' --tags ai
+cer set --name OPENAI_API_KEY --project web --env prod 'sk-DUMMY-123' --tags ai
 
 # a typed database secret (fields as key=value pairs)
-concealer set --name MAIN_DB --type database --tenant acme --project billing --env prod \
+cer set --name MAIN_DB --type database --tenant acme --project billing --env prod \
     host=db.acme.io port=5432 database=billing username=svc password=sk-DUMMY-pw auth_type=password
 ```
 
@@ -81,12 +84,12 @@ Every secret carries a **scope** — `tenant / project / environment / repo`. Em
 ## 5. Find, read, use
 
 ```bash
-concealer list --type database --tenant acme      # masked table
-concealer search OPENAI                            # search all fields
-concealer get --name OPENAI_API_KEY --project web --env prod   # print the value (audited)
+cer list --type database --tenant acme      # masked table
+cer search OPENAI                            # search all fields
+cer get --name OPENAI_API_KEY --project web --env prod   # print the value (audited)
 
 # inject secrets into a command's environment and run it — no value leaks to the terminal
-concealer run --project web --env prod npm run deploy
+cer run --project web --env prod npm run deploy
 ```
 
 `run` auto-detects `repo` and `project` from the current git repo when you omit them, then injects the most-specific matching secrets as environment variables.
@@ -96,7 +99,7 @@ concealer run --project web --env prod npm run deploy
 ## 6. Open the Web UI
 
 ```bash
-concealer web        # http://127.0.0.1:8787 (localhost only) — unlock with the master password
+cer web        # http://127.0.0.1:8787 (localhost only) — unlock with the master password
 ```
 
 Full CRUD with type-aware forms, searchable multi-select filters, per-secret deploy renderers, clipboard copy with auto-clear, and a tamper-evident audit-log viewer. See [Web UI]({{ site.baseurl }}/web-ui).
@@ -106,7 +109,7 @@ Full CRUD with type-aware forms, searchable multi-select filters, per-secret dep
 ## 7. Let an AI agent use secrets (without seeing them)
 
 ```bash
-concealer agent register claude          # prints a CONCEALER_TOKEN for this agent
+cer agent register claude                # prints a CONCEALER_TOKEN for this agent
 claude mcp add --scope user concealer \
   --env CONCEALER_TOKEN=<token-from-above> \
   -- /path/to/concealer/concealer mcp

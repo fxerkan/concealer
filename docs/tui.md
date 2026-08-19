@@ -29,20 +29,75 @@ Unlock the same way as the CLI — a `CONCEALER_TOKEN` in your environment (from
 
 ## Browsing & searching
 
-Arrow keys move the selection; typing filters the list instantly across name, scope, and tags. Secret fields stay **masked** in the list — the same record-aware masking rules as everywhere else (see [Secret Types]({{ site.baseurl }}/secret-types)).
+The screen has three panels — **1 · Filters**, **2 · Secrets**, **3 · Details**. Move focus between them, browse, reveal, copy, and edit entirely from the keyboard. Secret fields stay **masked** until you reveal them — the same record-aware masking rules as everywhere else (see [Secret Types]({{ site.baseurl }}/secret-types)).
 
 ![concealer TUI — searchable secret list]({{ site.baseurl }}/assets/tui-secrets.png)
 
-| Action | Keys |
-|---|---|
-| Move selection | ↑ / ↓ |
-| Search / filter | just start typing |
-| Reveal a value | select → reveal (audited) |
-| Add a secret | add key |
-| Delete a secret | delete key |
-| Quit | quit key |
+---
 
-*(On-screen hints show the exact keybindings for your build.)*
+## Keyboard shortcuts
+{: .no_toc }
+
+Press <kbd>?</kbd> anytime to see this table in-app. It is bilingual (press <kbd>L</kbd> to toggle TR/EN).
+
+### Panels & focus
+
+| Keys | Action |
+|---|---|
+| <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> | Cycle focus through the visible panels |
+| <kbd>←</kbd> <kbd>→</kbd> / <kbd>h</kbd> <kbd>l</kbd> | Move focus between panels |
+| <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> | Jump straight to Filters / Secrets / Details |
+
+### Navigation
+
+| Keys | Action |
+|---|---|
+| <kbd>↑</kbd> <kbd>↓</kbd> / <kbd>j</kbd> <kbd>k</kbd> | Move the selection up / down |
+| <kbd>g</kbd> / <kbd>G</kbd> | Jump to top / bottom |
+| <kbd>PgUp</kbd> / <kbd>PgDn</kbd>, <kbd>Ctrl</kbd>+<kbd>U</kbd> / <kbd>Ctrl</kbd>+<kbd>D</kbd> | Page up / down |
+
+### Search & filters
+
+| Keys | Action |
+|---|---|
+| <kbd>s</kbd> or <kbd>/</kbd> | Live search — filters as you type |
+| <kbd>Esc</kbd> | Clear the search / exit search mode |
+| <kbd>Space</kbd> / <kbd>Enter</kbd> | In the Filters panel: toggle a facet (type, project, env, tenant, repo, tag) |
+| <kbd>x</kbd> | Clear all active filters |
+
+### Reveal & copy
+
+| Keys | Action |
+|---|---|
+| <kbd>m</kbd> | In the Secrets panel: reveal / hide **all** fields of the selected record |
+| <kbd>↑</kbd> <kbd>↓</kbd> / <kbd>j</kbd> <kbd>k</kbd> then <kbd>Enter</kbd> / <kbd>m</kbd> | In the Details panel: pick a field and reveal just that one |
+| <kbd>c</kbd> | Copy the **value** to the clipboard |
+| <kbd>u</kbd> | Copy the **username** |
+| <kbd>w</kbd> | Copy the **url** |
+
+The clipboard is **auto-cleared after 45 seconds** (uses `pbcopy` / `xclip` / `wl-copy`). There is no *paste* — the TUI reads secrets out; to put a value **in**, use add/edit below.
+
+### Edit the vault
+
+| Keys | Action |
+|---|---|
+| <kbd>a</kbd> | Add a new secret (type-aware form) |
+| <kbd>e</kbd> | Edit the selected secret |
+| <kbd>d</kbd> | Delete the selected secret (with confirm) |
+| <kbd>r</kbd> | Rotate its value to a random one |
+
+### App
+
+| Keys | Action |
+|---|---|
+| <kbd>R</kbd> | Reload the vault from disk |
+| <kbd>Ctrl</kbd>+<kbd>L</kbd> | Force a redraw |
+| <kbd>L</kbd> | Toggle language (TR / EN) |
+| <kbd>?</kbd> | Show the in-app help |
+| <kbd>q</kbd> / <kbd>Ctrl</kbd>+<kbd>Q</kbd> | Quit |
+
+{: .note }
+> **Terminal rendering:** concealer draws box characters (`┌│─`) in UTF-8 terminals and falls back to ASCII (`+-\|`) where needed (e.g. VS Code's integrated terminal). Force it with `CONCEALER_TUI_ASCII=1` (ASCII) or `=0` (UTF-8).
 
 ---
 
