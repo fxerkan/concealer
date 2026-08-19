@@ -17,7 +17,7 @@ Where concealer sits next to cloud password managers, DevOps secret platforms, a
 
 ## TL;DR
 
-concealer is a **local‑only, single‑file, zero‑infra** secret manager: a typed, scoped, audited front end over [SOPS](https://github.com/getsops/sops) + [age](https://github.com/FiloSottile/age). It is not trying to be 1Password or HashiCorp Vault. It occupies a gap those tools leave open:
+concealer is a **local‑only, single‑file, zero‑infra, AI‑agent native** secret manager: a typed, scoped, audited front end over [SOPS](https://github.com/getsops/sops) + [age](https://github.com/FiloSottile/age). It is not trying to be 1Password or HashiCorp Vault. It occupies a gap those tools leave open:
 
 > An encrypted, git‑friendly vault a developer (or an AI agent) can run on one machine with no server, no SaaS account, no daemon, and no cloud — but with the typing, scoping, audit trail, and agent‑safe MCP access that raw `sops`/`age`/`pass` don't give you.
 
@@ -61,38 +61,65 @@ html[data-cer-theme="light"] .cmp-wrap{--cbg:#fff;--chead:#eef0f3;--czA:#fff;--c
 .cmp tbody tr.u .cap{box-shadow:inset 4px 0 0 var(--cstar)}
 .cmp .star{color:var(--cstar);font-weight:800;margin-left:4px}
 .cmp small{opacity:.8}
+.cmp-tools{display:flex;justify-content:flex-end;margin:6px 0 -6px}
+.cmp-expand{cursor:pointer;border:1px solid var(--cline);background:var(--chead);color:var(--ctxt);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600}
+.cmp-expand:hover{border-color:var(--cstar)}
+.cmp-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:999}
+.cmp-close{display:none;position:fixed;top:26px;right:32px;z-index:1001;cursor:pointer;border:1px solid var(--cline);background:var(--chead);color:var(--ctxt);border-radius:8px;padding:8px 14px;font-size:14px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+body.cmp-open .cmp-backdrop,body.cmp-open .cmp-close{display:block}
+body.cmp-open .cmp-wrap.cmp-full{position:fixed;inset:24px;max-height:none;height:calc(100vh - 48px);width:calc(100vw - 48px);z-index:1000;box-shadow:0 24px 90px rgba(0,0,0,.6)}
+body.cmp-open .cmp-wrap.cmp-full .cmp{font-size:13.5px}
 </style>
-<div class="cmp-wrap" markdown="0">
+<div class="cmp-tools"><button type="button" class="cmp-expand">⤢ Expand / zoom</button></div>
+<div class="cmp-wrap" id="cmpwrap" markdown="0">
 <table class="cmp">
 <thead><tr>
-<th class="cap">Capability</th><th class="cer">concealer</th><th>secretctl</th><th>1Password</th><th>Bitwarden<br>(+ Secrets&nbsp;Mgr)</th><th>Keeper</th><th>LastPass</th><th>HashiCorp Vault</th><th>Doppler</th><th>Infisical</th><th>AWS Secrets Mgr</th><th>SOPS+age (raw)</th><th>pass / gopass</th><th>KeePassXC</th>
+<th class="cap">Capability</th><th class="cer">concealer</th><th>secretctl</th><th>pass / gopass</th><th>KeePassXC</th><th>1Password</th><th>Bitwarden<br>(+ Secrets&nbsp;Mgr)</th><th>Keeper</th><th>LastPass</th><th>HashiCorp Vault</th><th>Doppler</th><th>Infisical</th><th>AWS Secrets Mgr</th><th>SOPS+age (raw)</th>
 </tr></thead>
 <tbody>
-<tr><td class="cap">Deployment</td><td class="cer">Local, single file</td><td>Local, single binary</td><td>SaaS</td><td>SaaS or self‑host</td><td>SaaS</td><td>SaaS</td><td>Self‑host / HCP</td><td>SaaS</td><td>SaaS or self‑host</td><td>Cloud only</td><td>Local</td><td>Local</td><td>Local</td></tr>
-<tr><td class="cap">Requires a server / daemon</td><td class="cer">❌ none</td><td>❌ none</td><td>cloud</td><td>⚠️ self‑host runs a server</td><td>cloud</td><td>cloud</td><td>✅ server</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
-<tr><td class="cap">Open source</td><td class="cer">✅</td><td>✅ Apache‑2.0</td><td>❌</td><td>✅</td><td>❌</td><td>❌</td><td>⚠️ BUSL</td><td>❌</td><td>✅</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td></tr>
-<tr><td class="cap">Cost</td><td class="cer">Free</td><td>Free</td><td>~$3/mo+</td><td>Free tier; SM $6–12/u/mo</td><td>~$3.75/u/mo+</td><td>~$3/mo+</td><td>Free OSS / $$$ ent.</td><td>paid tiers</td><td>Free OSS / paid cloud</td><td>usage‑based</td><td>Free</td><td>Free</td><td>Free</td></tr>
-<tr><td class="cap">Encryption backend</td><td class="cer">age (X25519) via SOPS</td><td>AES‑256‑GCM (Argon2id)</td><td>proprietary</td><td>proprietary</td><td>proprietary</td><td>proprietary</td><td>own / transit</td><td>managed</td><td>managed</td><td>KMS</td><td>age / PGP / KMS</td><td>GPG (or age)</td><td>AES / ChaCha</td></tr>
-<tr><td class="cap">Storage format</td><td class="cer">Encrypted YAML/JSON, git‑friendly</td><td>Encrypted SQLite (0600)</td><td>proprietary cloud</td><td>proprietary</td><td>proprietary</td><td>proprietary</td><td>backend store</td><td>cloud</td><td>cloud / DB</td><td>cloud</td><td>encrypted file</td><td>GPG files + git</td><td>single <code>.kdbx</code></td></tr>
-<tr><td class="cap">Git‑versionable vault</td><td class="cer">✅ <small>values encrypted, keys visible</small></td><td>❌ SQLite blob</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>⚠️</td><td>❌</td><td>⚠️</td><td>❌</td><td>✅</td><td>✅</td><td>⚠️ blob only</td></tr>
-<tr class="u"><td class="cap">Typed secrets <small>(db/api/ssh/…)</small><span class="star">★</span></td><td class="cer">✅ templates</td><td>—</td><td>⚠️ item types</td><td>⚠️ item types</td><td>⚠️</td><td>⚠️</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>⚠️</td></tr>
-<tr><td class="cap">Scoping</td><td class="cer">✅ first‑class <small>(tenant/project/env/repo)</small></td><td>⚠️ wildcards <small>(aws/*)</small></td><td>⚠️ vaults/tags</td><td>⚠️ collections</td><td>⚠️ folders</td><td>⚠️</td><td>✅ paths/policies</td><td>✅ configs/envs</td><td>✅ envs/folders</td><td>✅ ARNs</td><td>❌</td><td>⚠️ dirs</td><td>⚠️ groups</td></tr>
-<tr><td class="cap">Field‑aware masking</td><td class="cer">✅ per‑field + heuristics</td><td>—</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>n/a</td><td>n/a</td><td>⚠️</td><td>n/a</td><td>❌</td><td>❌</td><td>✅</td></tr>
-<tr><td class="cap">Web UI</td><td class="cer">✅ built‑in SPA</td><td>❌ <small>(desktop app)</small></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌ <small>(desktop app)</small></td></tr>
-<tr><td class="cap">TUI / CLI</td><td class="cer">✅ both</td><td>✅ CLI</td><td>✅ CLI</td><td>✅ CLI</td><td>⚠️</td><td>⚠️</td><td>✅ CLI</td><td>✅ CLI</td><td>✅ CLI</td><td>✅ CLI</td><td>✅ CLI</td><td>✅ CLI</td><td>⚠️</td></tr>
-<tr><td class="cap">Tamper‑evident audit log</td><td class="cer">✅ HMAC‑chained + head anchor</td><td>✅ HMAC‑chained</td><td>⚠️ cloud logs</td><td>⚠️</td><td>✅</td><td>⚠️</td><td>✅</td><td>✅</td><td>✅</td><td>✅ CloudTrail</td><td>❌</td><td>⚠️ git log</td><td>❌</td></tr>
-<tr><td class="cap">AI‑agent / MCP native</td><td class="cer">✅ MCP server, agent gate, rate‑limit</td><td>✅ MCP, no plaintext</td><td>⚠️ 3rd‑party</td><td>❌</td><td>❌</td><td>❌</td><td>⚠️ SDK</td><td>⚠️ SDK</td><td>⚠️ SDK</td><td>⚠️ SDK</td><td>❌</td><td>❌</td><td>❌</td></tr>
-<tr class="u"><td class="cap">Anti‑bulk‑exfiltration for agents<span class="star">★</span></td><td class="cer">✅ per‑agent quotas</td><td>—</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>⚠️ policy</td><td>❌</td><td>❌</td><td>⚠️ IAM</td><td>❌</td><td>❌</td><td>❌</td></tr>
-<tr><td class="cap">Dynamic / leased secrets</td><td class="cer">❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td><td>⚠️</td><td>✅</td><td>⚠️ rotation</td><td>❌</td><td>❌</td><td>❌</td></tr>
-<tr><td class="cap">Automatic rotation</td><td class="cer">❌ manual</td><td>—</td><td>⚠️</td><td>⚠️</td><td>✅</td><td>⚠️</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
-<tr><td class="cap">Multi‑user / RBAC / SSO</td><td class="cer">❌ single‑owner</td><td>❌ single‑owner</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅ IAM</td><td>⚠️ recipients</td><td>⚠️ keys</td><td>❌</td></tr>
-<tr><td class="cap">Mobile app / browser autofill</td><td class="cer">❌</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>⚠️</td><td>⚠️</td></tr>
-<tr><td class="cap">Works fully offline</td><td class="cer">✅</td><td>✅</td><td>⚠️ cache</td><td>⚠️</td><td>⚠️</td><td>⚠️</td><td>⚠️</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td></tr>
-<tr><td class="cap">Recovery codes / 2nd‑factor key rotation</td><td class="cer">✅ one‑time codes, code‑gated <code>passwd</code></td><td>—</td><td>✅ recovery kit</td><td>⚠️</td><td>✅</td><td>⚠️</td><td>⚠️ unseal keys</td><td>⚠️</td><td>⚠️</td><td>✅</td><td>❌</td><td>❌</td><td>⚠️ keyfile</td></tr>
-<tr><td class="cap">External dependencies</td><td class="cer"><code>sops</code>, <code>age</code>, <code>expect</code></td><td>none <small>(single binary)</small></td><td>—</td><td>—</td><td>—</td><td>—</td><td>many</td><td>—</td><td>—</td><td>—</td><td><code>sops</code>, <code>age</code></td><td><code>gpg</code> / <code>git</code></td><td>Qt app</td></tr>
+<tr><td class="cap">Deployment</td><td class="cer">Local, single file</td><td>Local, single binary</td><td>Local</td><td>Local</td><td>SaaS</td><td>SaaS or self‑host</td><td>SaaS</td><td>SaaS</td><td>Self‑host / HCP</td><td>SaaS</td><td>SaaS or self‑host</td><td>Cloud only</td><td>Local</td></tr>
+<tr><td class="cap">Requires a server / daemon</td><td class="cer">❌ none</td><td>❌ none</td><td>❌</td><td>❌</td><td>cloud</td><td>⚠️ self‑host runs a server</td><td>cloud</td><td>cloud</td><td>✅ server</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td></tr>
+<tr><td class="cap">Open source</td><td class="cer">✅</td><td>✅ Apache‑2.0</td><td>✅</td><td>✅</td><td>❌</td><td>✅</td><td>❌</td><td>❌</td><td>⚠️ BUSL</td><td>❌</td><td>✅</td><td>❌</td><td>✅</td></tr>
+<tr><td class="cap">Cost</td><td class="cer">Free</td><td>Free</td><td>Free</td><td>Free</td><td>~$3/mo+</td><td>Free tier; SM $6–12/u/mo</td><td>~$3.75/u/mo+</td><td>~$3/mo+</td><td>Free OSS / $$$ ent.</td><td>paid tiers</td><td>Free OSS / paid cloud</td><td>usage‑based</td><td>Free</td></tr>
+<tr><td class="cap">Encryption backend</td><td class="cer">age (X25519) via SOPS</td><td>AES‑256‑GCM (Argon2id)</td><td>GPG (or age)</td><td>AES / ChaCha</td><td>proprietary</td><td>proprietary</td><td>proprietary</td><td>proprietary</td><td>own / transit</td><td>managed</td><td>managed</td><td>KMS</td><td>age / PGP / KMS</td></tr>
+<tr><td class="cap">Storage format</td><td class="cer">Encrypted YAML/JSON, git‑friendly</td><td>Encrypted SQLite (0600)</td><td>GPG files + git</td><td>single <code>.kdbx</code></td><td>proprietary cloud</td><td>proprietary</td><td>proprietary</td><td>proprietary</td><td>backend store</td><td>cloud</td><td>cloud / DB</td><td>cloud</td><td>encrypted file</td></tr>
+<tr><td class="cap">Git‑versionable vault</td><td class="cer">✅ <small>values encrypted, keys visible</small></td><td>❌ SQLite blob</td><td>✅</td><td>⚠️ blob only</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>⚠️</td><td>❌</td><td>⚠️</td><td>❌</td><td>✅</td></tr>
+<tr class="u"><td class="cap">Typed secrets <small>(db/api/ssh/…)</small><span class="star">★</span></td><td class="cer">✅ templates</td><td>—</td><td>❌</td><td>⚠️</td><td>⚠️ item types</td><td>⚠️ item types</td><td>⚠️</td><td>⚠️</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td></tr>
+<tr><td class="cap">Scoping</td><td class="cer">✅ first‑class <small>(tenant/project/env/repo)</small></td><td>⚠️ wildcards <small>(aws/*)</small></td><td>⚠️ dirs</td><td>⚠️ groups</td><td>⚠️ vaults/tags</td><td>⚠️ collections</td><td>⚠️ folders</td><td>⚠️</td><td>✅ paths/policies</td><td>✅ configs/envs</td><td>✅ envs/folders</td><td>✅ ARNs</td><td>❌</td></tr>
+<tr><td class="cap">Field‑aware masking</td><td class="cer">✅ per‑field + heuristics</td><td>—</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>n/a</td><td>n/a</td><td>⚠️</td><td>n/a</td><td>❌</td></tr>
+<tr><td class="cap">Web UI</td><td class="cer">✅ built‑in SPA</td><td>❌ <small>(desktop app)</small></td><td>❌</td><td>❌ <small>(desktop app)</small></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td></tr>
+<tr><td class="cap">TUI / CLI</td><td class="cer">✅ both</td><td>✅ CLI</td><td>✅ CLI</td><td>⚠️</td><td>✅ CLI</td><td>✅ CLI</td><td>⚠️</td><td>⚠️</td><td>✅ CLI</td><td>✅ CLI</td><td>✅ CLI</td><td>✅ CLI</td><td>✅ CLI</td></tr>
+<tr><td class="cap">Tamper‑evident audit log</td><td class="cer">✅ HMAC‑chained + head anchor</td><td>✅ HMAC‑chained</td><td>⚠️ git log</td><td>❌</td><td>⚠️ cloud logs</td><td>⚠️</td><td>✅</td><td>⚠️</td><td>✅</td><td>✅</td><td>✅</td><td>✅ CloudTrail</td><td>❌</td></tr>
+<tr><td class="cap">AI‑agent / MCP native</td><td class="cer">✅ MCP server, agent gate, rate‑limit</td><td>✅ MCP, no plaintext</td><td>❌</td><td>❌</td><td>⚠️ 3rd‑party</td><td>❌</td><td>❌</td><td>❌</td><td>⚠️ SDK</td><td>⚠️ SDK</td><td>⚠️ SDK</td><td>⚠️ SDK</td><td>❌</td></tr>
+<tr class="u"><td class="cap">Anti‑bulk‑exfiltration for agents<span class="star">★</span></td><td class="cer">✅ per‑agent quotas</td><td>—</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>⚠️ policy</td><td>❌</td><td>❌</td><td>⚠️ IAM</td><td>❌</td></tr>
+<tr><td class="cap">Dynamic / leased secrets</td><td class="cer">❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td><td>⚠️</td><td>✅</td><td>⚠️ rotation</td><td>❌</td></tr>
+<tr><td class="cap">Automatic rotation</td><td class="cer">❌ manual</td><td>—</td><td>❌</td><td>❌</td><td>⚠️</td><td>⚠️</td><td>✅</td><td>⚠️</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td></tr>
+<tr><td class="cap">Multi‑user / RBAC / SSO</td><td class="cer">❌ single‑owner</td><td>❌ single‑owner</td><td>⚠️ keys</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅ IAM</td><td>⚠️ recipients</td></tr>
+<tr><td class="cap">Mobile app / browser autofill</td><td class="cer">❌</td><td>❌</td><td>⚠️</td><td>⚠️</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td></tr>
+<tr><td class="cap">Works fully offline</td><td class="cer">✅</td><td>✅</td><td>✅</td><td>✅</td><td>⚠️ cache</td><td>⚠️</td><td>⚠️</td><td>⚠️</td><td>⚠️</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
+<tr><td class="cap">Recovery codes / 2nd‑factor key rotation</td><td class="cer">✅ one‑time codes, code‑gated <code>passwd</code></td><td>—</td><td>❌</td><td>⚠️ keyfile</td><td>✅ recovery kit</td><td>⚠️</td><td>✅</td><td>⚠️</td><td>⚠️ unseal keys</td><td>⚠️</td><td>⚠️</td><td>✅</td><td>❌</td></tr>
+<tr><td class="cap">External dependencies</td><td class="cer"><code>sops</code>, <code>age</code>, <code>expect</code></td><td>none <small>(single binary)</small></td><td><code>gpg</code> / <code>git</code></td><td>Qt app</td><td>—</td><td>—</td><td>—</td><td>—</td><td>many</td><td>—</td><td>—</td><td>—</td><td><code>sops</code>, <code>age</code></td></tr>
 </tbody>
 </table>
 </div>
+<div class="cmp-backdrop"></div>
+<button type="button" class="cmp-close">✕ Close</button>
+<script>
+/* Fullscreen zoom for the comparison matrix. Block comments only. */
+(function(){
+  var wrap=document.getElementById('cmpwrap');
+  var btn=document.querySelector('.cmp-expand');
+  var back=document.querySelector('.cmp-backdrop');
+  var close=document.querySelector('.cmp-close');
+  if(!wrap||!btn)return;
+  function open(){document.body.classList.add('cmp-open');wrap.classList.add('cmp-full');}
+  function shut(){document.body.classList.remove('cmp-open');wrap.classList.remove('cmp-full');}
+  btn.addEventListener('click',open);
+  if(back)back.addEventListener('click',shut);
+  if(close)close.addEventListener('click',shut);
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')shut();});
+})();
+</script>
 
 *Pricing figures are indicative 2026 list prices and change often — treat them as order‑of‑magnitude, not quotes. secretctl figures are from its public README (Apache‑2.0, Go, SQLite, AES‑256‑GCM + Argon2id, MCP). “—” marks a capability its docs don't state.*
 
