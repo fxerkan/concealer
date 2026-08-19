@@ -18,7 +18,7 @@
     if(document.getElementById('cer-theme'))return;
     if(!document.body){setTimeout(init,50);return;}
     var btn=document.createElement('button');btn.id='cer-theme';document.body.appendChild(btn);
-    var cur=localStorage.getItem('cer_docs_theme')||'default';
+    var cur=localStorage.getItem('cer_docs_theme');if(cur!=='light'&&cur!=='default')cur='default';
     function paint(){btn.textContent=(cur==='light')?'☀️ Light':'🌙 Dark';}
     function apply(t){cur=t;if(window.jtd&&jtd.setTheme)jtd.setTheme(t);localStorage.setItem('cer_docs_theme',t);paint();}
     paint();
