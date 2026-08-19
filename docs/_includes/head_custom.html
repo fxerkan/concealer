@@ -7,34 +7,65 @@
     letter-spacing:-.3px;color:inherit}
   /* amber brand accent for the "er" suffix (house rule) */
   .cer-wm .ac,.site-title .ac{color:#0a0b0d;background:#ffb020;border-radius:4px;padding:0 .16em;margin-left:.04em}
-  #cer-theme{position:fixed;top:12px;right:14px;z-index:2000;border:1px solid #2a2f38;
+  #cer-theme,#cer-lang{position:fixed;top:12px;z-index:2000;border:1px solid #2a2f38;
     background:#161a20;color:#e8e8e6;border-radius:8px;height:32px;padding:0 12px;font-size:13px;
     font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}
-  #cer-theme:hover{border-color:#ffb020}
-  @media(max-width:800px){#cer-theme{top:auto;bottom:12px}}
+  #cer-theme{right:14px}#cer-lang{right:96px}
+  #cer-theme:hover,#cer-lang:hover{border-color:#ffb020}
+  @media(max-width:800px){#cer-theme{top:auto;bottom:12px}#cer-lang{top:auto;bottom:12px}}
 </style>
 <script>
-/* dark/light toggle for the docs via just-the-docs' jtd theme API; persists to localStorage.
-   Built stylesheets are just-the-docs-default.css (our amber "dark") and just-the-docs-light.css.
-   So the theme names must be 'default' and 'light' — NOT the scss filename 'concealer'.
-   NOTE: block comments only — this include is minified onto one line; a // comment would
-   swallow the rest of the script. */
+/* Docs enhancements: wordmark, dark/light toggle, and an EN/TR language toggle.
+   Theme stylesheets are just-the-docs-default.css (amber "dark") and just-the-docs-light.css,
+   so theme names must be 'default'/'light'. Turkish pages live under /concealer/tr/<slug>.html;
+   on those pages we rewrite the shared sidebar to Turkish (labels + /tr/ hrefs) so the nav config
+   is never duplicated. NOTE: block comments only — this include is minified onto one line; a //
+   comment would swallow the rest of the script. */
 (function(){
+  var NAV={
+    "Getting Started":"Başlarken","Installation":"Kurulum","Concepts":"Kavramlar",
+    "CLI Reference":"CLI Referansı","Secret Types":"Secret Türleri","Web UI":"Web Arayüzü",
+    "TUI":"TUI","MCP for AI Agents":"AI Ajanları için MCP","Tokens & Recovery":"Token'lar & Kurtarma",
+    "Security Model":"Güvenlik Modeli","Portability & Backup":"Taşınabilirlik & Yedekleme",
+    "🏠 Home":"🏠 Ana Sayfa"
+  };
+  function isTR(){return location.pathname.indexOf('/concealer/tr/')===0;}
+  function counterpart(){
+    var p=location.pathname;
+    return isTR()?p.replace('/concealer/tr/','/concealer/'):p.replace('/concealer/','/concealer/tr/');
+  }
   function wordmark(){
     var st=document.querySelector('.site-title');
     if(st&&!st.querySelector('.cer-wm')){var w=document.createElement('span');w.className='cer-wm';w.innerHTML='conceal<span class="ac">er</span>';st.appendChild(w);}
   }
+  function trSidebar(){
+    if(!isTR())return;
+    document.querySelectorAll('.site-nav a.nav-list-link, .aux-nav-list a.site-button').forEach(function(a){
+      var t=a.textContent.trim();
+      if(NAV[t])a.textContent=NAV[t];
+      var h=a.getAttribute('href')||'';
+      if(h.indexOf('/concealer/')===0 && h.indexOf('/concealer/tr/')!==0 && h.indexOf('github')<0 && !a.classList.contains('site-button'))
+        a.setAttribute('href',h.replace('/concealer/','/concealer/tr/'));
+    });
+    var si=document.getElementById('search-input');if(si)si.placeholder="concealer'da ara";
+  }
   function init(){
     if(document.getElementById('cer-theme'))return;
     if(!document.body){setTimeout(init,50);return;}
-    wordmark();
-    var btn=document.createElement('button');btn.id='cer-theme';document.body.appendChild(btn);
+    wordmark();trSidebar();
+    /* theme */
+    var tb=document.createElement('button');tb.id='cer-theme';document.body.appendChild(tb);
     var cur=localStorage.getItem('cer_docs_theme');if(cur!=='light'&&cur!=='default')cur='default';
-    function paint(){btn.textContent=(cur==='light')?'☀️ Light':'🌙 Dark';}
+    function paint(){tb.textContent=(cur==='light')?'☀️ Light':'🌙 Dark';}
     function apply(t){cur=t;if(window.jtd&&jtd.setTheme)jtd.setTheme(t);localStorage.setItem('cer_docs_theme',t);paint();}
     paint();
     (function ready(n){if(window.jtd&&jtd.setTheme){apply(cur);}else if(n>0){setTimeout(function(){ready(n-1);},50);}})(60);
-    btn.onclick=function(){apply(cur==='light'?'default':'light');};
+    tb.onclick=function(){apply(cur==='light'?'default':'light');};
+    /* language */
+    var lb=document.createElement('button');lb.id='cer-lang';document.body.appendChild(lb);
+    lb.textContent=isTR()?'🌐 TR':'🌐 EN';
+    lb.title=isTR()?'Switch to English':'Türkçe’ye geç';
+    lb.onclick=function(){localStorage.setItem('cer_docs_lang',isTR()?'en':'tr');location.href=counterpart();};
   }
   init();
 })();
