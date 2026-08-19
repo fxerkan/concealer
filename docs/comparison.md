@@ -31,7 +31,7 @@ If you need team sharing, SSO, dynamic database credentials, or mobile autofill,
 | ---------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | **Cloud password managers**              | 1Password, Bitwarden, Keeper, LastPass, Dashlane, NordPass                         | Human end‑users, autofill, cross‑device sync, sharing              |
 | **DevOps / enterprise secret platforms** | HashiCorp Vault, AWS/Azure/GCP Secret Manager, Doppler, Infisical, CyberArk Conjur | Fleets of services, dynamic secrets, rotation, RBAC, CI/CD injection |
-| **Local / file‑based OSS**              | SOPS+age (raw),`pass`/`gopass`, KeePassXC, git‑crypt                          | Owning your data, no server, git‑versionable                        |
+| **Local / file‑based OSS**              | SOPS+age (raw),`pass`/`gopass`, KeePassXC, git‑crypt, **secretctl**            | Owning your data, no server, git‑versionable                        |
 
 concealer lives in the third market but borrows the *ergonomics* (typing, scoping, audit, UI) usually only found in the first two.
 
@@ -39,34 +39,61 @@ concealer lives in the third market but borrows the *ergonomics* (typing, scopin
 
 ## Master comparison matrix
 
-Legend: ✅ yes · ⚠️ partial / with caveats · ❌ no · — n/a
+Legend: ✅ yes · ⚠️ partial / with caveats · ❌ no · — n/a or unknown · **★ = only concealer**
 
-| Capability                                          | **concealer**                            | 1Password                                                                                              | Bitwarden (+ Secrets Mgr)     | Keeper                | LastPass     | HashiCorp Vault      | Doppler         | Infisical          | AWS Secrets Mgr | SOPS+age (raw)   | pass / gopass   | KeePassXC        |
-| --------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------- | --------------------- | ------------ | -------------------- | --------------- | ------------------ | --------------- | ---------------- | --------------- | ---------------- |
-| **Deployment**                                | Local, single file                             | SaaS                                                                                                   | SaaS or self‑host            | SaaS                  | SaaS         | Self‑host / HCP     | SaaS            | SaaS or self‑host | Cloud only      | Local            | Local           | Local            |
-| **Requires a server/daemon**                  | ❌ none                                        | cloud                                                                                                  | ⚠️ self‑host runs a server | cloud                 | cloud        | ✅ server            | ✅              | ✅                 | ✅              | ❌               | ❌              | ❌               |
-| **Open source**                               | ✅                                             | ❌                                                                                                     | ✅                            | ❌                    | ❌           | ⚠️ BUSL            | ❌              | ✅                 | ❌              | ✅               | ✅              | ✅               |
-| **Cost**                                      | Free                                           | ~$3/mo+           | Free tier; SM$6–12/u/mo     | ~$3.75/u/mo+ | ~$3/mo+     | Free OSS /$$$ ent. | paid tiers                    | Free OSS / paid cloud | usage‑based | Free                 | Free            | Free               |                 |                  |                 |                  |
-| **Encryption backend**                        | age (X25519) via SOPS                          | proprietary                                                                                            | proprietary                   | proprietary           | proprietary  | own/transit          | managed         | managed            | KMS             | age/PGP/KMS      | GPG (or age)    | AES/ChaCha       |
-| **Storage format**                            | Encrypted YAML/JSON, git‑friendly             | proprietary cloud                                                                                      | proprietary                   | proprietary           | proprietary  | backend store        | cloud           | cloud/DB           | cloud           | encrypted file   | GPG files + git | single`.kdbx`  |
-| **Git‑versionable vault**                    | ✅ (values encrypted, keys visible)            | ❌                                                                                                     | ❌                            | ❌                    | ❌           | ⚠️                 | ❌              | ⚠️               | ❌              | ✅               | ✅              | ⚠️ blob only   |
-| **Typed secrets** (db/api/ssh/…)             | ✅ templates                                   | ⚠️ item types                                                                                        | ⚠️ item types               | ⚠️                  | ⚠️         | ❌                   | ❌              | ❌                 | ❌              | ❌               | ❌              | ⚠️             |
-| **Scoping**                                   | ✅ first‑class<br />(tenant/project/env/repo) | ⚠️ vaults/tags                                                                                       | ⚠️ collections              | ⚠️ folders          | ⚠️         | ✅ paths/policies    | ✅ configs/envs | ✅ envs/folders    | ✅ ARNs         | ❌               | ⚠️ dirs       | ⚠️ groups      |
-| **Field‑aware masking**                      | ✅ per‑field override + heuristics            | ✅                                                                                                     | ✅                            | ✅                    | ✅           | n/a                  | n/a             | ⚠️               | n/a             | ❌               | ❌              | ✅               |
-| **Web UI**                                    | ✅ built‑in SPA                               | ✅                                                                                                     | ✅                            | ✅                    | ✅           | ✅                   | ✅              | ✅                 | ✅              | ❌               | ❌              | ❌ (desktop app) |
-| **TUI / CLI**                                 | ✅ both                                        | ✅ CLI                                                                                                 | ✅ CLI                        | ⚠️                  | ⚠️         | ✅ CLI               | ✅ CLI          | ✅ CLI             | ✅ CLI          | ✅ CLI           | ✅ CLI          | ⚠️             |
-| **Tamper‑evident audit log**                 | ✅ HMAC‑chained + head anchor                 | ⚠️ cloud logs                                                                                        | ⚠️                          | ✅                    | ⚠️         | ✅                   | ✅              | ✅                 | ✅ CloudTrail   | ❌               | ⚠️ git log    | ❌               |
-| **AI‑agent / MCP native**                    | ✅ MCP server, agent gate, rate‑limit         | ⚠️ 3rd‑party                                                                                        | ❌                            | ❌                    | ❌           | ⚠️ SDK             | ⚠️ SDK        | ⚠️ SDK           | ⚠️ SDK        | ❌               | ❌              | ❌               |
-| **Anti‑bulk‑exfiltration for agents**       | ✅ per‑agent quotas                           | ❌                                                                                                     | ❌                            | ❌                    | ❌           | ⚠️ policy          | ❌              | ❌                 | ⚠️ IAM        | ❌               | ❌              | ❌               |
-| **Dynamic / leased secrets**                  | ❌                                             | ❌                                                                                                     | ❌                            | ❌                    | ❌           | ✅ signature feature | ⚠️            | ✅                 | ⚠️ rotation   | ❌               | ❌              | ❌               |
-| **Automatic rotation**                        | ❌ manual                                      | ⚠️                                                                                                   | ⚠️                          | ✅                    | ⚠️         | ✅                   | ✅              | ✅                 | ✅              | ❌               | ❌              | ❌               |
-| **Multi‑user / RBAC / SSO**                  | ❌ single‑owner                               | ✅                                                                                                     | ✅                            | ✅                    | ✅           | ✅                   | ✅              | ✅                 | ✅ IAM          | ⚠️ recipients  | ⚠️ keys       | ❌               |
-| **Mobile app / browser autofill**             | ❌                                             | ✅                                                                                                     | ✅                            | ✅                    | ✅           | ❌                   | ❌              | ❌                 | ❌              | ❌               | ⚠️            | ⚠️             |
-| **Works fully offline**                       | ✅                                             | ⚠️ cache                                                                                             | ⚠️                          | ⚠️                  | ⚠️         | ⚠️                 | ❌              | ❌                 | ❌              | ✅               | ✅              | ✅               |
-| **Recovery codes / 2nd‑factor key rotation** | ✅ one‑time codes, code‑gated`passwd`      | ✅ recovery kit                                                                                        | ⚠️                          | ✅                    | ⚠️         | ⚠️ unseal keys     | ⚠️            | ⚠️               | ✅              | ❌               | ❌              | ⚠️ keyfile     |
-| **External dependencies**                     | `sops`, `age`, `expect` only             | —                                                                                                     | —                            | —                    | —           | many                 | —              | —                 | —              | `sops`,`age` | `gpg`/`git` | Qt app           |
+The **Capability** and **concealer** columns stay pinned while you scroll right to see every other tool; scroll down inside the table for the remaining rows. Rows marked ★ are capabilities **no other tool in this table matches**.
 
-*Pricing figures are indicative 2026 list prices and change often — treat them as order‑of‑magnitude, not quotes.*
+<style>
+.cmp-wrap{--cbg:#0d0f13;--chead:#1b1f27;--czA:#0c0e12;--czB:#101319;--ccer:#1a160c;--ccerhd:#2a2410;--cline:#242a33;--ctxt:#e8e8e6;--cstar:#ffb020;
+  max-height:560px;overflow:auto;border:1px solid var(--cline);border-radius:12px;position:relative;margin:14px 0}
+html[data-cer-theme="light"] .cmp-wrap{--cbg:#fff;--chead:#eef0f3;--czA:#fff;--czB:#f6f7f9;--ccer:#fff6e2;--ccerhd:#ffe7bd;--cline:#e2e6eb;--ctxt:#1a1d23;--cstar:#b06f00}
+.cmp{border-collapse:separate;border-spacing:0;min-width:1560px;font-size:12.5px;line-height:1.4;color:var(--ctxt);background:var(--cbg)}
+.cmp th,.cmp td{box-sizing:border-box;border-bottom:1px solid var(--cline);border-right:1px solid var(--cline);padding:9px 12px;text-align:left;vertical-align:top;white-space:nowrap}
+.cmp thead th{position:sticky;top:0;z-index:3;background:var(--chead);font-weight:700}
+.cmp tbody tr:nth-child(odd) td{background:var(--czA)}
+.cmp tbody tr:nth-child(even) td{background:var(--czB)}
+.cmp .cap{position:sticky;left:0;z-index:2;width:216px;min-width:216px;max-width:216px;white-space:normal;font-weight:600}
+.cmp thead th.cap{z-index:5}
+.cmp .cer{position:sticky;left:216px;z-index:2;width:190px;min-width:190px;max-width:190px;white-space:normal;background:var(--ccer)!important}
+.cmp thead th.cer{z-index:5;background:var(--ccerhd)!important}
+.cmp tbody tr.u td{background:rgba(255,176,32,.07)}
+.cmp tbody tr.u .cap{box-shadow:inset 4px 0 0 var(--cstar)}
+.cmp .star{color:var(--cstar);font-weight:800;margin-left:4px}
+.cmp small{opacity:.8}
+</style>
+<div class="cmp-wrap" markdown="0">
+<table class="cmp">
+<thead><tr>
+<th class="cap">Capability</th><th class="cer">concealer</th><th>secretctl</th><th>1Password</th><th>Bitwarden<br>(+ Secrets&nbsp;Mgr)</th><th>Keeper</th><th>LastPass</th><th>HashiCorp Vault</th><th>Doppler</th><th>Infisical</th><th>AWS Secrets Mgr</th><th>SOPS+age (raw)</th><th>pass / gopass</th><th>KeePassXC</th>
+</tr></thead>
+<tbody>
+<tr><td class="cap">Deployment</td><td class="cer">Local, single file</td><td>Local, single binary</td><td>SaaS</td><td>SaaS or self‑host</td><td>SaaS</td><td>SaaS</td><td>Self‑host / HCP</td><td>SaaS</td><td>SaaS or self‑host</td><td>Cloud only</td><td>Local</td><td>Local</td><td>Local</td></tr>
+<tr><td class="cap">Requires a server / daemon</td><td class="cer">❌ none</td><td>❌ none</td><td>cloud</td><td>⚠️ self‑host runs a server</td><td>cloud</td><td>cloud</td><td>✅ server</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
+<tr><td class="cap">Open source</td><td class="cer">✅</td><td>✅ Apache‑2.0</td><td>❌</td><td>✅</td><td>❌</td><td>❌</td><td>⚠️ BUSL</td><td>❌</td><td>✅</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td></tr>
+<tr><td class="cap">Cost</td><td class="cer">Free</td><td>Free</td><td>~$3/mo+</td><td>Free tier; SM $6–12/u/mo</td><td>~$3.75/u/mo+</td><td>~$3/mo+</td><td>Free OSS / $$$ ent.</td><td>paid tiers</td><td>Free OSS / paid cloud</td><td>usage‑based</td><td>Free</td><td>Free</td><td>Free</td></tr>
+<tr><td class="cap">Encryption backend</td><td class="cer">age (X25519) via SOPS</td><td>AES‑256‑GCM (Argon2id)</td><td>proprietary</td><td>proprietary</td><td>proprietary</td><td>proprietary</td><td>own / transit</td><td>managed</td><td>managed</td><td>KMS</td><td>age / PGP / KMS</td><td>GPG (or age)</td><td>AES / ChaCha</td></tr>
+<tr><td class="cap">Storage format</td><td class="cer">Encrypted YAML/JSON, git‑friendly</td><td>Encrypted SQLite (0600)</td><td>proprietary cloud</td><td>proprietary</td><td>proprietary</td><td>proprietary</td><td>backend store</td><td>cloud</td><td>cloud / DB</td><td>cloud</td><td>encrypted file</td><td>GPG files + git</td><td>single <code>.kdbx</code></td></tr>
+<tr><td class="cap">Git‑versionable vault</td><td class="cer">✅ <small>values encrypted, keys visible</small></td><td>❌ SQLite blob</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>⚠️</td><td>❌</td><td>⚠️</td><td>❌</td><td>✅</td><td>✅</td><td>⚠️ blob only</td></tr>
+<tr class="u"><td class="cap">Typed secrets <small>(db/api/ssh/…)</small><span class="star">★</span></td><td class="cer">✅ templates</td><td>—</td><td>⚠️ item types</td><td>⚠️ item types</td><td>⚠️</td><td>⚠️</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>⚠️</td></tr>
+<tr><td class="cap">Scoping</td><td class="cer">✅ first‑class <small>(tenant/project/env/repo)</small></td><td>⚠️ wildcards <small>(aws/*)</small></td><td>⚠️ vaults/tags</td><td>⚠️ collections</td><td>⚠️ folders</td><td>⚠️</td><td>✅ paths/policies</td><td>✅ configs/envs</td><td>✅ envs/folders</td><td>✅ ARNs</td><td>❌</td><td>⚠️ dirs</td><td>⚠️ groups</td></tr>
+<tr><td class="cap">Field‑aware masking</td><td class="cer">✅ per‑field + heuristics</td><td>—</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>n/a</td><td>n/a</td><td>⚠️</td><td>n/a</td><td>❌</td><td>❌</td><td>✅</td></tr>
+<tr><td class="cap">Web UI</td><td class="cer">✅ built‑in SPA</td><td>❌ <small>(desktop app)</small></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌ <small>(desktop app)</small></td></tr>
+<tr><td class="cap">TUI / CLI</td><td class="cer">✅ both</td><td>✅ CLI</td><td>✅ CLI</td><td>✅ CLI</td><td>⚠️</td><td>⚠️</td><td>✅ CLI</td><td>✅ CLI</td><td>✅ CLI</td><td>✅ CLI</td><td>✅ CLI</td><td>✅ CLI</td><td>⚠️</td></tr>
+<tr><td class="cap">Tamper‑evident audit log</td><td class="cer">✅ HMAC‑chained + head anchor</td><td>✅ HMAC‑chained</td><td>⚠️ cloud logs</td><td>⚠️</td><td>✅</td><td>⚠️</td><td>✅</td><td>✅</td><td>✅</td><td>✅ CloudTrail</td><td>❌</td><td>⚠️ git log</td><td>❌</td></tr>
+<tr><td class="cap">AI‑agent / MCP native</td><td class="cer">✅ MCP server, agent gate, rate‑limit</td><td>✅ MCP, no plaintext</td><td>⚠️ 3rd‑party</td><td>❌</td><td>❌</td><td>❌</td><td>⚠️ SDK</td><td>⚠️ SDK</td><td>⚠️ SDK</td><td>⚠️ SDK</td><td>❌</td><td>❌</td><td>❌</td></tr>
+<tr class="u"><td class="cap">Anti‑bulk‑exfiltration for agents<span class="star">★</span></td><td class="cer">✅ per‑agent quotas</td><td>—</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>⚠️ policy</td><td>❌</td><td>❌</td><td>⚠️ IAM</td><td>❌</td><td>❌</td><td>❌</td></tr>
+<tr><td class="cap">Dynamic / leased secrets</td><td class="cer">❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td><td>⚠️</td><td>✅</td><td>⚠️ rotation</td><td>❌</td><td>❌</td><td>❌</td></tr>
+<tr><td class="cap">Automatic rotation</td><td class="cer">❌ manual</td><td>—</td><td>⚠️</td><td>⚠️</td><td>✅</td><td>⚠️</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
+<tr><td class="cap">Multi‑user / RBAC / SSO</td><td class="cer">❌ single‑owner</td><td>❌ single‑owner</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅ IAM</td><td>⚠️ recipients</td><td>⚠️ keys</td><td>❌</td></tr>
+<tr><td class="cap">Mobile app / browser autofill</td><td class="cer">❌</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>⚠️</td><td>⚠️</td></tr>
+<tr><td class="cap">Works fully offline</td><td class="cer">✅</td><td>✅</td><td>⚠️ cache</td><td>⚠️</td><td>⚠️</td><td>⚠️</td><td>⚠️</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td></tr>
+<tr><td class="cap">Recovery codes / 2nd‑factor key rotation</td><td class="cer">✅ one‑time codes, code‑gated <code>passwd</code></td><td>—</td><td>✅ recovery kit</td><td>⚠️</td><td>✅</td><td>⚠️</td><td>⚠️ unseal keys</td><td>⚠️</td><td>⚠️</td><td>✅</td><td>❌</td><td>❌</td><td>⚠️ keyfile</td></tr>
+<tr><td class="cap">External dependencies</td><td class="cer"><code>sops</code>, <code>age</code>, <code>expect</code></td><td>none <small>(single binary)</small></td><td>—</td><td>—</td><td>—</td><td>—</td><td>many</td><td>—</td><td>—</td><td>—</td><td><code>sops</code>, <code>age</code></td><td><code>gpg</code> / <code>git</code></td><td>Qt app</td></tr>
+</tbody>
+</table>
+</div>
+
+*Pricing figures are indicative 2026 list prices and change often — treat them as order‑of‑magnitude, not quotes. secretctl figures are from its public README (Apache‑2.0, Go, SQLite, AES‑256‑GCM + Argon2id, MCP). “—” marks a capability its docs don't state.*
 
 ---
 
@@ -94,6 +121,7 @@ Legend: ✅ yes · ⚠️ partial / with caveats · ❌ no · — n/a
 - **vs. `pass` / `gopass`** — those are GPG‑over‑files with git. concealer swaps fragile GnuPG/`gpg-agent` for age, adds structured/typed secrets and scoping instead of one‑secret‑per‑file, and ships a UI and agent API.
 - **vs. KeePassXC** — KeePassXC is an excellent *personal* single‑file vault with autofill, but it's a GUI desktop app, not git‑friendly (opaque `.kdbx` blob), and has no CLI‑first scoping, audit chain, or agent interface.
 - **vs. Infisical (self‑host)** — Infisical is the closest "developer secrets" competitor with an open‑source self‑host option, but it's a full client‑server platform (DB, web service, RBAC). concealer is the answer when even that is too much to run.
+- **vs. secretctl** — the closest philosophical neighbor: also local‑first, open‑source, single‑binary, with an HMAC‑chained audit log and an MCP integration that keeps plaintext away from agents. The differences are in storage and ergonomics — secretctl stores an encrypted **SQLite** file (AES‑256‑GCM + Argon2id, not git‑diffable) and ships a desktop app; concealer stores a **git‑friendly SOPS/age YAML** vault with first‑class typed secrets, four‑dimension scoping, a built‑in web SPA + TUI, and per‑agent anti‑bulk‑exfiltration quotas. Pick secretctl for a self‑contained binary + native GUI; pick concealer for a git‑versionable, typed, scoped vault you can also drive from the browser.
 
 ---
 
@@ -106,7 +134,7 @@ Legend: ✅ yes · ⚠️ partial / with caveats · ❌ no · — n/a
 | Team sharing, SSO, mobile autofill                            | 1Password / Bitwarden                           |
 | Dynamic DB creds, leases, encryption‑as‑a‑service          | HashiCorp Vault                                 |
 | Managed multi‑env secrets synced into CI/CD                  | Doppler / Infisical                             |
-| Just encrypt a config file in a repo                          | SOPS + age (or concealer if you want structure) |
+| Just encrypt a config file in a repo                          | **concealer**                             |
 | Cloud‑native app secrets on one provider                     | AWS/Azure/GCP Secret Manager                    |
 
 ---
