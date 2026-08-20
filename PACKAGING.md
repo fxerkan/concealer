@@ -29,7 +29,20 @@ git clone https://github.com/fxerkan/homebrew-tap && cd homebrew-tap
 mkdir -p Formula
 ```
 
-### Per release: cut a tag, then update the formula
+### Per release: fully automated
+
+`.github/workflows/release.yml` does all of the below automatically. When a push
+to `main` changes the `VERSION` line in `concealer`, it cuts the `vX.Y.Z` tag +
+GitHub release (notes pulled from that version's `CHANGELOG.md` section) and bumps
+`Formula/concealer.rb` in `fxerkan/homebrew-tap` (url + sha256). It's idempotent —
+re-runs skip if the tag already exists — and can be triggered manually via
+**Actions → release → Run workflow** to catch up the current `VERSION`.
+
+**One-time setup:** add a repo secret `HOMEBREW_TAP_TOKEN` — a PAT (classic `repo`,
+or fine-grained with **contents:write** on `fxerkan/homebrew-tap`). Without it the
+release still cuts but the tap bump step fails.
+
+<details><summary>Manual fallback (if you ever need it)</summary>
 
 1. **Bump & tag** in the `concealer` repo (VERSION + CHANGELOG already updated):
 
@@ -64,6 +77,8 @@ mkdir -p Formula
    ```
 
 Upgrades for users are then just `brew upgrade concealer`.
+
+</details>
 
 ### Homebrew policy compliance checklist
 

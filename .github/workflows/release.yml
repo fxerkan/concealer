@@ -1,0 +1,78 @@
+# Auto-release: when VERSION (in ./concealer) changes on main, cut a matching
+# tag + GitHub release (notes = that version's CHANGELOG section) and bump the
+# Homebrew tap formula (url + sha256). Idempotent: skips if the tag already exists.
+# ponytail: single workflow; VERSION is the trigger, no separate version bump step.
+name: release
+
+on:
+  push:
+    branches: [main]
+    paths: ['concealer']      # VERSION lives in the concealer script
+  workflow_dispatch: {}        # manual catch-up (e.g. to release the current VERSION)
+
+concurrency: release           # never run two releases at once
+
+permissions:
+  contents: write              # create tags + releases
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Read VERSION
+        id: v
+        run: |
+          V=$(sed -n 's/^VERSION = "\([^"]*\)".*/\1/p' concealer)
+          [ -n "$V" ] || { echo "::error::could not parse VERSION from concealer"; exit 1; }
+          echo "version=$V"  >> "$GITHUB_OUTPUT"
+          echo "tag=v$V"     >> "$GITHUB_OUTPUT"
+
+      - name: Skip if release already exists
+        id: check
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          if gh release view "${{ steps.v.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true"  >> "$GITHUB_OUTPUT"
+            echo "::notice::${{ steps.v.outputs.tag }} already released — nothing to do"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract changelog section
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          awk -v ver="${{ steps.v.outputs.version }}" '
+            $0 ~ "^## \\[" ver "\\]" {p=1; print; next}
+            p && /^## \[/ {exit}
+            p {print}
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          [ -s RELEASE_NOTES.md ] || echo "concealer ${{ steps.v.outputs.version }}" > RELEASE_NOTES.md
+
+      - name: Create tag + release
+        if: steps.check.outputs.exists == 'false'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release create "${{ steps.v.outputs.tag }}" \
+            --title "concealer ${{ steps.v.outputs.version }}" \
+            --notes-file RELEASE_NOTES.md \
+            --target "${{ github.sha }}"
+
+      - name: Bump Homebrew tap formula
+        if: steps.check.outputs.exists == 'false'
+        uses: mislav/bump-homebrew-formula-action@v3
+        with:
+          formula-name: concealer
+          formula-path: Formula/concealer.rb
+          homebrew-tap: fxerkan/homebrew-tap
+          tag-name: ${{ steps.v.outputs.tag }}
+          download-url: https://github.com/fxerkan/concealer/archive/refs/tags/${{ steps.v.outputs.tag }}.tar.gz
+          commit-message: |
+            concealer {{version}}
+
+            Automated by concealer release workflow.
+        env:
+          # PAT with `repo` (or fine-grained contents:write) on fxerkan/homebrew-tap.
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
