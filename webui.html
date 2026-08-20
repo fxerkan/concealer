@@ -589,7 +589,7 @@ const I18N={
   lim_not_hardened:"Vault HARDENED değil: diskte düz-metin age anahtarı (keys/age-key.txt) var. Bu yüzden MCP/CLI, secret'ları token/kayıt OLMADAN okuyabiliyor (bu sayfadaki limitler ve kayıt zorunluluğu bu haldeyken uygulanamaz). Zorunlu kılmak için: (1) <code>concealer harden</code> — düz-metin anahtarı kaldırır; (2) <code>concealer agent register claude-code</code> — CONCEALER_TOKEN üretir; (3) token'ı Claude Code MCP env'ine ekle; (4) MCP sunucusunu yeniden başlat.",
   set_portability:"Taşınabilirlik (makineler arası)",export_btn:"⬇ Dışa Aktar (.age)",import_btn:"⬆ İçe Aktar",
   set_export_hint:"Dışa aktarma tüm vault'u master parolayla (age) şifreler; başka makineye taşınabilir. İçe aktarma kayıtları bu vault'a birleştirir.",
-  exported:"dışa aktarma indirildi",imp_pick:"önce .age dosyası seç",imp_fail:"içe aktarma başarısız",imported_n:(n,u)=>`+${n} yeni, ~${u} güncellendi`,
+  exported:"dışa aktarma indirildi",imp_pick:"önce .age dosyası seç",imp_fail:"içe aktarma başarısız",imp_corrupt:"bozuk / okunamayan dosya",imported_n:(n,u)=>`+${n} yeni, ~${u} güncellendi`,
   set_backup:"Yedek (.cer)",set_backup_hint:"Bir .cer yedeği, tüm vault'un master parolandan AYRI özel bir yedek parolasıyla şifrelenmiş halidir — içi açılıp okunamayan opak binary. Yukarıdaki İçe Aktar ile geri yüklenir. Otomatik yedekler, süre dolunca kilit açılışında bir .cer'i yerel klasöre yazar.",
   backup_now:"⬇ Şimdi yedekle (.cer)",bk_auto:"Otomatik yedek",bk_interval:"Her (saat)",bk_keep:"Son (dosya) tut",bk_dir:"Hedef klasör",
   bk_pw:"Yedek parolası",bk_pw_ph:"belirle / değiştir (boş = değişmesin)",bk_pw_isset:"(ayarlı)",bk_pw_unset:"(ayarlı değil)",bk_run:"▶ Otomatik yedeği şimdi al",
@@ -649,7 +649,7 @@ const I18N={
   lim_not_hardened:"Vault is NOT hardened: a plaintext age key (keys/age-key.txt) is on disk, so MCP/CLI can read secrets WITHOUT a token or registration (the limits and registration requirement on this page can't be enforced in this state). To enforce them: (1) <code>concealer harden</code> — removes the plaintext key; (2) <code>concealer agent register claude-code</code> — prints a CONCEALER_TOKEN; (3) put that token in the Claude Code MCP env; (4) restart the MCP server.",
   set_portability:"Portability (move between machines)",export_btn:"⬇ Export (.age)",import_btn:"⬆ Import",
   set_export_hint:"Export encrypts the whole vault with your master password (age); portable to another machine. Import merges records into this vault.",
-  exported:"export downloaded",imp_pick:"pick a .age file first",imp_fail:"import failed",imported_n:(n,u)=>`+${n} new, ~${u} updated`,
+  exported:"export downloaded",imp_pick:"pick a .age file first",imp_fail:"import failed",imp_corrupt:"corrupt / unreadable file",imported_n:(n,u)=>`+${n} new, ~${u} updated`,
   set_backup:"Backup (.cer)",set_backup_hint:"A .cer backup is the whole vault encrypted with a dedicated backup password (separate from your master password) — an opaque binary you can't open to read. Restore it via Import above. Automatic backups write a .cer to a local folder on unlock once the interval has elapsed.",
   backup_now:"⬇ Backup now (.cer)",bk_auto:"Automatic backups",bk_interval:"Every (hours)",bk_keep:"Keep last (files)",bk_dir:"Destination folder",
   bk_pw:"Backup password",bk_pw_ph:"set / change (leave blank to keep)",bk_pw_isset:"(set)",bk_pw_unset:"(not set)",bk_run:"▶ Run auto-backup now",
@@ -976,7 +976,7 @@ function doImport(){
     askPw(t('import_btn'),async pw=>{
       const r=await api('/api/import',{method:'POST',body:JSON.stringify({pw,b64})});
       const d=await r.json();
-      if(!r.ok){toast(d.error||t('imp_fail'));return;}
+      if(!r.ok){const k='imp_'+(d.error||''); toast(I18N[LANG][k]?t(k):(d.error||t('imp_fail')));return;}
       toast(t('imported_n',d.imported,d.updated)); refreshFilterOptions(); loadSecrets();
     });
   };
