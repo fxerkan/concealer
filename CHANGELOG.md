@@ -6,20 +6,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
-## [0.9.0] — 2026-08-19
+## [0.9.0] — 2026-08-20
 
 ### Added
+
 - **Collections.** An optional free‑form `collection` field on every record — a user‑defined
   grouping axis independent of scope (`tenant/project/env/repo`) and tags. Nesting is a plain path
   string (`backend/payments`); no separate folder model. Filtering matches a collection and its
-  sub‑paths. Available everywhere: CLI (`list --collection`, `mv`/`cp --to-collection`, `set
-  --collection`, `dims`), TUI (Collection facet + `M` move / `C` copy keys + editable in the edit
+  sub‑paths. Available everywhere: CLI (`list --collection`, `mv`/`cp --to-collection`, `set --collection`, `dims`), TUI (Collection facet + `M` move / `C` copy keys + editable in the edit
   form), web (filter facet, Collection column, an in‑app collection **picker** — a `<select>` of
   existing collections with a `＋` button to type a new one — in both the editor and the per‑row
   **Move** dialog, plus a per‑row **Duplicate** action), and MCP (`list_secrets`/`set_secret` accept
   `collection`). See `docs/feature-plan.md` for the scope‑vs‑collection‑vs‑tag distinction.
-- **Rotation policy.** An optional per‑record `rotation` policy (`every_days` + `mode:
-  generate|manual`). `concealer rotate --due [--dry]` rotates every overdue record whose mode is
+- **Rotation policy.** An optional per‑record `rotation` policy (`every_days` + `mode: generate|manual`). `concealer rotate --due [--dry]` rotates every overdue record whose mode is
   `generate` and has a `value` field, and only *flags* `manual`/multi‑field records so it never
   breaks a provider‑bound credential. Overdue records are badged in `list` and the web grid. Set a
   policy with `set --rotate-days N [--rotate-mode manual]` or the web editor. **This rotates the
@@ -38,14 +37,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   steps: token, web, first secret, agent registration, backup).
 
 ### Changed
+
 - **CLI/MCP output is now English-only.** All user-facing messages — CLI prompts, errors, `init`
   onboarding, `unlock`/`agent`/`harden`/`recover` output, rate-limit notices, MCP tool descriptions
   and responses, and web API error strings — were translated from Turkish to English. Turkish source
-  comments are unchanged; the web UI stays bilingual via its `I18N` dict.
+  comments are unchanged. The **TUI and web UI stay bilingual** (TR/EN) — their error/info messages
+  follow the active language via `L()` / the `I18N` dict; the import "corrupt file" error is now a
+  localized code (`imp_corrupt`) instead of raw text.
 
 ## [0.8.1] — 2026-08-19
 
 ### Fixed
+
 - **Audit Logs: long values no longer break the table.** A single very long
   cell value (e.g. an `inject` record whose `key` is the comma-joined list of
   every injected secret name) forced the table wider than the viewport, which
@@ -54,12 +57,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   chars with a `… ▾` expand toggle.
 
 ### Added
+
 - **Audit Logs: Detail filter.** New multiselect filter on the Detail column
   (alongside Source/Action/Actor/Key).
 - The **Key** filter dropdown now lists individual secret names (comma-joined
   `inject` keys are split), and filtering matches rows by membership.
 
 ### Changed
+
 - **Audit Logs: date filtering consolidated.** The separate quick-period row
   and the two From/To inputs are merged into a single **Date range** dropdown
   placed first in the filter panel (presets + custom From/To in one popup),
@@ -68,6 +73,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.8.0] — 2026-08-18
 
 ### Added
+
 - **Encrypted vault backups (`.cer`).** Settings → **Backup** can now write the
   whole vault to an opaque `.cer` file — the entire secret DB `age`-encrypted with
   a **dedicated backup password that must differ from the master password** (min 8
@@ -87,6 +93,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
     `.gitignore` (init + `harden`).
 
 ### Security
+
 - **The MCP anti-bulk-exfiltration control point now also covers the CLI.** AI
   agents can drive the `concealer` CLI directly, so `list`, `search`, and `get`
   now pass through the same `rate_gate` as MCP — `per_call` + rolling
@@ -95,8 +102,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   blocked once the window quota is spent (`get_denied` audit). The limit note
   goes to **stderr** so it can't corrupt piped stdout. **Web and TUI are left
   unrestricted** on purpose — that's the human owner, unlocked by master password.
-- **Settings → MCP access limits now shows a hardening warning.** `GET
-  /api/settings` returns `hardened` (true when no plaintext `keys/age-key.txt` is
+- **Settings → MCP access limits now shows a hardening warning.** `GET /api/settings` returns `hardened` (true when no plaintext `keys/age-key.txt` is
   on disk). If the vault is **not** hardened, the panel warns that MCP/CLI can
   read secrets *without a token or registration* (the legacy plaintext-key
   fallback bypasses tokens entirely) and shows the fix: `concealer harden` →
@@ -108,6 +114,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.7.0] — 2026-08-18
 
 ### Security
+
 - **MCP anti-bulk-exfiltration control point.** An AI agent (or a stolen token)
   can no longer dump the whole vault through MCP `list_secrets`/`search_secrets`.
   Two limits now apply per agent:
@@ -119,8 +126,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
     the quota is spent the agent is told to narrow (`project`/`tag`/`type`) or
     wait. Already-seen names re-list for free (idempotent) so honest re-queries
     don't burn quota; `window_quota: 0` fully blocks an agent.
-  State is per-agent in `keys/ratestate.json` (git-ignored; holds only names +
-  timestamps, never values) so it survives an MCP process restart.
+    State is per-agent in `keys/ratestate.json` (git-ignored; holds only names +
+    timestamps, never values) so it survives an MCP process restart.
 - **Registration is now mandatory for MCP secret access.** Every MCP tool call
   requires a **registered agent token** (`concealer agent register <name>` →
   `source=agent`). A raw CLI/human token, or no token, is refused (fail-closed) —
@@ -129,6 +136,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   MCP `list`/`search`/`inject` audit line.
 
 ### Added
+
 - **Per-agent limits managed in the web Settings page.** A new "MCP access limits"
   panel edits the default limits and per-agent overrides (each registered agent is
   listed); saving requires the master password. `GET/POST /api/settings` carry
@@ -137,6 +145,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.6.10] — 2026-08-18
 
 ### Security
+
 - **Custom field *names* that look like secret values are now blocked and hidden.**
   A leaked credential/token/URL accidentally entered as a *field name* (e.g. an
   Atlassian `ATATT…` token, a base64 blob, or a `https://…` URL) no longer:
@@ -154,22 +163,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.6.9] — 2026-08-18
 
 ### Fixed
+
 - **Shell-history inline `KEY=VALUE` false positives.** The command-line inline
   rule is far noisier than the `.env`-file rule it borrowed (`--file=path`,
   `--tag-value=…`, `--parent=//…`). It now requires **both** a strongly
-  secret-looking key name (`secret|token|passw|credential|api_key|access_key|
-  private_key|bearer|pat` — no longer the broad `value|key|id`) **and** a
+  secret-looking key name (`secret|token|passw|credential|api_key|access_key| private_key|bearer|pat` — no longer the broad `value|key|id`) **and** a
   high-entropy value. File paths, URLs, and tag values no longer show as leaks;
   real assignments like `AWS_BEARER_TOKEN_BEDROCK=…` / `PASSWORD=…` still do.
 
 ## [0.6.8] — 2026-08-18
 
 ### Changed
+
 - **Risks tab split into sub-tabs.** "Reused values" and "Shell history" are now
   two sub-tabs inside Risks (the history section was easy to miss at the bottom
   of the page). The history table now uses the same responsive `.cards` grid.
 
 ### Fixed
+
 - **Shell-history scan false positives.** Vault-value matching now only fires on
   **high-entropy** stored values (`len ≥ 12`, mixed alnum) and only on a full
   token boundary — so a short label stored in a secret field (a project code,
@@ -182,6 +193,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.6.7] — 2026-08-18
 
 ### Changed
+
 - **Risks (leaks) table now matches the Secrets/Audit grid.** Converted the leak-group table to the same model-driven grid: sortable columns, drag-to-resize handles, per-column show/hide + reorder, and the `⚙` column menu now sits on the last header cell (was a `⋮` button floating in the toolbar above the table). Added responsive `.cards` layout parity.
 - Secrets header columns are now resizable (drag handle), matching Audit/Risks.
 - Audit header cells now show the pointer cursor on hover (added the `sortable` class), matching Secrets.
@@ -190,6 +202,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.6.6] — 2026-08-18
 
 ### Changed
+
 - **Login CLI hint fits one line.** The command teaser dropped the repeated
   `$ cer` prefixes (which wrapped to two lines) for a single, readable
   `$ cer web · tui · mcp` — `cer` accented, modes in text colour, `·` separators
@@ -198,6 +211,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.6.5] — 2026-08-18
 
 ### Added
+
 - **Shell history leak scan + purge.** New `concealer history [--purge]` command
   and a **Shell history leaks** section in the Risks tab. Scans `~/.zsh_history`,
   `~/.bash_history` (and `.histfile`/`.sh_history`/`.ksh_history`) for secret
@@ -214,11 +228,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.6.4] — 2026-08-18
 
 ### Changed
+
 - **TUI shortcuts follow the function's first letter.** Copy is now **`c`**
   (was `p`) and search is **`s`** (the old `/` still works — `s` is friendlier on
   a Turkish keyboard). Help bar and help window updated.
 
 ### Added
+
 - **TUI language toggle (TR / EN).** Press **`L`** to switch the whole TUI
   between Turkish and English; the choice persists in `keys/config.json`
   (`lang`). Default is taken from the OS locale (`LANG=tr*` → Turkish, else
@@ -228,6 +244,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.6.3] — 2026-08-18
 
 ### Security
+
 - **TUI wipes the terminal scrollback on exit.** The TUI already runs in the
   alternate screen buffer, but terminals like iTerm2 (with *"Save lines to
   scrollback in alternate screen mode"* enabled) copy the alt-screen frames into
@@ -239,6 +256,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.6.2] — 2026-08-18
 
 ### Changed
+
 - **Login redaction is now a continuous streaming animation.** Each dummy secret
   runs a full lifecycle on its own slow (8–15 s) loop — rises in, shows plaintext,
   gets redacted (amber bar + strike-through), fades out, then **reappears at a new
@@ -255,6 +273,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 Complete the Turkish translation of the web UI.
 
 ### Fixed
+
 - **Missing Turkish strings.** Tab labels (Sırlar / Denetim Kayıtları / Riskler),
   the scope-dimension filter & form labels (Tenant/Proje/Ortam/Repo), column
   headers (Ad/Tip/Anahtar), the auto-lock countdown (oto-kilit), and the
@@ -269,6 +288,7 @@ Complete the Turkish translation of the web UI.
 Audit grid parity, a Stats dashboard, themes, and a redaction login animation.
 
 ### Added
+
 - **Stats dashboard** (new tab). Interactive, dependency-free charts (hand-rolled
   HTML bars + inline SVG trend line) over secrets and the audit log: activity
   trend, and top type / platform-tag / interface(source) / action / actor /
@@ -300,6 +320,7 @@ Audit grid parity, a Stats dashboard, themes, and a redaction login animation.
   never show on sight. `host:port/path` (no credentials) stays visible.
 
 ### Changed
+
 - **TUI Details panel is now interactive.** Focus it (`3`/Tab) and move a cursor
   over each key/value with `↑↓`/`j`/`k`; `Enter` or `m` reveals **just the
   selected field** (per-field, not all-at-once); `p` copies the selected field.
@@ -312,6 +333,7 @@ Audit grid parity, a Stats dashboard, themes, and a redaction login animation.
   background instead of showing the vault behind them.
 
 ### Fixed
+
 - **TUI now renders in the VS Code integrated terminal** (borders/panels were
   invisible there). VS Code's terminal (xterm.js) drops the Unicode box-drawing
   glyphs (`┌ │ ─`) this UI draws with. The TUI now detects VS Code
@@ -327,6 +349,7 @@ Audit grid parity, a Stats dashboard, themes, and a redaction login animation.
 Secrets grid: custom-field columns, reorder, native folder picker.
 
 ### Added
+
 - **Custom fields as table columns.** The column picker now lists every field
   found across secrets (e.g. `web_url`, `host`, `username`) — toggle any on as
   its own column. Plain fields show their value; secret fields stay masked.
@@ -339,6 +362,7 @@ Secrets grid: custom-field columns, reorder, native folder picker.
   screens; secret-types table refreshed.
 
 ### Changed
+
 - Scan folder: **Import selected** stays disabled until a scan finds candidates;
   **Scan** is now the amber (primary) button, Import is a distinct green.
 - Header logo enlarged, vertically centered with the wordmark, brighter glow.
@@ -350,6 +374,7 @@ Secrets grid: custom-field columns, reorder, native folder picker.
 Terminal UI + English help.
 
 ### Added
+
 - **`concealer tui`** — a full-screen curses vault browser (btop / Keeper-
   Supershell style) mirroring the web app, in the Covert amber palette. Three
   focusable panels — **Filters** (facets with live counts, multi-select),
@@ -365,6 +390,7 @@ Terminal UI + English help.
   (Unix/macOS).
 
 ### Changed
+
 - **`help` / `--help` is now fully English** and column-aligned (built via a row
   formatter so synopsis/description columns stay flush). Added the `tui` entry.
 
@@ -373,11 +399,13 @@ Terminal UI + English help.
 Secrets-page follow-ups: privacy, tag filtering, and a real folder picker.
 
 ### Removed
+
 - **PII-bearing secret types** (`credit_card`, `bank_account`, `passport`,
   `id_card`) — these must never live in this vault. Remaining everyday types:
   `pin`, `wifi`, `membership`, `secure_note`.
 
 ### Added
+
 - **Tags** multi-select in the filter panel (`filt()` tag matching accepts
   comma-joined values, any-match).
 - **Folder picker** in Scan folder: a server-side directory browser
@@ -392,6 +420,7 @@ Secrets-page follow-ups: privacy, tag filtering, and a real folder picker.
 Web UI overhaul: responsive/mobile layout and per-secret deploy.
 
 ### Added
+
 - **11 new secret types** beyond api_key/database/website/custom — developer:
   `access_token`, `oauth`, `jwt`, `ssh_key`, `certificate`, `server`, `login`;
   everyday: `pin` (phone/door/card), `wifi`, `credit_card`, `bank_account`,
@@ -409,6 +438,7 @@ Web UI overhaul: responsive/mobile layout and per-secret deploy.
   selector (10/25/50/100, remembered).
 
 ### Changed
+
 - Secrets row actions reduced to **View + a kebab menu** (Edit / Deploy /
   Delete). Column-picker moved to a gear in the Actions header.
 - **Sticky** search/filter bar and table header (removed the `overflow`
@@ -423,6 +453,7 @@ Web UI overhaul: responsive/mobile layout and per-secret deploy.
   and stays visible on mobile.
 
 ### Fixed
+
 - Auto-lock now closes any open modal (Edit/Deploy) when it locks, so the
   login screen is no longer hidden behind a stale popup.
 
@@ -431,6 +462,7 @@ Web UI overhaul: responsive/mobile layout and per-secret deploy.
 Distribution release: installable via Homebrew, with a detailed CLI help.
 
 ### Added
+
 - **Homebrew packaging.** `Formula/concealer.rb` + `PACKAGING.md`. Users install
   with `brew install fxerkan/tap/concealer`, which pulls in `sops`, `age`, and
   `expect` automatically — no manual dependency setup.
@@ -441,17 +473,19 @@ Distribution release: installable via Homebrew, with a detailed CLI help.
   install hint when `sops`/`age`/`expect` are missing, instead of a cryptic error.
 
 ### Changed
+
 - **Default vault home.** When run from a package install (no vault next to the
   script), `CONCEALER_HOME` now defaults to `~/.concealer` so the vault lives in a
   writable per-user dir. Repo checkouts with an existing vault keep using the
   script directory unchanged.
 
-## [0.2.0] — 2026-08-18
+## [0.2.0][0.2.0] — 2026-08-18
 
 Security hardening release: tamper-evident audit, encrypted key-at-rest,
 unlock tokens for agents, and master-password recovery.
 
 ### Added
+
 - **Recovery codes.** `init` now generates 8 one-time recovery codes (shown
   **once**, only their scrypt hash + a code-wrapped copy of the age key are
   stored — never the plaintext code).
@@ -481,6 +515,7 @@ unlock tokens for agents, and master-password recovery.
 - `concealer version` / `--version`.
 
 ### Changed
+
 - `_age_pw` now matches the `passphrase` substring instead of `passphrase:`.
   age's encryption prompt ends in `…one): `, so the old pattern never matched
   and every age call hung for 30 s.
@@ -492,6 +527,7 @@ unlock tokens for agents, and master-password recovery.
   `keys/recovery.json`, and `keys/agents.json`.
 
 ### Security
+
 - Audit chain is now resistant to insertion, reordering, and tail-truncation.
   Known ceiling: `keys/audit.key` is on disk, so a full filesystem-root attacker
   can still re-forge the chain — documented in `audit_verify`. True immutability
@@ -500,14 +536,16 @@ unlock tokens for agents, and master-password recovery.
   plaintext.
 
 ### Backward compatibility
+
 - Existing vaults with a plaintext `age-key.txt` keep working with no token
   (legacy path); run `concealer harden` to opt into key-at-rest.
 
-## [0.1.0]
+## [0.1.0][0.1.0]
 
 Initial baseline: single-file local secret manager over SOPS + age.
 
 ### Added
+
 - Typed secrets (`api_key` / `database` / `website` / `custom`) with
   `tenant / project / environment / repo` scoping, tags, url, notes, full CRUD.
 - CLI, localhost web UI (bilingual TR/EN), and MCP stdio server
@@ -515,6 +553,3 @@ Initial baseline: single-file local secret manager over SOPS + age.
 - HMAC-SHA256-chained audit log; scrypt master-password verifier; passphrase-
   wrapped portable key backup; idle auto-lock; leak scan; folder import; deploy
   renderers.
-
-[0.2.0]: #020--2026-08-18
-[0.1.0]: #010

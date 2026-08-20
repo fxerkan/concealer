@@ -2466,7 +2466,7 @@ def serve_web(port):
             if path == "/api/import":      # pw = bundle'in parolasi (yerel master olmayabilir)
                 b = self._body()
                 try: blob = base64.b64decode(b.get("b64", ""))
-                except Exception: return self._json({"error": "corrupt file"}, 400)
+                except Exception: return self._json({"error": "corrupt"}, 400)   # code → localized in webui (imp_corrupt)
                 try: nn, nu = import_bundle(b.get("pw", ""), blob)
                 except Exception as ex: return self._json({"error": str(ex)}, 400)
                 audit("import", source="web", detail=f"+{nn} ~{nu}")
