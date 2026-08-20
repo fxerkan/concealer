@@ -107,6 +107,11 @@ th .colbtn:hover{color:var(--acc);background:var(--panel)}
 tr:last-child td{border-bottom:0}
 .chip{display:inline-block;background:var(--chip);color:#bcd;border-radius:20px;padding:2px 9px;font-size:11px;margin:1px 2px}
 .type-badge{font-size:11px;padding:3px 9px;border-radius:6px;font-weight:600;background:#242a33;color:#c6ccd6}
+.ovd{font-size:11px;padding:2px 7px;border-radius:6px;font-weight:600;background:#3a2410;color:var(--warn);white-space:nowrap}
+.coll{white-space:nowrap}
+.collpick{display:flex;gap:6px;align-items:center}
+.collpick select,.collpick input{flex:1;min-width:0}
+.collnew-btn{flex:0 0 auto;font-weight:700;padding:6px 11px;line-height:1}
 .t-api_key{background:#132534;color:#8fd0ff}.t-database{background:#241d33;color:#c3a6ff}
 .t-website{background:#12301f;color:#86e6a8}.t-login{background:#12301f;color:#86e6a8}.t-custom{background:#2e2612;color:#ffcf7a}
 .t-access_token,.t-jwt,.t-oauth{background:#132534;color:#8fd0ff}
@@ -354,6 +359,7 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
         </div>
         <div class="filterpanel" id="filterpanel">
           <div class="msel" id="ms-type"></div>
+          <div class="msel" id="ms-collection"></div>
           <div class="msel" id="ms-tenant"></div>
           <div class="msel" id="ms-project"></div>
           <div class="msel" id="ms-environment"></div>
@@ -532,11 +538,11 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
 const IDLE = parseInt("__IDLE__") || 300;
 const CLIP_CLEAR = 20;
 const DIMS=['tenant','project','environment','repo'];
-const FDIMS=['type','tenant','project','environment','repo','tags'];   // filter dropdown alanlari
+const FDIMS=['type','collection','tenant','project','environment','repo','tags'];   // filter dropdown alanlari
 let TYPES={}, idleLeft=IDLE, idleTimer=null, LANG='tr';
 // coklu-secim filtre durumu + secenekler + istemci-tarafi sayfalama
-const FILT={type:new Set(),tenant:new Set(),project:new Set(),environment:new Set(),repo:new Set(),tags:new Set()};
-const FOPTS={type:[],tenant:[],project:[],environment:[],repo:[],tags:[]};
+const FILT={type:new Set(),collection:new Set(),tenant:new Set(),environment:new Set(),project:new Set(),repo:new Set(),tags:new Set()};
+const FOPTS={type:[],collection:[],tenant:[],project:[],environment:[],repo:[],tags:[]};
 let SPAGE=1; let SPAGE_SIZE=parseInt(localStorage.getItem('concealer_psize'))||25; let SROWS=[];
 
 // ---------- i18n ----------
@@ -551,6 +557,10 @@ const I18N={
   idle_lock:"⏱ oto-kilit",idle_locked:"Boşta kalma — kilitlendi",
   name_req:"ad gerekli",save:"Kaydet",cancel:"İptal",close:"Kapat",fields:"alanlar",notes:"notlar",
   add_field:"+ alan ekle",field:"alan",value:"değer",type:"tip",scope:"kapsam",tags:"etiketler",url:"url",
+  collection:"Koleksiyon",th_collection:"Koleksiyon",rotation:"Rotasyon",rot_days:"Her (gün)",rot_mode:"Mod",
+  rot_generate:"otomatik üret",rot_manual:"elle",rot_none:"politika yok",overdue:"gecikmiş",rot_overdue_d:d=>`${d} gün gecikmiş`,
+  move_to:"Koleksiyona taşı",copy_to:"Çoğalt (Duplicate)",coll_root:"(kök)",copied:"çoğaltıldı",moved:"taşındı",
+  coll_none:"(yok)",coll_new:"yeni koleksiyon…",coll_pick:"Koleksiyon seç veya + ile yeni ekle",
   new_secret_title:"+ Yeni Sır",edit_title:"✏️ Düzenle",
   all_actions:"tüm eylemler",all_sources:"tüm kaynaklar",key_filter:"anahtar filtre",verify_chain:"🔗 Zincir doğrula",
   th_time:"Zaman (UTC)",th_source:"Kaynak",th_action:"Eylem",th_key:"Anahtar",th_detail:"Detay",
@@ -579,7 +589,7 @@ const I18N={
   lim_not_hardened:"Vault HARDENED değil: diskte düz-metin age anahtarı (keys/age-key.txt) var. Bu yüzden MCP/CLI, secret'ları token/kayıt OLMADAN okuyabiliyor (bu sayfadaki limitler ve kayıt zorunluluğu bu haldeyken uygulanamaz). Zorunlu kılmak için: (1) <code>concealer harden</code> — düz-metin anahtarı kaldırır; (2) <code>concealer agent register claude-code</code> — CONCEALER_TOKEN üretir; (3) token'ı Claude Code MCP env'ine ekle; (4) MCP sunucusunu yeniden başlat.",
   set_portability:"Taşınabilirlik (makineler arası)",export_btn:"⬇ Dışa Aktar (.age)",import_btn:"⬆ İçe Aktar",
   set_export_hint:"Dışa aktarma tüm vault'u master parolayla (age) şifreler; başka makineye taşınabilir. İçe aktarma kayıtları bu vault'a birleştirir.",
-  exported:"dışa aktarma indirildi",imp_pick:"önce .age dosyası seç",imp_fail:"içe aktarma başarısız",imported_n:(n,u)=>`+${n} yeni, ~${u} güncellendi`,
+  exported:"dışa aktarma indirildi",imp_pick:"önce .age dosyası seç",imp_fail:"içe aktarma başarısız",imp_corrupt:"bozuk / okunamayan dosya",imported_n:(n,u)=>`+${n} yeni, ~${u} güncellendi`,
   set_backup:"Yedek (.cer)",set_backup_hint:"Bir .cer yedeği, tüm vault'un master parolandan AYRI özel bir yedek parolasıyla şifrelenmiş halidir — içi açılıp okunamayan opak binary. Yukarıdaki İçe Aktar ile geri yüklenir. Otomatik yedekler, süre dolunca kilit açılışında bir .cer'i yerel klasöre yazar.",
   backup_now:"⬇ Şimdi yedekle (.cer)",bk_auto:"Otomatik yedek",bk_interval:"Her (saat)",bk_keep:"Son (dosya) tut",bk_dir:"Hedef klasör",
   bk_pw:"Yedek parolası",bk_pw_ph:"belirle / değiştir (boş = değişmesin)",bk_pw_isset:"(ayarlı)",bk_pw_unset:"(ayarlı değil)",bk_run:"▶ Otomatik yedeği şimdi al",
@@ -607,6 +617,10 @@ const I18N={
   idle_lock:"⏱ auto-lock",idle_locked:"Idle — locked",
   name_req:"name required",save:"Save",cancel:"Cancel",close:"Close",fields:"fields",notes:"notes",
   add_field:"+ add field",field:"field",value:"value",type:"type",scope:"scope",tags:"tags",url:"url",
+  collection:"Collection",th_collection:"Collection",rotation:"Rotation",rot_days:"Every (days)",rot_mode:"Mode",
+  rot_generate:"auto-generate",rot_manual:"manual",rot_none:"no policy",overdue:"overdue",rot_overdue_d:d=>`${d} days overdue`,
+  move_to:"Move to collection",copy_to:"Duplicate",coll_root:"(root)",copied:"duplicated",moved:"moved",
+  coll_none:"(none)",coll_new:"new collection…",coll_pick:"Pick a collection or add a new one with +",
   new_secret_title:"+ New Secret",edit_title:"✏️ Edit",
   all_actions:"all actions",all_sources:"all sources",key_filter:"key filter",verify_chain:"🔗 Verify chain",
   th_time:"Time (UTC)",th_source:"Source",th_action:"Action",th_key:"Key",th_detail:"Detail",
@@ -635,7 +649,7 @@ const I18N={
   lim_not_hardened:"Vault is NOT hardened: a plaintext age key (keys/age-key.txt) is on disk, so MCP/CLI can read secrets WITHOUT a token or registration (the limits and registration requirement on this page can't be enforced in this state). To enforce them: (1) <code>concealer harden</code> — removes the plaintext key; (2) <code>concealer agent register claude-code</code> — prints a CONCEALER_TOKEN; (3) put that token in the Claude Code MCP env; (4) restart the MCP server.",
   set_portability:"Portability (move between machines)",export_btn:"⬇ Export (.age)",import_btn:"⬆ Import",
   set_export_hint:"Export encrypts the whole vault with your master password (age); portable to another machine. Import merges records into this vault.",
-  exported:"export downloaded",imp_pick:"pick a .age file first",imp_fail:"import failed",imported_n:(n,u)=>`+${n} new, ~${u} updated`,
+  exported:"export downloaded",imp_pick:"pick a .age file first",imp_fail:"import failed",imp_corrupt:"corrupt / unreadable file",imported_n:(n,u)=>`+${n} new, ~${u} updated`,
   set_backup:"Backup (.cer)",set_backup_hint:"A .cer backup is the whole vault encrypted with a dedicated backup password (separate from your master password) — an opaque binary you can't open to read. Restore it via Import above. Automatic backups write a .cer to a local folder on unlock once the interval has elapsed.",
   backup_now:"⬇ Backup now (.cer)",bk_auto:"Automatic backups",bk_interval:"Every (hours)",bk_keep:"Keep last (files)",bk_dir:"Destination folder",
   bk_pw:"Backup password",bk_pw_ph:"set / change (leave blank to keep)",bk_pw_isset:"(set)",bk_pw_unset:"(not set)",bk_run:"▶ Run auto-backup now",
@@ -802,6 +816,7 @@ async function refreshFilterOptions(){
   const rows=await (await api('/api/secrets')).json();
   DIMS.forEach(d=>FOPTS[d]=[...new Set(rows.map(e=>e[d]).filter(Boolean))].sort());
   FOPTS.type=[...new Set(rows.map(e=>e.type).filter(Boolean))].sort();
+  FOPTS.collection=[...new Set(rows.map(e=>e.collection).filter(Boolean))].sort();
   FOPTS.tags=[...new Set(rows.flatMap(e=>e.tags||[]))].sort();
   FDIMS.forEach(d=>{ [...FILT[d]].forEach(v=>{ if(!FOPTS[d].includes(v))FILT[d].delete(v); }); renderMsel(d); });
   updateFilterCount();
@@ -961,7 +976,7 @@ function doImport(){
     askPw(t('import_btn'),async pw=>{
       const r=await api('/api/import',{method:'POST',body:JSON.stringify({pw,b64})});
       const d=await r.json();
-      if(!r.ok){toast(d.error||t('imp_fail'));return;}
+      if(!r.ok){const k='imp_'+(d.error||''); toast(I18N[LANG][k]?t(k):(d.error||t('imp_fail')));return;}
       toast(t('imported_n',d.imported,d.updated)); refreshFilterOptions(); loadSecrets();
     });
   };
@@ -1188,8 +1203,9 @@ async function loadSecrets(){
 }
 // --- kolon modeli ---
 function scBaseCols(){ return [
-  {k:'name',    l:t('th_name'),    cls:'mono', v:e=>e.name, r:e=>`<b>${esc(e.name)}</b>${e.url?` <a href="${esc(e.url)}" target="_blank">↗</a>`:''}`},
+  {k:'name',    l:t('th_name'),    cls:'mono', v:e=>e.name, r:e=>`<b>${esc(e.name)}</b>${e.url?` <a href="${esc(e.url)}" target="_blank">↗</a>`:''}${e.overdue!=null?` <span class="ovd" title="${esc(t('rot_overdue_d',e.overdue))}">⟳ ${t('overdue')}</span>`:''}`},
   {k:'type',    l:t('th_type'),    v:e=>e.type, r:e=>`<span class="type-badge t-${e.type}">${esc(e.type)}</span>`},
+  {k:'collection',l:t('th_collection'),cls:'mut mono',v:e=>e.collection||'',r:e=>e.collection?`<span class="coll">📁 ${esc(e.collection)}</span>`:'<span class="mut">—</span>'},
   {k:'scope',   l:t('th_scope'),   cls:'mut mono', v:e=>DIMS.map(d=>e[d]||'*').join('/'), r:e=>DIMS.map(d=>esc(e[d]||'*')).join(' / ')},
   {k:'tags',    l:t('th_tags'),    v:e=>(e.tags||[]).join(','), r:e=>(e.tags||[]).map(tagChip).join('')},
   {k:'updated', l:t('th_updated'), cls:'mut', v:e=>e.updated||'', r:e=>fmtTs(e.updated)},
@@ -1257,6 +1273,8 @@ function rowMenu(ev,id,name){
   ev.stopPropagation(); closeRowMenu();
   const m=document.createElement('div'); m.className='rowmenu'; m.id='rowmenu';
   m.innerHTML=`<button onclick="closeRowMenu();openEditor('${id}')">✏️ ${t('edit')}</button>
+    <button onclick="closeRowMenu();moveSecret('${id}')">📁 ${t('move_to')}</button>
+    <button onclick="closeRowMenu();copySecret('${id}')">⧉ ${t('copy_to')}</button>
     <button onclick="closeRowMenu();openDeploy('${id}')">${t('deploy_btn')}</button>
     <button class="danger" onclick="closeRowMenu();delSecret('${id}','${esc(name)}')">🗑 ${t('del')}</button>`;
   document.body.appendChild(m);
@@ -1288,6 +1306,41 @@ async function delSecret(id,name){
     if(r.status===403){toast(t('wrong_pw'));return;} toast(t('deleted')); refreshFilterOptions(); loadSecrets(); };
   if((window.CFG&&window.CFG.confirm_ops||[]).includes('delete')) askPw(t('del'),send); else send();
 }
+// collection'a tasi/kopyala: tam kaydi cek (fields degerleriyle), collection'i degistirip PUT/yeni-form
+function _revealFields(e){ const fv={}; Object.entries(e.fields).forEach(([k,f])=>fv[k]=f.value??''); return fv; }
+// --- yeniden kullanilabilir koleksiyon secici: mevcutlardan <select> + '+' ile yeni ad yaz ---
+function collOptions(cur){
+  const all=[...new Set([...(FOPTS.collection||[]), ...(cur?[cur]:[])])].sort();
+  return `<option value="" ${cur?'':'selected'}>${t('coll_none')}</option>`+
+    all.map(c=>`<option value="${esc(c)}" ${c===cur?'selected':''}>${esc(c)}</option>`).join('');
+}
+function collPicker(pfx,cur){
+  return `<div class="collpick">
+    <select id="${pfx}_sel">${collOptions(cur)}</select>
+    <button type="button" class="ghost collnew-btn" title="${t('coll_new')}" onclick="collPickNew('${pfx}')">＋</button>
+    <input id="${pfx}_new" class="hidden" placeholder="${t('coll_new')}"></div>`;
+}
+function collPickNew(pfx){ const i=$('#'+pfx+'_new'),s=$('#'+pfx+'_sel'); i.classList.remove('hidden'); if(s)s.classList.add('hidden'); i.focus(); }
+function collPickVal(pfx){ const i=$('#'+pfx+'_new');
+  if(i && !i.classList.contains('hidden') && i.value.trim()) return i.value.trim().replace(/^\/+|\/+$/g,'');
+  const s=$('#'+pfx+'_sel'); return s?s.value:''; }
+async function moveSecret(id){
+  const e=await (await api('/api/secret/'+id+'?reveal=1&intent=edit')).json();
+  modal('📁 '+t('move_to'),`<div class="field"><label class="fld">${esc(e.name)} — ${t('collection')}</label>
+    ${collPicker('mv',e.collection||'')}<div class="mut" style="font-size:12px;margin-top:6px">${t('coll_pick')}</div></div>`,
+    [{x:t('save'),p:1,f:async()=>{
+      const b={name:e.name,type:e.type,tenant:e.tenant,project:e.project,environment:e.environment,repo:e.repo,
+        url:e.url,notes:e.notes,tags:e.tags||[],fields:_revealFields(e),rotation:e.rotation||{},collection:collPickVal('mv')};
+      await api('/api/secret/'+id,{method:'PUT',body:JSON.stringify(b)}); closeModal(); toast(t('moved')); refreshFilterOptions(); loadSecrets();
+    }},{x:t('cancel'),f:closeModal}]);
+}
+// Duplicate: kaydin bir kopyasini yeni-secret formunda acar (yeni id ile kaydedilir); orijinal degismez
+async function copySecret(id){
+  const e=await (await api('/api/secret/'+id+'?reveal=1&intent=edit')).json();
+  openEditor(null,{type:e.type,tenant:e.tenant,project:e.project,environment:e.environment,repo:e.repo,
+    url:e.url,notes:e.notes,tags:e.tags||[],collection:e.collection||'',rotation:e.rotation||{},
+    name:e.name+'-copy',fields:_revealFields(e)});
+}
 
 async function viewSecret(id){
   const e=await (await api('/api/secret/'+id+'?reveal=1&intent=view')).json();
@@ -1313,7 +1366,7 @@ function copyText(v,name,field){ doCopy(v); fetch('/api/copy',{method:'POST',bod
 function doCopy(v){ navigator.clipboard.writeText(v).then(()=>{ toast(t('copied')); setTimeout(()=>navigator.clipboard.writeText('').catch(()=>{}),CLIP_CLEAR*1000); }).catch(()=>toast(t('copy_fail'))); }
 
 async function openEditor(id, preset){
-  let e={name:'',type:'api_key',tenant:'',project:'',environment:'',repo:'',tags:[],url:'',notes:'',fields:{}};
+  let e={name:'',type:'api_key',tenant:'',project:'',environment:'',repo:'',tags:[],url:'',notes:'',fields:{},collection:'',rotation:{}};
   if(id){ e=await (await api('/api/secret/'+id+'?reveal=1&intent=edit')).json(); const fv={}; Object.entries(e.fields).forEach(([k,f])=>fv[k]=f.value??''); e.fields=fv; }
   else if(preset){ Object.assign(e, preset); }
   const body=`<div class="grid">
@@ -1325,10 +1378,15 @@ async function openEditor(id, preset){
     <div class="field"><label class="fld">${t('frepo')}</label><input id="e_repo" value="${esc(e.repo)}"></div>
     <div class="field full"><label class="fld">${t('url')}</label><input id="e_url" value="${esc(e.url)}" placeholder="https://…"></div>
     <div class="field full"><label class="fld">${t('tags')}</label><input id="e_tags" value="${esc((e.tags||[]).join(', '))}" placeholder="ai, prod"></div>
+    <div class="field full"><label class="fld">${t('collection')}</label>${collPicker('ecol', e.collection||'')}</div>
+    <div class="field"><label class="fld">${t('rotation')} — ${t('rot_days')}</label><input id="e_rotdays" type="number" min="0" value="${esc(String((e.rotation||{}).every_days||''))}" placeholder="0 = ${t('rot_none')}"></div>
+    <div class="field"><label class="fld">${t('rot_mode')}</label><select id="e_rotmode">
+      <option value="generate" ${((e.rotation||{}).mode||'generate')==='generate'?'selected':''}>${t('rot_generate')}</option>
+      <option value="manual" ${(e.rotation||{}).mode==='manual'?'selected':''}>${t('rot_manual')}</option></select></div>
     </div><label class="fld">${t('fields')}</label><div id="e_fields"></div>
     <div class="field"><label class="fld">${t('notes')}</label><textarea id="e_notes">${esc(e.notes)}</textarea></div>`;
   modal(id?t('edit_title'):t('new_secret_title'),body,[{x:t('save'),p:1,f:()=>saveSecret(id)},{x:t('cancel'),f:closeModal}]);
-  window._editFields=e.fields; renderFields();
+  window._editFields=e.fields; window._editRotLast=(e.rotation||{}).last||''; renderFields();
 }
 function renderFields(){
   const type=$('#e_type').value,cont=$('#e_fields'),cur=window._editFields||{};
@@ -1349,9 +1407,12 @@ async function saveSecret(id){
   const type=$('#e_type').value; let fields={};
   if(type==='custom')document.querySelectorAll('#e_fields .kv').forEach(r=>{const k=r.querySelector('.kv-k').value.trim();if(k)fields[k]=r.querySelector('.kv-v').value;});
   else document.querySelectorAll('#e_fields input[data-f]').forEach(i=>fields[i.dataset.f]=i.value);
+  const rd=parseInt($('#e_rotdays').value)||0;
+  const rotation=rd>0?{every_days:rd,mode:$('#e_rotmode').value,last:(window._editRotLast||new Date().toISOString())}:{};
   const b={name:$('#e_name').value.trim(),type,tenant:$('#e_tenant').value.trim(),project:$('#e_project').value.trim(),
     environment:$('#e_environment').value.trim(),repo:$('#e_repo').value.trim(),url:$('#e_url').value.trim(),
-    notes:$('#e_notes').value,tags:$('#e_tags').value.split(',').map(s=>s.trim()).filter(Boolean),fields};
+    notes:$('#e_notes').value,tags:$('#e_tags').value.split(',').map(s=>s.trim()).filter(Boolean),fields,
+    collection:collPickVal('ecol'),rotation};
   if(!b.name){toast(t('name_req'));return;}
   if(id)await api('/api/secret/'+id,{method:'PUT',body:JSON.stringify(b)}); else await api('/api/secrets',{method:'POST',body:JSON.stringify(b)});
   closeModal(); toast(id?t('updated'):t('created')); refreshFilterOptions(); loadSecrets();
@@ -1393,7 +1454,7 @@ Object.assign(FILT,{a_source:new Set(),a_action:new Set(),a_actor:new Set(),a_ke
 Object.assign(FOPTS,{a_source:[],a_action:[],a_actor:[],a_key:[],a_detail:[],st_source:[],st_actor:[],st_type:[],st_project:[]});
 Object.assign(MSEL_LABEL,{a_source:'th_source',a_action:'th_action',a_actor:'th_actor',a_key:'th_key',a_detail:'th_detail',
   st_source:'ch_interface',st_actor:'th_actor',st_type:'type',st_project:'ch_project',
-  type:'type',tags:'tags',tenant:'ften',project:'fproj',environment:'fenv',repo:'frepo'});   // secrets filtre etiketleri
+  type:'type',tags:'tags',collection:'collection',tenant:'ften',project:'fproj',environment:'fenv',repo:'frepo'});   // secrets filtre etiketleri
 MSEL_VLABEL.a_action=actLabel;   // action filtresi tablo/stats ile ayni cevrili etiketleri gosterir
 ['a_source','a_action','a_actor','a_key','a_detail'].forEach(d=>MSEL_ON[d]=()=>{updateAuditFilterCount();APAGE=1;aRender();});
 ['st_source','st_actor','st_type','st_project'].forEach(d=>MSEL_ON[d]=()=>{updateStatsFilterCount();loadStats();});

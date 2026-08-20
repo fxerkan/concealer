@@ -19,3 +19,6 @@ keys/recovery.json
 keys/audit.head
 keys/ratestate.json
 keys/backup.json
+
+*.code-workspace
+.DS_Store
