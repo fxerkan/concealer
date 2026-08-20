@@ -6,9 +6,39 @@
 <title>concealer — local-only secret manager for the AI-coding era</title>
 <meta name="description" content="Local-only, single-file secret manager for the AI-coding era. Encrypted with SOPS + age. No cloud, no telemetry, no account. CLI · Web UI · TUI · MCP.">
 <link rel="icon" href="/concealer/assets/logo.svg">
+<link rel="canonical" href="https://fxerkan.github.io/concealer/">
+<meta name="keywords" content="secret manager, secrets management, SOPS, age encryption, local-first, AI coding, MCP server, env vars, API keys, vault, developer tools, open source">
+<meta name="author" content="FXerkan">
+<meta name="theme-color" content="#0a0b0d">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="concealer">
+<meta property="og:url" content="https://fxerkan.github.io/concealer/">
 <meta property="og:title" content="concealer — secret manager for the AI-coding era">
 <meta property="og:description" content="Local-only, single-file secret manager. Encrypted with SOPS + age. Agents use secrets without ever seeing them.">
-<meta property="og:image" content="/concealer/assets/hero.png">
+<meta property="og:image" content="https://fxerkan.github.io/concealer/assets/hero.png">
+<meta property="og:image:alt" content="concealer — local-only secret manager for the AI-coding era">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="concealer — secret manager for the AI-coding era">
+<meta name="twitter:description" content="Local-only, single-file secret manager. Encrypted with SOPS + age. No cloud, no telemetry, no account.">
+<meta name="twitter:image" content="https://fxerkan.github.io/concealer/assets/hero.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "concealer",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "macOS, Linux",
+  "description": "Local-only, single-file secret manager for the AI-coding era. Encrypted with SOPS + age. No cloud, no telemetry, no account. CLI, Web UI, TUI and an MCP server for AI agents.",
+  "url": "https://fxerkan.github.io/concealer/",
+  "downloadUrl": "https://github.com/fxerkan/concealer",
+  "license": "https://opensource.org/licenses/MIT",
+  "softwareVersion": "latest",
+  "author": { "@type": "Person", "name": "FXerkan", "url": "https://fxerkan.com" },
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "keywords": "secret manager, SOPS, age, local-first, AI coding, MCP, encryption, developer tools"
+}
+</script>
 <style>
 /* ===== theme (mirrors the app's webui palette) ===== */
 :root, html[data-theme="dark"]{
@@ -171,6 +201,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
     <nav>
       <a class="lnk" data-collapse href="/concealer/getting-started" data-i18n="nav_docs">Docs</a>
       <a class="lnk" data-collapse href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener">GitHub</a>
+      <a class="lnk" data-collapse href="mailto:concealer@fxerkan.com?subject=concealer%20support" data-i18n="nav_support">Support</a>
       <button class="lnk" id="installbtn" data-collapse data-i18n="nav_install" style="border:0;background:none;font-family:inherit;cursor:pointer">Install</button>
       <button class="iconbtn" id="lang" title="Language">🌐 <span id="langlbl">EN</span></button>
       <button class="iconbtn" id="theme" title="Theme"><span id="themeico">🌙</span></button>
@@ -296,6 +327,21 @@ cer run --project web --env prod npm run deploy</div>
   </div>
 </div></div>
 
+<!-- ===== SUPPORT ===== -->
+<section id="support">
+  <div class="wrap">
+    <div class="sec-h">
+      <div class="eyebrow" data-i18n="sup_eyebrow">Support</div>
+      <h2 data-i18n="sup_h">Questions, bugs or feedback?</h2>
+      <p data-i18n="sup_p">Reach out directly — we read every message and usually reply within a day.</p>
+    </div>
+    <div class="ctarow">
+      <a class="btn primary" href="mailto:concealer@fxerkan.com?subject=concealer%20support&body=Hi%2C%0A%0A" data-i18n="sup_btn">✉️ Email support</a>
+      <a class="btn ghost" href="https://github.com/fxerkan/concealer/issues/new" target="_blank" rel="noopener" data-i18n="sup_issue">Open a GitHub issue</a>
+    </div>
+  </div>
+</section>
+
 <!-- ===== FOOTER ===== -->
 <footer><div class="wrap">
   <div>
@@ -307,6 +353,7 @@ cer run --project web --env prod npm run deploy</div>
     <a href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener">GitHub</a>
     <a href="https://github.com/fxerkan/concealer/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
     <a href="/concealer/comparison" data-i18n="nav_comparison">Comparison</a>
+    <a href="mailto:concealer@fxerkan.com?subject=concealer%20support" data-i18n="nav_support">Support</a>
   </div>
 </div></footer>
 
@@ -370,7 +417,8 @@ document.getElementById('theme').onclick=()=>setTheme(html.getAttribute('data-th
 
 /* ===== language toggle (EN/TR, persists like the app: concealer_lang) ===== */
 const I18N={
- en:{nav_docs:"Docs",nav_install:"Install",nav_comparison:"Comparison",copy:"Copy",copied:"Copied ✓",
+ en:{nav_docs:"Docs",nav_install:"Install",nav_comparison:"Comparison",nav_support:"Support",copy:"Copy",copied:"Copied ✓",
+  sup_eyebrow:"Support",sup_h:"Questions, bugs or feedback?",sup_p:"Reach out directly — we read every message and usually reply within a day.",sup_btn:"✉️ Email support",sup_issue:"Open a GitHub issue",
   hero_tag:"The local-only secret manager for the AI-coding era.",
   hero_sub:"Encrypted with SOPS + age. No cloud, no telemetry, no account. Your agents <em>use</em> secrets without ever <em>seeing</em> them.",
   pill_local:"🔒 Local-only",pill_ai:"🤖 AI-safe by design",pill_oss:"⭐ Open source (MIT)",
@@ -391,7 +439,8 @@ const I18N={
   cta_h:"Stop pasting keys into chat windows.",cta_p:"Local-only. Portable. Open source. Built for the AI-coding era.",cta_install:"Install now",
   modal_h:"Install concealer",modal_p:"Homebrew pulls in sops, age and expect automatically.",
   modal_alt:"Prefer the manual route? See the <a href=\"/concealer/installation\">Installation guide</a>."},
- tr:{nav_docs:"Dokümanlar",nav_install:"Kurulum",nav_comparison:"Karşılaştırma",copy:"Kopyala",copied:"Kopyalandı ✓",
+ tr:{nav_docs:"Dokümanlar",nav_install:"Kurulum",nav_comparison:"Karşılaştırma",nav_support:"Destek",copy:"Kopyala",copied:"Kopyalandı ✓",
+  sup_eyebrow:"Destek",sup_h:"Soru, hata ya da geri bildirim?",sup_p:"Doğrudan yaz — her mesajı okuyoruz ve genelde bir gün içinde yanıtlıyoruz.",sup_btn:"✉️ E-posta ile destek",sup_issue:"GitHub'da konu aç",
   hero_tag:"Yapay zekâ ile kodlama çağı için yerel, tek dosyalı gizli bilgi yöneticisi.",
   hero_sub:"SOPS + age ile şifreli. Bulut yok, telemetri yok, hesap yok. Ajanların gizli bilgileri <em>görmeden</em> <em>kullanır</em>.",
   pill_local:"🔒 Yalnızca yerel",pill_ai:"🤖 Tasarımca YZ-güvenli",pill_oss:"⭐ Açık kaynak (MIT)",
