@@ -60,19 +60,25 @@ jobs:
             --notes-file RELEASE_NOTES.md \
             --target "${{ github.sha }}"
 
+      # Reconcile the tap formula to the current VERSION. Runs every time (not gated on
+      # the release-exists check) so a stale tap self-heals; commits only if it changed.
+      # Plain curl+sed+git — no third-party action (mislav@v3 returns HTTP 303 on some PATs).
       - name: Bump Homebrew tap formula
-        if: steps.check.outputs.exists == 'false'
-        uses: mislav/bump-homebrew-formula-action@v3
-        with:
-          formula-name: concealer
-          formula-path: Formula/concealer.rb
-          homebrew-tap: fxerkan/homebrew-tap
-          tag-name: ${{ steps.v.outputs.tag }}
-          download-url: https://github.com/fxerkan/concealer/archive/refs/tags/${{ steps.v.outputs.tag }}.tar.gz
-          commit-message: |
-            concealer {{version}}
-
-            Automated by concealer release workflow.
         env:
-          # PAT with `repo` (or fine-grained contents:write) on fxerkan/homebrew-tap.
-          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}   # PAT with contents:write on fxerkan/homebrew-tap
+          TAG: ${{ steps.v.outputs.tag }}
+          VER: ${{ steps.v.outputs.version }}
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "::error::HOMEBREW_TAP_TOKEN secret is not set"; exit 1; }
+          URL="https://github.com/fxerkan/concealer/archive/refs/tags/${TAG}.tar.gz"
+          SHA=$(curl -fsSL "$URL" | shasum -a 256 | cut -d' ' -f1)
+          echo "${SHA:?empty sha256}  $URL"
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/fxerkan/homebrew-tap.git" tap
+          sed -i -E \
+            -e "s#(url \")https://github.com/fxerkan/concealer/archive/refs/tags/v[0-9][0-9.]*\.tar\.gz(\")#\1${URL}\2#" \
+            -e "s#(sha256 \")[0-9a-f]{64}(\")#\1${SHA}\2#" \
+            tap/Formula/concealer.rb
+          cd tap
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "concealer ${VER}" && git push || echo "tap already up to date"
