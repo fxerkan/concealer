@@ -112,8 +112,8 @@ def rate_gate(label, rows):
     hidden = held + max(0, len(rows) - len(capped))
     note = ""
     if hidden:
-        note = ("\n[limit] %d secret gizlendi — agent '%s' (cagri basi <=%d, pencere distinct kotasi %d, kalan %d). "
-                "Sorguyu daralt (project/tag/type) veya pencerenin dolmasini bekle."
+        note = ("\n[limit] %d secret(s) hidden — agent '%s' (per-call <=%d, window distinct quota %d, %d left). "
+                "Narrow the query (project/tag/type) or wait for the window to reset."
                 % (hidden, label, lim["per_call"], lim["window_quota"], max(0, remaining - newn)))
     return allowed, note
 
@@ -172,7 +172,7 @@ def mask(v):
 def load():
     r = subprocess.run(["sops", "-d", "--output-type", "json", FILE],
                        env=_env(), capture_output=True, text=True)
-    if r.returncode: sys.exit(f"cozme hatasi: {r.stderr.strip()}")
+    if r.returncode: sys.exit(f"decrypt error: {r.stderr.strip()}")
     d = json.loads(r.stdout); d.setdefault("secrets", [])
     for e in d["secrets"]: norm(e)
     return d
@@ -182,7 +182,7 @@ def save(d):
            "--filename-override", FILE, "/dev/stdin"]
     if os.path.exists(SOPSCFG): cmd[1:1] = ["--config", SOPSCFG]
     r = subprocess.run(cmd, input=json.dumps(d), env=_env(), capture_output=True, text=True)
-    if r.returncode: sys.exit(f"sifreleme hatasi: {r.stderr.strip()}")
+    if r.returncode: sys.exit(f"encrypt error: {r.stderr.strip()}")
     with open(FILE, "w") as f: f.write(r.stdout)
 
 def norm(e):
@@ -304,15 +304,15 @@ def anchor_push(file=None, webhook=None, syslog=None, persist=False):
         try:
             with open(os.path.expanduser(file), "a") as f: f.write(line + "\n")
             sent.append("file")
-        except OSError as ex: sys.stderr.write(f"anchor file hatasi: {ex}\n")
+        except OSError as ex: sys.stderr.write(f"anchor file error: {ex}\n")
     if syslog:
         try: subprocess.run(["logger", "-t", "concealer-audit", line], check=False); sent.append("syslog")
-        except OSError as ex: sys.stderr.write(f"anchor syslog hatasi: {ex}\n")
+        except OSError as ex: sys.stderr.write(f"anchor syslog error: {ex}\n")
     if webhook:
         try:
             req = urllib.request.Request(webhook, data=line.encode(), headers={"Content-Type": "application/json"})
             urllib.request.urlopen(req, timeout=5); sent.append("webhook")
-        except Exception as ex: sys.stderr.write(f"anchor webhook hatasi: {ex}\n")
+        except Exception as ex: sys.stderr.write(f"anchor webhook error: {ex}\n")
     audit("audit_anchor", key=f"seq={rec['seq']}", source="cli", detail=",".join(sent))
     return rec, sent
 
@@ -622,7 +622,7 @@ def export_bundle(pw):
     try:
         tin.write(plain); tin.close(); os.chmod(tin.name, 0o600)
         rc, err = _age_pw(["-p", "-o", tout, tin.name], pw, confirm=True)
-        if rc: raise RuntimeError(err.strip() or "age sifreleme hatasi")
+        if rc: raise RuntimeError(err.strip() or "age encrypt error")
         return open(tout, "rb").read()
     finally:
         for p in (tin.name, tout):
@@ -635,7 +635,7 @@ def import_bundle(pw, blob):
     try:
         tin.write(blob); tin.close()
         rc, err = _age_pw(["-d", "-o", tout, tin.name], pw)
-        if rc: raise RuntimeError("parola yanlis veya bozuk bundle")
+        if rc: raise RuntimeError("wrong password or corrupt bundle")
         data = json.loads(open(tout, errors="ignore").read())
         d = load(); nn, nu = merge_secrets(d, data.get("secrets", [])); save(d)
         return nn, nu
@@ -665,12 +665,12 @@ def _recipient():
 def _age_enc_pub(data):
     """data'yi age recipient (public key) ile sifrele → ciphertext bytes. Parolasiz; cozmek age private key ister."""
     rcpt = _recipient()
-    if not rcpt: raise RuntimeError("pubkey yok (once init)")
+    if not rcpt: raise RuntimeError("no pubkey (run init first)")
     tin = tempfile.NamedTemporaryFile(delete=False)
     tin.write(data if isinstance(data, bytes) else data.encode()); tin.close(); tout = tin.name + ".age"
     try:
         r = subprocess.run(["age", "-r", rcpt, "-o", tout, tin.name], capture_output=True, text=True)
-        if r.returncode: raise RuntimeError(r.stderr.strip() or "age recipient enc hatasi")
+        if r.returncode: raise RuntimeError(r.stderr.strip() or "age recipient enc error")
         return open(tout, "rb").read()
     finally:
         for p in (tin.name, tout):
@@ -684,7 +684,7 @@ def _age_dec_priv(blob):
     try:
         if key: r = subprocess.run(["age", "-d", "-i", "-", tin.name], input=key, capture_output=True, text=True)
         else:   r = subprocess.run(["age", "-d", "-i", KEY, tin.name], capture_output=True, text=True)
-        if r.returncode: raise RuntimeError(r.stderr.strip() or "age coz hatasi")
+        if r.returncode: raise RuntimeError(r.stderr.strip() or "age decrypt error")
         return r.stdout
     finally:
         try: os.remove(tin.name)
@@ -721,7 +721,7 @@ def _write_cer(pw, dst_dir, keep=7):
 def run_auto_backup():
     """Ayarli klasore bir .cer yaz (sarmali parolayi age key ile cozer). enabled/interval BAKMAZ (manuel/cron)."""
     c = _backup_cfg()
-    if not c.get("dir") or not c.get("pw_wrapped"): raise RuntimeError("oto-yedek ayarli degil (klasor+parola)")
+    if not c.get("dir") or not c.get("pw_wrapped"): raise RuntimeError("auto-backup not configured (folder+password)")
     pw = _age_dec_priv(base64.b64decode(c["pw_wrapped"]))
     path = _write_cer(pw, c["dir"], c.get("keep", 7))
     c["last"] = now_iso(); _save_backup_cfg(c)
@@ -756,9 +756,9 @@ def _age_pw(args, passphrase, confirm=False):
 
 def _ask_new_password():
     while True:
-        p1 = getpass.getpass("Master password belirle: ")
-        if not p1: print("bos olamaz."); continue
-        if p1 != getpass.getpass("Tekrar gir: "): print("eslesmedi, tekrar."); continue
+        p1 = getpass.getpass("Set master password: ")
+        if not p1: print("cannot be empty."); continue
+        if p1 != getpass.getpass("Repeat: "): print("did not match, try again."); continue
         return p1
 
 _SN, _SR, _SP = 16384, 8, 1
@@ -799,7 +799,7 @@ def _age_unwrap(blob, pw):
     try:
         tin.write(blob); tin.close()
         rc, err = _age_pw(["-d", "-o", tout, tin.name], pw)
-        if rc: raise RuntimeError("kod yanlis veya bozuk")
+        if rc: raise RuntimeError("wrong or corrupt code")
         return open(tout, "rb").read()
     finally:
         for p in (tin.name, tout):
@@ -829,11 +829,11 @@ def consume_recovery(i):
 def _print_codes(codes):
     bar = "=" * 58
     print("\n" + bar)
-    print("  RECOVERY KODLARI — BU EKRAN BIR KEZ GOSTERILIR")
-    print("  Bunlari BASKA bir yere kaydet (parola yoneticisi/kasa/kagit).")
-    print("  Diskte DUZ METIN saklanmaz; buradan kopyalamazsan geri gelmez.")
-    print("   - master password'u UNUTURSAN:      concealer recover")
-    print("   - master password'u DEGISTIRMEK icin de bir kod gerekir (passwd)")
+    print("  RECOVERY CODES — THIS SCREEN IS SHOWN ONCE")
+    print("  Save these SOMEWHERE ELSE (password manager/vault/paper).")
+    print("  Not stored in PLAINTEXT on disk; if you do not copy them now they are gone.")
+    print("   - if you FORGET the master password:  concealer recover")
+    print("   - CHANGING the master password also needs a code (passwd)")
     print(bar)
     for i, c in enumerate(codes, 1): print(f"   {i}.  {c}")
     print(bar + "\n")
@@ -851,7 +851,7 @@ def _age_enc_bytes(data, pw):
     tout = tin.name + ".age"
     try:
         rc, err = _age_pw(["-p", "-o", tout, tin.name], pw, confirm=True)
-        if rc: raise RuntimeError(err.strip() or "age enc hatasi")
+        if rc: raise RuntimeError(err.strip() or "age enc error")
         return open(tout, "rb").read()
     finally:
         for p in (tin.name, tout):
@@ -877,7 +877,7 @@ def _write_backup(keytext, pw):
     try:
         if os.path.exists(tmp): os.remove(tmp)
         rc, err = _age_pw(["-p", "-o", tmp, tk.name], pw, confirm=True)
-        if rc: raise RuntimeError(err.strip() or "yedek olusturulamadi")
+        if rc: raise RuntimeError(err.strip() or "backup could not be created")
         os.replace(tmp, BACKUP)
     finally:
         try: os.remove(tk.name)
@@ -949,13 +949,13 @@ def _unlock_key():
     if tok:
         k = resolve_token(tok)
         if k: _KEY_CACHE = k; return k
-        sys.exit("CONCEALER_TOKEN gecersiz/suresi dolmus/iptal. Yeni token: concealer unlock")
+        sys.exit("CONCEALER_TOKEN invalid/expired/revoked. New token: concealer unlock")
     if os.path.exists(KEY): return None   # eski (hardened degil) vault: sops dosyadan okur
     if sys.stdin.isatty():                # etkilesimli: master pw ile ac (tek process icin cache'le)
         k = key_from_master(getpass.getpass("Master password (unlock): "))
-        if not k: sys.exit("parola yanlis.")
+        if not k: sys.exit("wrong password.")
         _KEY_CACHE = k; return k
-    sys.exit("kilitli: CONCEALER_TOKEN yok. Insan: 'concealer unlock', ajan: 'concealer agent register <ad>'.")
+    sys.exit("locked: no CONCEALER_TOKEN. Human: 'concealer unlock', agent: 'concealer agent register <name>'.")
 
 def detect(dim):
     if dim in ("repo", "project"):
@@ -978,22 +978,22 @@ def _banner():
 
 def init(force=False):
     if os.path.exists(KEY) and not force:
-        sys.exit(f"zaten kurulu: {KEY}\nyeniden kurmak icin: concealer init --force")
+        sys.exit(f"already set up: {KEY}\nto reinstall: concealer init --force")
     _banner()
-    print(_c("Kasa kuruluyor…", "1") + f"  ({HOME})\n")
-    print(_c("Adim 1/2", "38;5;214;1") + " — bir master password belirle (kasayi bu acar; kaybolursa recovery kodu gerekir).")
+    print(_c("Setting up vault…", "1") + f"  ({HOME})\n")
+    print(_c("Step 1/2", "38;5;214;1") + " — set a master password (this opens the vault; if lost you need a recovery code).")
     os.makedirs(os.path.dirname(KEY), exist_ok=True)
     for f in (KEY, PUBKEY, BACKUP, MASTER):
         if os.path.exists(f): os.remove(f)
     r = subprocess.run(["age-keygen", "-o", KEY], capture_output=True, text=True)
-    if r.returncode: sys.exit(f"age-keygen hatasi: {r.stderr.strip()}")
+    if r.returncode: sys.exit(f"age-keygen error: {r.stderr.strip()}")
     os.chmod(KEY, 0o600)
     pub = next(w for w in (r.stderr + r.stdout).split() if w.startswith("age1"))
     with open(PUBKEY, "w") as f: f.write(pub + "\n")
     keytext = open(KEY).read()
     pw = _ask_new_password()
     rc, err = _age_pw(["-p", "-o", BACKUP, KEY], pw, confirm=True)
-    if rc: sys.exit(f"parolali yedek olusturulamadi: {err.strip()}")
+    if rc: sys.exit(f"password-protected backup could not be created: {err.strip()}")
     write_master(pw); _audit_key()
     for f in (RECOVERY, AUDITHEAD, AGENTS):   # force yeniden-kurulumda eski kalintiyi temizle
         if os.path.exists(f): os.remove(f)
@@ -1003,55 +1003,55 @@ def init(force=False):
     save({"secrets": []}); audit("init", source="cli")
     with open(os.path.join(HOME, ".gitignore"), "w") as f:
         f.write("keys/age-key.txt\nkeys/audit.key\nkeys/audit.head\nkeys/recovery.json\nkeys/agents.json\nkeys/ratestate.json\nkeys/backup.json\n")
-    print("\n" + _c("Adim 2/2", "38;5;214;1") + " — kurtarma kodlarini kaydet (asagida, YALNIZ bir kez gosterilir).")
+    print("\n" + _c("Step 2/2", "38;5;214;1") + " — save the recovery codes (below, shown ONLY once).")
     _print_codes(codes)
     # key-at-rest: age private key'i diskten kaldir (yalniz sifreli BACKUP kalir).
     os.remove(KEY); audit("harden", source="cli")
     tok = mint_token(keytext, "cli", "cli", ttl=TOKEN_TTL)
-    print("\n" + _c("✓ Kuruldu.", "38;5;40;1") + f"  KEY-AT-REST acik — age private key artik diskte duz metin DEGIL.")
+    print("\n" + _c("✓ Done.", "38;5;40;1") + f"  KEY-AT-REST on — the age private key is no longer plaintext on disk.")
     print(f"  public key: {pub}\n")
-    print(_c("Sonraki adimlar:", "1"))
-    print("  1) CLI token'ini shell'ine ekle (~%dh gecerli, yenile: eval \"$(concealer unlock)\"):" % (TOKEN_TTL // 3600))
+    print(_c("Next steps:", "1"))
+    print("  1) Add the CLI token to your shell (~%dh valid, refresh: eval \"$(concealer unlock)\"):" % (TOKEN_TTL // 3600))
     print("     " + _c(f"export CONCEALER_TOKEN={tok}", "38;5;214"))
-    print("  2) Web arayuzu (master password ile acilir):   " + _c("concealer web", "38;5;214"))
-    print("  3) Ilk secret'i ekle:   " + _c('concealer set --name GITHUB_TOKEN --project myapp ghp_...', "38;5;214"))
-    print("  4) AI agent'a erisim ver (MCP):   " + _c("concealer agent register <ad>", "38;5;214"))
-    print("  5) Otomatik yedek kur:   " + _c("concealer backup --dir <klasor>", "38;5;214") + "  (ayrinti: web → Settings)")
+    print("  2) Web UI (opens with the master password):   " + _c("concealer web", "38;5;214"))
+    print("  3) Add your first secret:   " + _c('concealer set --name GITHUB_TOKEN --project myapp ghp_...', "38;5;214"))
+    print("  4) Grant an AI agent access (MCP):   " + _c("concealer agent register <name>", "38;5;214"))
+    print("  5) Set up automatic backups:   " + _c("concealer backup --dir <folder>", "38;5;214") + "  (details: web → Settings)")
 
 def passwd():
-    if not os.path.exists(BACKUP): sys.exit("once 'concealer init' calistir.")
+    if not os.path.exists(BACKUP): sys.exit("run 'concealer init' first.")
     # 1. faktor: mevcut master password (decrypt ile hem dogrula hem key'i al).
-    keytext = key_from_master(getpass.getpass("Mevcut master password: "))
-    if not keytext: sys.exit("mevcut parola yanlis.")
+    keytext = key_from_master(getpass.getpass("Current master password: "))
+    if not keytext: sys.exit("current password is wrong.")
     # 2. faktor: gecerli bir recovery kodu (tuketilir) — master pw tek basina devralmasin.
     d = _recovery_data()
     if not d or not d["codes"]:
-        sys.exit("recovery kodu gerekli ama kalmadi/yok.\n"
-                 "  once yeni set uret:  concealer recovery   (master password ister)")
-    i = recovery_index(getpass.getpass("Recovery kodu (2. faktor): "))
-    if i is None: sys.exit("gecersiz recovery kodu.")
+        sys.exit("a recovery code is required but none are left/available.\n"
+                 "  first generate a new set:  concealer recovery   (asks for the master password)")
+    i = recovery_index(getpass.getpass("Recovery code (2nd factor): "))
+    if i is None: sys.exit("invalid recovery code.")
     pw = _ask_new_password()
     _write_backup(keytext, pw); write_master(pw); consume_recovery(i); audit("passwd", source="cli")
     left = len(_recovery_data()["codes"])
-    print(f"master password guncellendi. kalan recovery kodu: {left}"
+    print(f"master password updated. recovery codes left: {left}"
           + ("\n  UYARI: kod kalmadi → 'concealer recovery' ile yenile." if left == 0 else ""))
 
 def recover():
     """Master password unutuldu: recovery kodu ile age key'i coz + yeni parola ata."""
-    if not os.path.exists(RECOVERY): sys.exit("recovery.json yok; bu vault recovery kodu ile kurulmamis.")
-    code = getpass.getpass("Recovery kodu: ")
+    if not os.path.exists(RECOVERY): sys.exit("no recovery.json; this vault was not set up with recovery codes.")
+    code = getpass.getpass("Recovery code: ")
     i = recovery_index(code)
-    if i is None: sys.exit("gecersiz recovery kodu.")
+    if i is None: sys.exit("invalid recovery code.")
     blob = base64.b64decode(_recovery_data()["codes"][i]["blob"])
     try: keytext = _age_unwrap(blob, code.strip()).decode()
-    except Exception as ex: sys.exit(f"cozme hatasi: {ex}")
+    except Exception as ex: sys.exit(f"decrypt error: {ex}")
     if os.path.exists(KEY):                       # eski vault: kayip key dosyasini geri yaz
         with open(KEY, "w") as f: f.write(keytext)
         os.chmod(KEY, 0o600)
     pw = _ask_new_password()
     _write_backup(keytext, pw); write_master(pw); consume_recovery(i); audit("recover", source="cli")
     left = len(_recovery_data()["codes"])
-    print(f"kurtarildi; yeni master password ayarlandi. kalan recovery kodu: {left}"
+    print(f"recovered; new master password set. recovery codes left: {left}"
           + ("\n  UYARI: kod kalmadi → 'concealer recovery' ile yenile." if left == 0 else ""))
     if not os.path.exists(KEY):
         global _KEY_CACHE; _KEY_CACHE = keytext
@@ -1059,49 +1059,49 @@ def recover():
 
 def recovery_regen():
     """Yeni recovery kod seti uret (eskiler gecersiz olur). Master password ister."""
-    if not os.path.exists(BACKUP): sys.exit("once 'concealer init' calistir.")
+    if not os.path.exists(BACKUP): sys.exit("run 'concealer init' first.")
     keytext = key_from_master(getpass.getpass("Master password: "))
-    if not keytext: sys.exit("parola yanlis.")
+    if not keytext: sys.exit("wrong password.")
     codes = _gen_codes(); write_recovery(codes, keytext); audit("recovery_regen", source="cli")
     _print_codes(codes)
 
 def unlock():
     """Insan: master pw ile TTL'li CLI token uret. stdout=SADECE export satiri (eval icin)."""
-    if not os.path.exists(BACKUP): sys.exit("once 'concealer init' calistir.")
+    if not os.path.exists(BACKUP): sys.exit("run 'concealer init' first.")
     keytext = key_from_master(getpass.getpass("Master password: "))
-    if not keytext: sys.exit("parola yanlis.")
+    if not keytext: sys.exit("wrong password.")
     tok = mint_token(keytext, "cli", "cli", ttl=TOKEN_TTL); audit("unlock", source="cli")
-    sys.stderr.write(f"CLI token uretildi (~{TOKEN_TTL // 3600}h). Calistir:  eval \"$(concealer unlock)\"\n")
+    sys.stderr.write(f"CLI token generated (~{TOKEN_TTL // 3600}h). Run:  eval \"$(concealer unlock)\"\n")
     print(f"export CONCEALER_TOKEN={tok}")
 
 def agent_cmd(a):
     """Ajan token'lari: register/list/revoke. Ajan bir kez kaydolur, bir daha parola sormaz."""
     sub = a[0] if a else "list"
     if sub == "register":
-        if len(a) < 2: sys.exit("kullanim: concealer agent register <ad>")
+        if len(a) < 2: sys.exit("usage: concealer agent register <name>")
         keytext = key_from_master(getpass.getpass("Master password: "))
-        if not keytext: sys.exit("parola yanlis.")
+        if not keytext: sys.exit("wrong password.")
         tok = mint_token(keytext, a[1], "agent", ttl=None); audit("agent_register", key=a[1], source="cli")
-        print(f"agent '{a[1]}' kaydedildi (suresiz, iptal edilebilir token).")
-        print("MCP sunucu env'ine (or. .mcp.json / claude config) ekle:")
+        print(f"agent '{a[1]}' registered (long-lived, revocable token).")
+        print("Add to the MCP server env (e.g. .mcp.json / claude config):")
         print(f'  "env": {{ "CONCEALER_TOKEN": "{tok}" }}')
-        print(f"  (iptal: concealer agent revoke {a[1]})")
+        print(f"  (revoke: concealer agent revoke {a[1]})")
     elif sub == "revoke":
-        if len(a) < 2: sys.exit("kullanim: concealer agent revoke <ad|all>")
-        n = revoke_token(a[1]); audit("agent_revoke", key=a[1], source="cli"); print(f"iptal edilen token: {n}")
+        if len(a) < 2: sys.exit("usage: concealer agent revoke <name|all>")
+        n = revoke_token(a[1]); audit("agent_revoke", key=a[1], source="cli"); print(f"revoked tokens: {n}")
     else:
         d = _agents_data()
-        if not d or not d["tokens"]: print("token yok."); return
+        if not d or not d["tokens"]: print("no tokens."); return
         for t in d["tokens"]:
             st = "revoked" if t["revoked"] else (("expires " + t["expires"]) if t["expires"] else "suresiz")
             print(f"  {t['label']:16} {t['source']:6} {st:30} created {t['created']}")
 
 def harden():
     """Eski (duz metin key'li) vault'u key-at-rest'e gecir: age-key.txt'i kaldir, CLI token uret."""
-    if not os.path.exists(BACKUP): sys.exit("once 'concealer init' calistir.")
-    if not os.path.exists(KEY): print("zaten hardened (diskte duz metin key yok)."); return
+    if not os.path.exists(BACKUP): sys.exit("run 'concealer init' first.")
+    if not os.path.exists(KEY): print("already hardened (no plaintext key on disk)."); return
     keytext = key_from_master(getpass.getpass("Master password: "))
-    if not keytext: sys.exit("parola yanlis.")
+    if not keytext: sys.exit("wrong password.")
     os.remove(KEY); audit("harden", source="cli")
     gi = os.path.join(HOME, ".gitignore")           # eski init agents.json satirini yazmamis olabilir
     try:
@@ -1111,8 +1111,8 @@ def harden():
             with open(gi, "a") as f: f.write("\n".join(miss) + "\n")
     except OSError: pass
     tok = mint_token(keytext, "cli", "cli", ttl=TOKEN_TTL)
-    print("hardened: age private key diskten kaldirildi (yalniz sifreli yedek kaldi).")
-    print(f"  export CONCEALER_TOKEN={tok}   (~{TOKEN_TTL // 3600}h; ajan: concealer agent register <ad>)")
+    print("hardened: the age private key was removed from disk (only the encrypted backup remains).")
+    print(f"  export CONCEALER_TOKEN={tok}   (~{TOKEN_TTL // 3600}h; agent: concealer agent register <name>)")
 
 # ---------------- injection ----------------
 def collect_secrets(target, d=None):
@@ -1176,7 +1176,7 @@ def _render_target(kv, stem, target):
                          for k, v in kv.items())
     if target == "github":
         return "\n".join(f"gh secret set {k} --body {shlex.quote(v)}" for k, v in kv.items())
-    return "bilinmeyen hedef"
+    return "unknown target"
 
 def redact(text, d):
     for e in secs(d):
@@ -1501,7 +1501,7 @@ def _tui_main(scr, data):
             ("m", L("Secrets panel: reveal / hide ALL fields of the record")),
             ("c  u  w", L("copy value · username · url  (clipboard clears in 45s)")),
             ("a  e  d  r", L("add · edit · delete · rotate (random)")),
-            ("M  C", L("move to collection · copy to collection")),
+            ("M  C", L("move to collection · duplicate (copy)")),
             ("", ""),
             ("R  Ctrl-L", L("reload vault   ·   force redraw")),
             ("L", L("toggle language (TR / EN)")),
@@ -1628,29 +1628,42 @@ def _tui_main(scr, data):
         save(st["d"]); audit("rotate", key=e["name"], source="tui")
         reload_(L("rotated: %s", e["name"]))
 
-    def move_flow():   # collection'a tasi (bos = kokten cikar; yeni yol yazinca collection olusur)
+    def pick_collection(cur=""):
+        # web picker'in TUI karsiligi: mevcut koleksiyonlar + '(none)' + 'new…'. Doner: str yol, ya da None (iptal).
+        colls = sorted({e.get("collection", "") for e in secs(st["d"]) if e.get("collection")})
+        opts = [L("(none)")] + colls + [L("+ new collection…")]
+        start = colls.index(cur) + 1 if cur in colls else 0
+        idx = pick(L("Collection"), opts, start)
+        if idx is None: return None                       # iptal
+        if idx == 0: return ""                            # (none)
+        if idx == len(opts) - 1:                          # yeni yaz
+            nv = prompt(L("new collection"), cur)
+            return None if nv is None else nv.strip().strip("/")
+        return opts[idx]                                  # mevcut secildi
+
+    def move_flow():   # collection'a tasi (mevcuttan sec ya da yeni yaz; bos = kokten cikar)
         e = cur()
         if not e: return
-        nv = prompt(L("Move to collection  (blank = none)"), e.get("collection", ""))
+        nv = pick_collection(e.get("collection", ""))
         if nv is None: st["msg"] = L("move cancelled"); return
-        tgt = by_id(st["d"], e["id"]); tgt["collection"] = nv.strip().strip("/"); tgt["updated"] = now_iso()
+        tgt = by_id(st["d"], e["id"]); tgt["collection"] = nv; tgt["updated"] = now_iso()
         save(st["d"]); audit("update", key=e["name"], source="tui", detail=f"collection={tgt['collection'] or '-'}")
         reload_(L("moved: %s", e["name"]))
 
-    def copy_flow():   # kaydi kopyala (yeni id + istege bagli yeni ad + hedef collection)
+    def copy_flow():   # duplicate: kaydin kopyasi (yeni id + yeni ad + hedef collection)
         e = cur()
         if not e: return
-        nn = prompt(L("Copy — new name"), e["name"] + "_copy")
-        if not nn: st["msg"] = L("copy cancelled"); return
-        nc = prompt(L("Copy — into collection  (blank = none)"), e.get("collection", ""))
-        if nc is None: st["msg"] = L("copy cancelled"); return
+        nn = prompt(L("Duplicate — new name"), e["name"] + "-copy")
+        if not nn: st["msg"] = L("duplicate cancelled"); return
+        nc = pick_collection(e.get("collection", ""))
+        if nc is None: st["msg"] = L("duplicate cancelled"); return
         src = by_id(st["d"], e["id"])
         ne = norm({k: (list(v) if isinstance(v, list) else dict(v) if isinstance(v, dict) else v)
                    for k, v in src.items() if k != "id"})
-        ne["name"] = nn; ne["collection"] = nc.strip().strip("/"); ne["created"] = ne["updated"] = now_iso()
+        ne["name"] = nn; ne["collection"] = nc; ne["created"] = ne["updated"] = now_iso()
         secs(st["d"]).append(ne); save(st["d"])
-        audit("create", key=nn, source="tui", detail=f"cp collection={ne['collection'] or '-'}")
-        reload_(L("copied: %s", nn))
+        audit("create", key=nn, source="tui", detail=f"duplicate collection={ne['collection'] or '-'}")
+        reload_(L("duplicated: %s", nn))
 
     # ---- ekran cizimi ----
     def draw():
@@ -2045,9 +2058,9 @@ def _preflight():
     missing = sorted({_DEPS[b] for b in _DEPS if not shutil.which(b)})
     if not missing: return
     hint = ("brew install " + " ".join(missing)) if shutil.which("brew") else \
-           ("apt/dnf ile kur: " + ", ".join(missing))
-    sys.exit(f"eksik bagimlilik: {', '.join(missing)}\nkur: {hint}\n"
-             "(homebrew ile 'brew install fxerkan/tap/concealer' hepsini birlikte kurar)")
+           ("install with apt/dnf: " + ", ".join(missing))
+    sys.exit(f"missing dependency: {', '.join(missing)}\ninstall: {hint}\n"
+             "(with homebrew, 'brew install fxerkan/tap/concealer' installs everything together)")
 
 def cli(argv):
     cmd = argv[0] if argv else "help"; a = argv[1:]
@@ -2067,7 +2080,7 @@ def cli(argv):
         d = _flag(a, "--dir")
         if d: c = _backup_cfg(); c["dir"] = d; _save_backup_cfg(c)
         try: path = run_auto_backup()
-        except Exception as ex: sys.exit(f"backup hatasi: {ex}")
+        except Exception as ex: sys.exit(f"backup error: {ex}")
         return print(f"backup: {path}")
     if cmd == "tui": return tui()
     if cmd == "list":
@@ -2097,21 +2110,21 @@ def cli(argv):
             file = _flag(aa, "--file"); webhook = _flag(aa, "--webhook")
             syslog = True if "--syslog" in aa else None
             rec, sent = anchor_push(file=file, webhook=webhook, syslog=syslog, persist=persist)
-            if not rec: return print("audit henuz bos — anchor yok.")
-            print(f"anchor: seq={rec['seq']} hash={rec['hash'][:16]}…  gonderildi: {','.join(sent) or '(hedef yok)'}")
-            if not sent: print("  ipucu: hedef ver → concealer audit anchor --file ~/anchors.log [--syslog] [--webhook URL]")
+            if not rec: return print("audit log is still empty — no anchor.")
+            print(f"anchor: seq={rec['seq']} hash={rec['hash'][:16]}…  sent: {','.join(sent) or '(no target)'}")
+            if not sent: print("  hint: give a target → concealer audit anchor --file ~/anchors.log [--syslog] [--webhook URL]")
             return
         for r in audit_rows()[-40:]:
             who = f"[{r['actor']}] " if r.get("actor") else ""
             print(f"{r['ts']:20} {r['source']:6} {r['action']:10} {r['key']:24} {who}{r.get('detail','')}")
     elif cmd == "get":
         hits = filt(load(), _sel(a))
-        if len(hits) != 1: sys.exit(f"{len(hits)} kayit eslesti, tekillestir.")
+        if len(hits) != 1: sys.exit(f"{len(hits)} records matched, narrow it down.")
         e = hits[0]; actor = _cli_actor()
         allowed, note = rate_gate(actor, [e])   # deger okuma da distinct-isim kotasina sayilir (get-donguleri engellenir)
         if not allowed:
             audit("get_denied", key=e["name"], source="cli", detail=label(e), actor=actor)
-            sys.exit(note.lstrip("\n") or "limit: erisim kotasi doldu.")
+            sys.exit(note.lstrip("\n") or "limit: access quota exhausted.")
         audit("get", key=e["name"], source="cli", detail=label(e), actor=actor)
         if e["type"] == "api_key": print(e["fields"].get("value", ""))
         else:
@@ -2123,9 +2136,9 @@ def cli(argv):
         rot = None
         if rdays is not None:
             try: rot = {"every_days": max(0, int(rdays)), "mode": rmode or "generate", "last": now_iso()}
-            except ValueError: sys.exit("--rotate-days sayi olmali")
-        if "name" not in sel: sys.exit("--name gerekli")
-        if not a: sys.exit("deger gerekli (api_key icin) veya field=val ciftleri")
+            except ValueError: sys.exit("--rotate-days must be a number")
+        if "name" not in sel: sys.exit("--name required")
+        if not a: sys.exit("value required (for api_key) or field=val pairs")
         d = load(); ident = {dim: sel.get(dim, "") for dim in DIMS}; ident["name"] = sel["name"]
         hit = next((e for e in secs(d) if matches(e, ident)), None)
         fields = {}
@@ -2135,7 +2148,7 @@ def cli(argv):
         else:
             fields = {"value": a[0]}
         fields, bad = _clean_fields(fields)   # adi secret-benzeri (kacak) alanlari reddet
-        if bad: sys.exit("gecersiz alan adi (bir secret degeri gibi gorunuyor): " + ", ".join(mask(b) for b in bad))
+        if bad: sys.exit("invalid field name (looks like a secret value): " + ", ".join(mask(b) for b in bad))
         if hit:
             hit["fields"].update(fields); hit["updated"] = now_iso()
             if tags is not None: hit["tags"] = [t for t in tags.split(",") if t]
@@ -2162,13 +2175,13 @@ def cli(argv):
                         e["fields"]["value"] = _secrets.token_urlsafe(32)
                         e["rotation"]["last"] = e["updated"] = now_iso()
                         audit("rotate", key=e["name"], source="cli", detail="auto")
-                    did += 1; print(f"{'[dry] ' if dry else ''}rotate: {e['name']} @ {label(e)} ({over}g gecikmis)")
+                    did += 1; print(f"{'[dry] ' if dry else ''}rotate: {e['name']} @ {label(e)} ({over}d overdue)")
                 else:   # manual ya da 'value' alani yok (cok-alanli kimlik) → deger kirmadan uyar
-                    flagged += 1; print(f"UYAR: {e['name']} @ {label(e)} ({over}g gecikmis) — elle dondur ({mode})")
+                    flagged += 1; print(f"WARN: {e['name']} @ {label(e)} ({over}d overdue) — rotate manually ({mode})")
             if did and not dry: save(d)
-            return print(f"\n{did} dondurudu, {flagged} elle-dondurme bekliyor." + (" (dry-run: yazilmadi)" if dry else ""))
+            return print(f"\n{did} rotated, {flagged} awaiting manual rotation." + (" (dry-run: nothing written)" if dry else ""))
         d = load(); hits = [e for e in secs(d) if matches(e, _sel(list(a)))]
-        if len(hits) != 1: sys.exit(f"{len(hits)} kayit eslesti, tekillestir.")
+        if len(hits) != 1: sys.exit(f"{len(hits)} records matched, narrow it down.")
         val = a[0] if a and not a[0].startswith("--") else _secrets.token_urlsafe(32)
         hits[0]["fields"]["value"] = val; hits[0]["updated"] = now_iso()
         if hits[0].get("rotation", {}).get("every_days"): hits[0]["rotation"]["last"] = hits[0]["updated"]  # saati sifirla
@@ -2176,15 +2189,15 @@ def cli(argv):
         audit("rotate", key=hits[0]["name"], source="cli"); print(f"rotate: {hits[0]['name']} -> {mask(val)}")
     elif cmd == "rm":
         d = load(); hits = [e for e in secs(d) if matches(e, _sel(a))]
-        if len(hits) != 1: sys.exit(f"{len(hits)} kayit eslesti, tekillestir.")
+        if len(hits) != 1: sys.exit(f"{len(hits)} records matched, narrow it down.")
         secs(d).remove(hits[0]); save(d)
         audit("delete", key=hits[0]["name"], source="cli"); print(f"rm: {hits[0]['name']}")
     elif cmd in ("mv", "cp"):   # collection'a tasi (mv: alani guncelle) / kopyala (cp: klon + yeni id)
         to = _flag(a, "--to-collection"); newname = _flag(a, "--as")
-        if to is None: sys.exit("--to-collection gerekli")
+        if to is None: sys.exit("--to-collection required")
         to = to.strip().strip("/")
         d = load(); hits = [e for e in secs(d) if matches(e, _sel(list(a)))]
-        if len(hits) != 1: sys.exit(f"{len(hits)} kayit eslesti, tekillestir.")
+        if len(hits) != 1: sys.exit(f"{len(hits)} records matched, narrow it down.")
         e = hits[0]
         if cmd == "mv":
             e["collection"] = to; e["updated"] = now_iso(); save(d)
@@ -2207,7 +2220,7 @@ def cli(argv):
         os.execvpe(a[0], a, env)
     elif cmd == "leaks":
         gs = leak_scan(); audit("leak_scan", source="cli")
-        if not gs: print("paylasilan (yeniden kullanilan) secret degeri yok."); return
+        if not gs: print("no shared (reused) secret values."); return
         for g in gs:
             print(f"[{g['severity']:4}] score {g['score']:3}  x{g['count']}  {g['mask']:14}  "
                   f"projects={','.join(g['projects']) or '-'}  envs={','.join(g['envs']) or '-'}")
@@ -2215,44 +2228,44 @@ def cli(argv):
     elif cmd == "history":
         purge = "--purge" in a
         hits = history_scan(); audit("history_scan", key=f"{len(hits)} hits", source="cli")
-        if not hits: print("shell history icinde secret bulunamadi."); return
+        if not hits: print("no secrets found in shell history."); return
         for h in hits:
             print(f"[{h['severity']:4}] {h['file']}:{h['line']:<5} {h['mask']:14} ({','.join(h['reasons'])})")
             print(f"        {h['cmd']}")
         if purge:
             n = history_purge(hits); audit("history_purge", key=f"{n} lines", source="cli")
-            print(f"\nhistory temizlendi: {n} satir silindi (yedek: *.concealer.bak)")
-            print("not: acik shell oturumlari bellekteki history'yi geri yazabilir — 'history -c' calistir.")
+            print(f"\nhistory cleaned: {n} lines deleted (backup: *.concealer.bak)")
+            print("note: open shell sessions may rewrite the in-memory history — run 'history -c'.")
         else:
-            print(f"\n{len(hits)} bulgu. history'den silmek icin: concealer history --purge")
+            print(f"\n{len(hits)} findings. to delete from history: concealer history --purge")
     elif cmd == "scan":
         if not a or a[0].startswith("--"):
-            sys.exit("kullanim: concealer scan <klasor> [--import] [--history] [--project P --env E ..]")
+            sys.exit("usage: concealer scan <folder> [--import] [--history] [--project P --env E ..]")
         root = a.pop(0)
         do_import = "--import" in a; history = "--history" in a
         a = [x for x in a if x not in ("--import", "--history")]
         sel = _sel(a); cands = scan_folder(root, history)
-        if not cands: print("aday secret bulunamadi."); return
-        print(f"{len(cands)} aday:")
+        if not cands: print("no candidate secrets found."); return
+        print(f"{len(cands)} candidates:")
         for c in cands: print(f"  {c['name']:28} {c['mask']:14} <- {c['source']}")
-        if not do_import: print("\n(kuru calisma) iceri aktarmak icin --import ekle"); return
+        if not do_import: print("\n(dry run) add --import to import them"); return
         d = load(); scope = {dim: sel.get(dim, "") for dim in DIMS}
         if not scope["project"]: scope["project"] = os.path.basename(os.path.abspath(os.path.expanduser(root)))
         n_new, n_skip = _import_cands(d, cands, scope); save(d)
         audit("scan_import", key=f"{n_new} secrets", source="scan", detail=root)
-        print(f"\niceri aktarildi: {n_new}, atlandi (mevcut): {n_skip}  @ {label(scope)}")
+        print(f"\nimported: {n_new}, skipped (existing): {n_skip}  @ {label(scope)}")
     elif cmd == "export":
         out = a[0] if a and not a[0].startswith("--") else f"concealer-export-{now_iso()[:10]}.age"
-        pw = getpass.getpass("Master password (bundle şifreleme): ")
-        if not verify_master(pw): sys.exit("parola yanlış.")
+        pw = getpass.getpass("Master password (bundle encryption): ")
+        if not verify_master(pw): sys.exit("wrong password.")
         blob = export_bundle(pw); open(out, "wb").write(blob)
         audit("export", source="cli", detail=out); print(f"export: {out} ({len(blob)} bytes)")
     elif cmd == "import":
-        if not a: sys.exit("kullanım: concealer import <bundle.age>")
-        pw = getpass.getpass("Bundle parolası: ")
+        if not a: sys.exit("usage: concealer import <bundle.age>")
+        pw = getpass.getpass("Bundle password: ")
         try: nn, nu = import_bundle(pw, open(a[0], "rb").read())
-        except Exception as ex: sys.exit(f"import hatası: {ex}")
-        audit("import", source="cli", detail=a[0]); print(f"import: +{nn} yeni, ~{nu} güncellendi")
+        except Exception as ex: sys.exit(f"import error: {ex}")
+        audit("import", source="cli", detail=a[0]); print(f"import: +{nn} new, ~{nu} updated")
     elif cmd == "config":
         if not a:
             for k, v in CFG.items(): print(f"{k} = {v}")
@@ -2266,7 +2279,7 @@ def cli(argv):
         scope = _sel(a); scope.pop("name", None); scope.pop("type", None)
         out = deploy_render(scope, target)
         audit("deploy", source="cli", detail=f"{target} {label(scope)}")
-        print(out or "(eşleşme yok)")
+        print(out or "(no match)")
     elif cmd == "web": serve_web(int(a[0]) if a else 8787)
     elif cmd == "mcp": mcp_stdio()
     else:
@@ -2334,7 +2347,7 @@ def serve_web(port):
                 return self._json(out)
             if path.startswith("/api/secret/"):
                 sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
-                if not e: return self._json({"error": "yok"}, 404)
+                if not e: return self._json({"error": "not found"}, 404)
                 reveal = q.get("reveal") == "1"
                 if reveal:
                     audit("reveal", key=e["name"], source="web", detail=q.get("intent", "view"))
@@ -2453,7 +2466,7 @@ def serve_web(port):
             if path == "/api/import":      # pw = bundle'in parolasi (yerel master olmayabilir)
                 b = self._body()
                 try: blob = base64.b64decode(b.get("b64", ""))
-                except Exception: return self._json({"error": "bozuk dosya"}, 400)
+                except Exception: return self._json({"error": "corrupt file"}, 400)
                 try: nn, nu = import_bundle(b.get("pw", ""), blob)
                 except Exception as ex: return self._json({"error": str(ex)}, 400)
                 audit("import", source="web", detail=f"+{nn} ~{nu}")
@@ -2498,7 +2511,7 @@ def serve_web(port):
                 b = self._body(); target = b.get("target", "dotenv")
                 if b.get("id"):                       # tek secret (row-level deploy)
                     e = by_id(load(), b["id"])
-                    if not e: return self._json({"error": "yok"}, 404)
+                    if not e: return self._json({"error": "not found"}, 404)
                     audit("deploy", key=e["name"], source="web", detail=f"{target} {label(e)}")
                     return self._json({"text": deploy_render_one(e, target), "targets": DEPLOY_TARGETS})
                 scope = {dim: b.get(dim, "") for dim in DIMS if b.get(dim)}
@@ -2524,7 +2537,7 @@ def serve_web(port):
             if not valid(self._tok() or ""): return self._json({"error": "locked"}, 401)
             if path.startswith("/api/secret/"):
                 sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
-                if not e: return self._json({"error": "yok"}, 404)
+                if not e: return self._json({"error": "not found"}, 404)
                 b = self._body(); ne = _entry_from_body(b)
                 for k in ["name", "type"] + DIMS + ["tags", "url", "notes", "fields", "collection", "rotation"]: e[k] = ne[k]
                 e["updated"] = now_iso(); save(d)
@@ -2537,7 +2550,7 @@ def serve_web(port):
             if not valid(self._tok() or ""): return self._json({"error": "locked"}, 401)
             if path.startswith("/api/secret/"):
                 sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
-                if not e: return self._json({"error": "yok"}, 404)
+                if not e: return self._json({"error": "not found"}, 404)
                 if "delete" in CFG["confirm_ops"] and not verify_master(self._body().get("pw", "")):
                     return self._json({"error": "bad_pw"}, 403)
                 secs(d).remove(e); save(d)
@@ -2546,7 +2559,7 @@ def serve_web(port):
             self._json({"error": "not found"}, 404)
 
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), H)
-    print(f"concealer web: http://127.0.0.1:{port}  (idle-lock {CFG['idle']}s, Ctrl+C ile durdur)")
+    print(f"concealer web: http://127.0.0.1:{port}  (idle-lock {CFG['idle']}s, Ctrl+C to stop)")
     try: srv.serve_forever()
     except KeyboardInterrupt: pass
 
@@ -2564,30 +2577,30 @@ def _entry_from_body(b):
 # ---------------- MCP ----------------
 _DIMPROPS = {d: {"type": "string"} for d in DIMS}
 MCP_TOOLS = [
-    {"name": "list_secrets", "description": "Secret'lari tip+boyut+tag+collection ile listeler (deger vermez).",
+    {"name": "list_secrets", "description": "List secrets by type+scope+tag+collection (no values returned).",
      "inputSchema": {"type": "object", "properties": {**_DIMPROPS, "tag": {"type": "string"}, "type": {"type": "string"},
-        "collection": {"type": "string", "description": "collection yolu ile daralt (alt-yollar dahil)"}}}},
-    {"name": "search_secrets", "description": "name/boyut/tag/url/notes icinde arar (deger vermez).",
+        "collection": {"type": "string", "description": "narrow by collection path (sub-paths included)"}}}},
+    {"name": "search_secrets", "description": "Search across name/scope/tag/url/notes (no values returned).",
      "inputSchema": {"type": "object", "properties": {"term": {"type": "string"}}, "required": ["term"]}},
-    {"name": "run_with_secrets", "description": "Komutu boyutlara uyan secret'lar env'e enjekte edilerek calistirir. Deger sizmaz; cikti maskelenir.",
+    {"name": "run_with_secrets", "description": "Run a command with scope-matching secrets injected into env. No values leak; output is masked.",
      "inputSchema": {"type": "object", "properties": {"command": {"type": "string"}, **_DIMPROPS}, "required": ["command"]}},
-    {"name": "set_secret", "description": "Secret olustur/guncelle (deger YAZAR, geri vermez). Ayni name+boyut varsa gunceller. 'actor' ile kendini tanit; audit source=mcp olur.",
+    {"name": "set_secret", "description": "Create/update a secret (WRITES the value, never returns it). Updates if the same name+scope exists. Identify yourself with 'actor'; audit source=mcp.",
      "inputSchema": {"type": "object", "properties": {
         "name": {"type": "string"}, "type": {"type": "string", "description": "api_key|database|website|custom"},
-        "value": {"type": "string", "description": "api_key icin tek deger"},
-        "fields": {"type": "object", "description": "cok alanli tipler icin {field: value}"},
+        "value": {"type": "string", "description": "single value for api_key"},
+        "fields": {"type": "object", "description": "{field: value} for multi-field types"},
         "tags": {"type": "array", "items": {"type": "string"}}, "url": {"type": "string"},
-        "notes": {"type": "string"}, "actor": {"type": "string", "description": "eylemi yapan agent kimligi"},
-        "collection": {"type": "string", "description": "serbest gruplama yolu (opsiyonel)"},
+        "notes": {"type": "string"}, "actor": {"type": "string", "description": "identity of the acting agent"},
+        "collection": {"type": "string", "description": "free-form grouping path (optional)"},
         **_DIMPROPS}, "required": ["name"]}},
 ]
-def _fmt(rows): return "\n".join(f"{e['name']:22} {e['type']:9} {label(e):22} [{','.join(e['tags'])}]" for e in rows) or "(bos)"
+def _fmt(rows): return "\n".join(f"{e['name']:22} {e['type']:9} {label(e):22} [{','.join(e['tags'])}]" for e in rows) or "(empty)"
 def _mcp_call(name, args):
     # Kayit zorunlulugu: yalniz 'agent' kaynagi token'lar MCP'den secret'a erisebilir (kayitsiz ajan = fail-closed).
     agent, source = _mcp_agent()
     if source != "agent":
-        return ("hata: erisim reddedildi — kayitli agent token'i gerekli. "
-                "Once vault sahibi: `concealer agent register <ad>` ve uretilen CONCEALER_TOKEN'i MCP env'ine koy.")
+        return ("error: access denied — a registered agent token is required. "
+                "First, the vault owner: `concealer agent register <name>` and put the generated CONCEALER_TOKEN in the MCP env.")
     if name == "list_secrets":
         sel = {d: args[d] for d in DIMS if args.get(d)}
         rows = filt(load(), sel, args.get("tag"), None, args.get("type"), args.get("collection"))
@@ -2604,7 +2617,7 @@ def _mcp_call(name, args):
         for dim in ("repo", "project"): target.setdefault(dim, detect(dim))
         env, d = inject_env(target, source="mcp", actor=agent)
         r = subprocess.run(["/bin/sh", "-c", args["command"]], env=env, capture_output=True, text=True)
-        return redact(f"[{label(target)}]\n" + r.stdout + r.stderr, d) or "(cikti yok)"
+        return redact(f"[{label(target)}]\n" + r.stdout + r.stderr, d) or "(no output)"
     if name == "set_secret":
         actor = args.get("actor") or agent or os.environ.get("CONCEALER_ACTOR", "")
         d = load(); ident = {dim: args.get(dim, "") for dim in DIMS}; ident["name"] = args["name"]
@@ -2612,7 +2625,7 @@ def _mcp_call(name, args):
         fields = dict(args.get("fields") or {})
         if args.get("value") is not None and "value" not in fields: fields["value"] = args["value"]
         fields, bad = _clean_fields(fields)   # adi secret-benzeri (kacak) alanlari reddet
-        if bad: return "hata: gecersiz alan adi (bir secret degeri gibi gorunuyor): " + ", ".join(mask(b) for b in bad)
+        if bad: return "error: invalid field name (looks like a secret value): " + ", ".join(mask(b) for b in bad)
         if hit:
             hit["fields"].update(fields); hit["updated"] = now_iso()
             if "tags" in args: hit["tags"] = [t for t in (args["tags"] or []) if t]
@@ -2628,7 +2641,7 @@ def _mcp_call(name, args):
             secs(d).append(norm(e)); act = "create"
         save(d); audit(act, key=args["name"], source="mcp", detail=label(ident), actor=actor)
         return f"{act}: {args['name']} @ {label(ident)}"
-    return f"bilinmeyen arac: {name}"
+    return f"unknown tool: {name}"
 def mcp_stdio():
     def send(o): sys.stdout.write(json.dumps(o) + "\n"); sys.stdout.flush()
     for line in sys.stdin:
@@ -2643,7 +2656,7 @@ def mcp_stdio():
         elif m == "tools/call":
             p = req.get("params", {})
             try: text = _mcp_call(p.get("name"), p.get("arguments", {}))
-            except Exception as e: text = f"hata: {e}"
+            except Exception as e: text = f"error: {e}"
             send({"jsonrpc": "2.0", "id": mid, "result": {"content": [{"type": "text", "text": text}]}})
         elif mid is not None:
             send({"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": f"method not found: {m}"}})

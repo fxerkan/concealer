@@ -14,9 +14,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   string (`backend/payments`); no separate folder model. Filtering matches a collection and its
   sub‑paths. Available everywhere: CLI (`list --collection`, `mv`/`cp --to-collection`, `set
   --collection`, `dims`), TUI (Collection facet + `M` move / `C` copy keys + editable in the edit
-  form), web (filter facet, Collection column, editor field with a datalist, per‑row **Move** /
-  **Copy** actions), and MCP (`list_secrets`/`set_secret` accept `collection`). See
-  `docs/feature-plan.md` for the scope‑vs‑collection‑vs‑tag distinction.
+  form), web (filter facet, Collection column, an in‑app collection **picker** — a `<select>` of
+  existing collections with a `＋` button to type a new one — in both the editor and the per‑row
+  **Move** dialog, plus a per‑row **Duplicate** action), and MCP (`list_secrets`/`set_secret` accept
+  `collection`). See `docs/feature-plan.md` for the scope‑vs‑collection‑vs‑tag distinction.
 - **Rotation policy.** An optional per‑record `rotation` policy (`every_days` + `mode:
   generate|manual`). `concealer rotate --due [--dry]` rotates every overdue record whose mode is
   `generate` and has a `value` field, and only *flags* `manual`/multi‑field records so it never
@@ -35,6 +36,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 - **Guided `init`.** `init` now shows the concealer ASCII banner (accent‑colored on a TTY) and lays
   its output out as numbered onboarding steps (set master password → save recovery codes → next
   steps: token, web, first secret, agent registration, backup).
+
+### Changed
+- **CLI/MCP output is now English-only.** All user-facing messages — CLI prompts, errors, `init`
+  onboarding, `unlock`/`agent`/`harden`/`recover` output, rate-limit notices, MCP tool descriptions
+  and responses, and web API error strings — were translated from Turkish to English. Turkish source
+  comments are unchanged; the web UI stays bilingual via its `I18N` dict.
 
 ## [0.8.1] — 2026-08-19
 

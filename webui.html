@@ -109,6 +109,9 @@ tr:last-child td{border-bottom:0}
 .type-badge{font-size:11px;padding:3px 9px;border-radius:6px;font-weight:600;background:#242a33;color:#c6ccd6}
 .ovd{font-size:11px;padding:2px 7px;border-radius:6px;font-weight:600;background:#3a2410;color:var(--warn);white-space:nowrap}
 .coll{white-space:nowrap}
+.collpick{display:flex;gap:6px;align-items:center}
+.collpick select,.collpick input{flex:1;min-width:0}
+.collnew-btn{flex:0 0 auto;font-weight:700;padding:6px 11px;line-height:1}
 .t-api_key{background:#132534;color:#8fd0ff}.t-database{background:#241d33;color:#c3a6ff}
 .t-website{background:#12301f;color:#86e6a8}.t-login{background:#12301f;color:#86e6a8}.t-custom{background:#2e2612;color:#ffcf7a}
 .t-access_token,.t-jwt,.t-oauth{background:#132534;color:#8fd0ff}
@@ -556,7 +559,8 @@ const I18N={
   add_field:"+ alan ekle",field:"alan",value:"değer",type:"tip",scope:"kapsam",tags:"etiketler",url:"url",
   collection:"Koleksiyon",th_collection:"Koleksiyon",rotation:"Rotasyon",rot_days:"Her (gün)",rot_mode:"Mod",
   rot_generate:"otomatik üret",rot_manual:"elle",rot_none:"politika yok",overdue:"gecikmiş",rot_overdue_d:d=>`${d} gün gecikmiş`,
-  move_to:"Koleksiyona taşı",copy_to:"Kopyala",coll_root:"(kök)",copied:"kopyalandı",moved:"taşındı",
+  move_to:"Koleksiyona taşı",copy_to:"Çoğalt (Duplicate)",coll_root:"(kök)",copied:"çoğaltıldı",moved:"taşındı",
+  coll_none:"(yok)",coll_new:"yeni koleksiyon…",coll_pick:"Koleksiyon seç veya + ile yeni ekle",
   new_secret_title:"+ Yeni Sır",edit_title:"✏️ Düzenle",
   all_actions:"tüm eylemler",all_sources:"tüm kaynaklar",key_filter:"anahtar filtre",verify_chain:"🔗 Zincir doğrula",
   th_time:"Zaman (UTC)",th_source:"Kaynak",th_action:"Eylem",th_key:"Anahtar",th_detail:"Detay",
@@ -615,7 +619,8 @@ const I18N={
   add_field:"+ add field",field:"field",value:"value",type:"type",scope:"scope",tags:"tags",url:"url",
   collection:"Collection",th_collection:"Collection",rotation:"Rotation",rot_days:"Every (days)",rot_mode:"Mode",
   rot_generate:"auto-generate",rot_manual:"manual",rot_none:"no policy",overdue:"overdue",rot_overdue_d:d=>`${d} days overdue`,
-  move_to:"Move to collection",copy_to:"Copy",coll_root:"(root)",copied:"copied",moved:"moved",
+  move_to:"Move to collection",copy_to:"Duplicate",coll_root:"(root)",copied:"duplicated",moved:"moved",
+  coll_none:"(none)",coll_new:"new collection…",coll_pick:"Pick a collection or add a new one with +",
   new_secret_title:"+ New Secret",edit_title:"✏️ Edit",
   all_actions:"all actions",all_sources:"all sources",key_filter:"key filter",verify_chain:"🔗 Verify chain",
   th_time:"Time (UTC)",th_source:"Source",th_action:"Action",th_key:"Key",th_detail:"Detail",
@@ -1303,19 +1308,38 @@ async function delSecret(id,name){
 }
 // collection'a tasi/kopyala: tam kaydi cek (fields degerleriyle), collection'i degistirip PUT/yeni-form
 function _revealFields(e){ const fv={}; Object.entries(e.fields).forEach(([k,f])=>fv[k]=f.value??''); return fv; }
+// --- yeniden kullanilabilir koleksiyon secici: mevcutlardan <select> + '+' ile yeni ad yaz ---
+function collOptions(cur){
+  const all=[...new Set([...(FOPTS.collection||[]), ...(cur?[cur]:[])])].sort();
+  return `<option value="" ${cur?'':'selected'}>${t('coll_none')}</option>`+
+    all.map(c=>`<option value="${esc(c)}" ${c===cur?'selected':''}>${esc(c)}</option>`).join('');
+}
+function collPicker(pfx,cur){
+  return `<div class="collpick">
+    <select id="${pfx}_sel">${collOptions(cur)}</select>
+    <button type="button" class="ghost collnew-btn" title="${t('coll_new')}" onclick="collPickNew('${pfx}')">＋</button>
+    <input id="${pfx}_new" class="hidden" placeholder="${t('coll_new')}"></div>`;
+}
+function collPickNew(pfx){ const i=$('#'+pfx+'_new'),s=$('#'+pfx+'_sel'); i.classList.remove('hidden'); if(s)s.classList.add('hidden'); i.focus(); }
+function collPickVal(pfx){ const i=$('#'+pfx+'_new');
+  if(i && !i.classList.contains('hidden') && i.value.trim()) return i.value.trim().replace(/^\/+|\/+$/g,'');
+  const s=$('#'+pfx+'_sel'); return s?s.value:''; }
 async function moveSecret(id){
   const e=await (await api('/api/secret/'+id+'?reveal=1&intent=edit')).json();
-  const nc=prompt(t('move_to'),e.collection||''); if(nc===null)return;
-  const b={name:e.name,type:e.type,tenant:e.tenant,project:e.project,environment:e.environment,repo:e.repo,
-    url:e.url,notes:e.notes,tags:e.tags||[],fields:_revealFields(e),rotation:e.rotation||{},
-    collection:nc.trim().replace(/^\/+|\/+$/g,'')};
-  await api('/api/secret/'+id,{method:'PUT',body:JSON.stringify(b)}); toast(t('moved')); refreshFilterOptions(); loadSecrets();
+  modal('📁 '+t('move_to'),`<div class="field"><label class="fld">${esc(e.name)} — ${t('collection')}</label>
+    ${collPicker('mv',e.collection||'')}<div class="mut" style="font-size:12px;margin-top:6px">${t('coll_pick')}</div></div>`,
+    [{x:t('save'),p:1,f:async()=>{
+      const b={name:e.name,type:e.type,tenant:e.tenant,project:e.project,environment:e.environment,repo:e.repo,
+        url:e.url,notes:e.notes,tags:e.tags||[],fields:_revealFields(e),rotation:e.rotation||{},collection:collPickVal('mv')};
+      await api('/api/secret/'+id,{method:'PUT',body:JSON.stringify(b)}); closeModal(); toast(t('moved')); refreshFilterOptions(); loadSecrets();
+    }},{x:t('cancel'),f:closeModal}]);
 }
+// Duplicate: kaydin bir kopyasini yeni-secret formunda acar (yeni id ile kaydedilir); orijinal degismez
 async function copySecret(id){
   const e=await (await api('/api/secret/'+id+'?reveal=1&intent=edit')).json();
   openEditor(null,{type:e.type,tenant:e.tenant,project:e.project,environment:e.environment,repo:e.repo,
     url:e.url,notes:e.notes,tags:e.tags||[],collection:e.collection||'',rotation:e.rotation||{},
-    name:e.name+'_copy',fields:_revealFields(e)});
+    name:e.name+'-copy',fields:_revealFields(e)});
 }
 
 async function viewSecret(id){
@@ -1354,9 +1378,7 @@ async function openEditor(id, preset){
     <div class="field"><label class="fld">${t('frepo')}</label><input id="e_repo" value="${esc(e.repo)}"></div>
     <div class="field full"><label class="fld">${t('url')}</label><input id="e_url" value="${esc(e.url)}" placeholder="https://…"></div>
     <div class="field full"><label class="fld">${t('tags')}</label><input id="e_tags" value="${esc((e.tags||[]).join(', '))}" placeholder="ai, prod"></div>
-    <div class="field full"><label class="fld">${t('collection')}</label>
-      <input id="e_collection" list="dl_collection" value="${esc(e.collection||'')}" placeholder="backend/payments">
-      <datalist id="dl_collection">${(FOPTS.collection||[]).map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+    <div class="field full"><label class="fld">${t('collection')}</label>${collPicker('ecol', e.collection||'')}</div>
     <div class="field"><label class="fld">${t('rotation')} — ${t('rot_days')}</label><input id="e_rotdays" type="number" min="0" value="${esc(String((e.rotation||{}).every_days||''))}" placeholder="0 = ${t('rot_none')}"></div>
     <div class="field"><label class="fld">${t('rot_mode')}</label><select id="e_rotmode">
       <option value="generate" ${((e.rotation||{}).mode||'generate')==='generate'?'selected':''}>${t('rot_generate')}</option>
@@ -1390,7 +1412,7 @@ async function saveSecret(id){
   const b={name:$('#e_name').value.trim(),type,tenant:$('#e_tenant').value.trim(),project:$('#e_project').value.trim(),
     environment:$('#e_environment').value.trim(),repo:$('#e_repo').value.trim(),url:$('#e_url').value.trim(),
     notes:$('#e_notes').value,tags:$('#e_tags').value.split(',').map(s=>s.trim()).filter(Boolean),fields,
-    collection:$('#e_collection').value.trim().replace(/^\/+|\/+$/g,''),rotation};
+    collection:collPickVal('ecol'),rotation};
   if(!b.name){toast(t('name_req'));return;}
   if(id)await api('/api/secret/'+id,{method:'PUT',body:JSON.stringify(b)}); else await api('/api/secrets',{method:'POST',body:JSON.stringify(b)});
   closeModal(); toast(id?t('updated'):t('created')); refreshFilterOptions(); loadSecrets();
