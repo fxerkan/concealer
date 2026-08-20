@@ -173,6 +173,13 @@ footer a{color:var(--mut)} footer a:hover{color:var(--acc)}
 footer .links{display:flex;gap:18px;flex-wrap:wrap}
 [hidden]{display:none!important}
 
+/* mailto fallback toast */
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+  background:var(--panel2);color:var(--txt);border:1px solid var(--acc);border-radius:10px;
+  padding:12px 18px;font-size:14px;font-weight:600;box-shadow:0 12px 40px rgba(0,0,0,.5);
+  opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:3000;max-width:90vw}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
 /* install popup modal */
 .modal{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
   background:rgba(0,0,0,.6);backdrop-filter:blur(3px)}
@@ -479,6 +486,29 @@ async function copyCmd(cmd,btn){
 }
 document.getElementById('copybtn').onclick=e=>copyCmd(document.getElementById('installcmd').textContent,e.target);
 document.getElementById('modalcopy').onclick=e=>copyCmd(document.getElementById('modalcmd').textContent,e.target);
+
+/* ===== mailto fallback ===== */
+/* mailto opens the native mail app only where the OS has a default handler registered.
+   Some machines/browsers have none, so a bare mailto click looks like "nothing happens".
+   Guarantee feedback: copy the address + show a toast, while still letting the mail app
+   open where a handler exists (no preventDefault). */
+(function(){
+  var toast;
+  function showToast(msg){
+    if(!toast){toast=document.createElement('div');toast.className='toast';document.body.appendChild(toast);}
+    toast.textContent=msg;toast.classList.add('show');
+    clearTimeout(showToast._t);showToast._t=setTimeout(function(){toast.classList.remove('show');},2800);
+  }
+  document.addEventListener('click',function(e){
+    var a=e.target.closest&&e.target.closest('a[href^="mailto:"]');
+    if(!a)return;
+    var email=a.getAttribute('href').slice(7).split('?')[0];
+    try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(email);}catch(_){}
+    var l=(localStorage.getItem('concealer_lang')||'en');
+    showToast(l==='tr'?('📋 Adres kopyalandı: '+email+' — mail uygulaman açılmadıysa yapıştır.')
+                      :('📋 Address copied: '+email+' — paste it if your mail app didn’t open.'));
+  });
+})();
 
 /* ===== install popup ===== */
 const modal=document.getElementById('installmodal');
