@@ -4,9 +4,20 @@
 
 # conceal**er**
 
+<p align="center">
+  <a href="https://github.com/fxerkan/concealer/stargazers"><img src="https://img.shields.io/github/stars/fxerkan/concealer?style=for-the-badge&logo=github&color=ffb020&labelColor=0a0b0d" alt="GitHub stars"></a>
+  <a href="https://github.com/fxerkan/concealer/blob/main/LICENSE"><img src="https://img.shields.io/github/license/fxerkan/concealer?style=for-the-badge&color=ffb020&labelColor=0a0b0d" alt="MIT License"></a>
+  <a href="https://github.com/fxerkan/homebrew-tap"><img src="https://img.shields.io/badge/brew-fxerkan%2Ftap%2Fconcealer-ffb020?style=for-the-badge&logo=homebrew&labelColor=0a0b0d" alt="Homebrew"></a>
+  <a href="https://fxerkan.github.io/concealer/"><img src="https://img.shields.io/badge/docs-fxerkan.github.io-ffb020?style=for-the-badge&labelColor=0a0b0d" alt="Docs"></a>
+</p>
+
 > **Local‑only, single‑file secret manager for the AI‑coding era.**
 > Encrypted with [SOPS](https://github.com/getsops/sops) + [age](https://github.com/FiloSottile/age).
 > No cloud, no telemetry, no account. CLI · Web UI · MCP · TUI.
+
+<p align="center">
+  <b><a href="https://fxerkan.github.io/concealer/">📖 Documentation</a> · <a href="https://github.com/fxerkan/concealer/issues/new">🐛 Report a bug</a> · ⭐ <a href="https://github.com/fxerkan/concealer/stargazers">Star this repo</a> if it helps you!</b>
+</p>
 
 <sub>see [CHANGELOG](CHANGELOG.md)</sub>
 

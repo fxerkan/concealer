@@ -22,6 +22,8 @@ aux_links:
     - "https://github.com/fxerkan/concealer"
   "Homebrew":
     - "https://github.com/fxerkan/homebrew-tap"
+  "Support":
+    - "mailto:concealer@fxerkan.com?subject=concealer%20support"
 aux_links_new_tab: false
 
 footer_content: 'Developed by <a href="https://fxerkan.com">FXerkan</a> — Code more, worry less. · MIT License'
@@ -30,6 +32,7 @@ footer_content: 'Developed by <a href="https://fxerkan.com">FXerkan</a> — Code
 plugins:
   - jekyll-remote-theme
   - jekyll-seo-tag
+  - jekyll-sitemap
 
 exclude:
   - Gemfile
