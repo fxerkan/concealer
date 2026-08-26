@@ -2,6 +2,7 @@
 title: Web UI
 layout: default
 nav_order: 7
+has_children: true
 ---
 
 # Web UI
