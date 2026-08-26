@@ -57,7 +57,7 @@ concealer web 8080       # özel port
 ## Oturum ve kilitleme
 
 - Kilit açma, age anahtarını **yalnızca o oturum için belleğe** (`_SESS_KEY`) çözer — istek yolunda age/tty istemi yok, diskte açık anahtar yok.
-- Oturumun **sabit bir boşta kalma otomatik kilidi** vardır: `idle` saniye hareketsizlikten sonra oturum ve bellekteki anahtar temizlenir. Aktivite TTL'yi **uzatmaz** — sabit ömürlü bir kilittir.
+- Oturumun **sabit bir boşta kalma otomatik kilidi** vardır: `idle` saniye hareketsizlikten sonra oturum ve bellekteki anahtar referansları bırakılır (ardından `gc.collect()`). Aktivite TTL'yi **uzatmaz** — sabit ömürlü bir kilittir. Not: bu, referansları bırakıp kopyaları geri kazanır ama belleği **sıfırlamaz** — CPython serbest bırakılan `str`/`bytes` üzerine yazamaz, dolayısıyla plaintext, üzerine yazılana kadar heap/swap'te kalabilir. Bkz. Güvenlik → Web UI kapsamı.
 - Arayüzden hemen **Kilitle**, ya da boşta kalınca otomatik olarak gerçekleşir.
 
 ---

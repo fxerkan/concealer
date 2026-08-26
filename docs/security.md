@@ -66,7 +66,10 @@ The audit log holds key **names and actions, not values**. It is tamper-evident 
 
 ## Web UI scope
 
-The web server binds to `127.0.0.1` **only** and is **single-user**. Treat it as a local convenience, not a hardened multi-user server. The session decrypts the key into memory only, with a hard idle auto-lock that clears it.
+The web server binds to `127.0.0.1` **only** and is **single-user**. Treat it as a local convenience, not a hardened multi-user server. The session decrypts the key into process memory (never to disk), and a hard idle auto-lock drops it after `idle` seconds.
+
+{: .warning }
+> **Honest ceiling — in-memory secrets are not zeroized.** concealer is pure Python (CPython). When the session locks, it drops its references to the key and calls `gc.collect()`, but **CPython does not overwrite freed memory**. Python `str`/`bytes` are immutable, and the plaintext flows through several unavoidable copies — the decrypted vault from `sops`, `json.loads`, the age key handed to the `sops` child via the `SOPS_AGE_KEY` **environment variable** (readable via `/proc/<pid>/environ` by the same user on Linux), the master password from `getpass`. So plaintext key/secret bytes may **linger in the process heap, in swap, or in a core dump** until overwritten by chance. "Auto-lock clears it" means the reachable-copy window shrinks — it is **not** secure erasure. Treat process memory (and swap/core dumps) as a trust boundary: an attacker who can read the process's memory, its swap, or a core dump can recover secrets. This is a design limit of a stdlib-only tool, not a defect we can fully fix in Python.
 
 ---
 

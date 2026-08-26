@@ -57,7 +57,7 @@ The **[Risks]({{ site.baseurl }}/risks)** tab surfaces stale, reused, and expose
 ## Session & locking
 
 - Unlock decrypts the age key into **memory for that session only** (`_SESS_KEY`) — no age/tty prompt in the request path, no plaintext key on disk.
-- The session has a **hard idle auto-lock**: after `idle` seconds of inactivity, the session and the in-memory key are cleared. Activity does **not** extend the TTL — it's a fixed-lifetime lock.
+- The session has a **hard idle auto-lock**: after `idle` seconds of inactivity, the session and the in-memory key references are dropped (followed by `gc.collect()`). Activity does **not** extend the TTL — it's a fixed-lifetime lock. Note: this drops references and reclaims copies but does **not** zeroize memory — CPython cannot overwrite freed `str`/`bytes`, so plaintext may persist in the heap/swap until overwritten. See [Security → Web UI scope]({{ site.baseurl }}/security#web-ui-scope).
 - **Lock** immediately from the UI, or it happens automatically on idle.
 
 ---

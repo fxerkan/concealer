@@ -12,10 +12,10 @@ Audit: keys/audit.log (JSONL, HMAC-chained, tamper-evident). Keeps only key
 NAMES and actions, never secret VALUES.
 """
 import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse, urllib.request, html, getpass, time, webbrowser
-import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil, fnmatch
+import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil, fnmatch, gc
 from datetime import datetime, timezone, timedelta
 
-VERSION = "0.9.10"   # advances through 0.x; 1.0 = reserved for the full live/release version
+VERSION = "0.9.11"   # advances through 0.x; 1.0 = reserved for the full live/release version
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -2770,14 +2770,26 @@ def cli(argv):
 _SESSIONS = {}   # token -> last_activity_epoch
 _SESS_KEY = {}   # token -> decrypted age key text (on a hardened vault; in memory, not written to disk)
 
+def _lock_clear(tok=None):
+    """Drop the in-memory key/session, then gc.collect() to reclaim freed copies.
+    ponytail: BEST-EFFORT ONLY — CPython does not zeroize memory. Plaintext key/secret
+    bytes may still linger in the process heap (and potentially swap or a core dump)
+    until overwritten. This only shrinks the reachable-copy window; it is NOT secure
+    erasure. See docs/security.md 'Known limitations: in-memory secrets'."""
+    global _KEY_CACHE
+    if tok is not None:
+        _SESSIONS.pop(tok, None); _SESS_KEY.pop(tok, None)
+    _KEY_CACHE = None
+    gc.collect()
+
 def serve_web(port):
     import time
     def valid(tok):
         global _KEY_CACHE
         t = _SESSIONS.get(tok)
         if not t: return False
-        if time.time() - t > CFG["idle"]:   # idle auto-lock: session + in-memory key are cleared
-            _SESSIONS.pop(tok, None); _SESS_KEY.pop(tok, None); _KEY_CACHE = None; return False
+        if time.time() - t > CFG["idle"]:   # idle auto-lock: drop session + in-memory key, then gc
+            _lock_clear(tok); return False
         _KEY_CACHE = _SESS_KEY.get(tok)     # cache the key for this request (sops reads from memory)
         return True   # fixed lifetime: activity does not extend the TTL (hard auto-lock)
     def remaining(tok):
@@ -2903,8 +2915,7 @@ def serve_web(port):
             tok = self._tok()
             if path == "/api/lock":
                 if tok:
-                    _SESSIONS.pop(tok, None); _SESS_KEY.pop(tok, None)
-                    _KEY_CACHE = None; audit("lock", source="web")
+                    _lock_clear(tok); audit("lock", source="web")
                 return self._json({"ok": True})
             if not valid(tok or ""): return self._json({"error": "locked"}, 401)
             if path == "/api/secrets":     # create
