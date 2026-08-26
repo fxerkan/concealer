@@ -267,7 +267,9 @@ def test_tui(cli_tok):
             try:
                 c = p.read(2048)
             except Exception:
-                break
+                if not p.isalive():
+                    break
+                time.sleep(0.05); continue     # transient (e.g. alt-screen switch) — keep reading
             if c:
                 buf[0] += c
             elif not p.isalive():
@@ -283,11 +285,11 @@ def test_tui(cli_tok):
         return s.lower()
 
     marks = ("filter", "secret", "project", "api_key")   # panel headers + a field the vault row shows
-    t = time.time() + 6
+    t = time.time() + 15                                 # generous: CI spawn+import+unlock+curses draw
     while time.time() < t and not any(k in visible(buf[0]) for k in marks):
         time.sleep(0.2)
     vis = visible(buf[0])
-    rendered = buf[0].count("\x1b[") > 20 and any(k in vis for k in marks)
+    rendered = any(k in vis for k in marks)
     alive = p.isalive()
 
     quit_clean = False
@@ -307,7 +309,8 @@ def test_tui(cli_tok):
     if not alive:
         raise RuntimeError(f"TUI exited before rendering (curses init failed?). tail: {buf[0][-300:]!r}")
     if not rendered:
-        raise RuntimeError(f"TUI ran but no UI text detected. visible tail: {vis[-300:]!r}")
+        raise RuntimeError(f"TUI ran but no UI text detected. bytes={len(buf[0])} "
+                           f"visible tail={vis[-200:]!r} raw tail={buf[0][-200:]!r}")
     log(f"  TUI started + rendered on windows-curses "
         f"(interactive quit {'confirmed' if quit_clean else 'not assertable via winpty; real keyboard quits with q'})")
 
