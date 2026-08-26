@@ -131,7 +131,18 @@ This is best-effort:
 Put `CONCEALER_HOME` on your NTFS user profile volume (the default,
 `%USERPROFILE%\.concealer`), not a shared or removable drive.
 
-### 2. Memory is not wiped (same as everywhere)
+### 2. Saving briefly writes vault plaintext to an ACL-locked temp file
+
+On Unix, `concealer` hands the plaintext vault to `sops` for encryption via
+`/dev/stdin` — it never touches the disk. **Windows has no `/dev/stdin`**, so on
+Windows `save()` writes the plaintext JSON to a temporary file inside the
+ACL-locked `keys/` directory (user-only, via inheritance), passes that path to
+`sops`, and deletes it immediately afterward. The window is short and the file is
+access-restricted, but it is a real difference: for the duration of an encrypt,
+the vault plaintext exists on disk on Windows. Combined with the memory caveat
+below, treat a Windows host as slightly weaker at-rest than a Unix one.
+
+### 3. Memory is not wiped (same as everywhere)
 
 As on macOS/Linux, CPython does not zeroize memory. Plaintext secrets, the age
 key, and the master password may linger in the process heap, the **pagefile**

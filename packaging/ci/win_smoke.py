@@ -97,23 +97,26 @@ def test_age_pty():
 # ConPTY instead would nest ConPTYs (age's ConPTY inside ours), which deadlocks —
 # a test artifact, not a concealer bug: the single-level path is proven by test_age_pty.
 _MAKE_VAULT = r"""
-import io, getpass, importlib, re, sys
-from contextlib import redirect_stdout
+import io, getpass, importlib, re, sys, traceback
+from contextlib import redirect_stdout, redirect_stderr
 _r = iter(['pw'] * 12)
 getpass.getpass = lambda *a, **k: next(_r)
 m = importlib.import_module('concealer.__main__')
 m.getpass.getpass = getpass.getpass
 def cap(argv):
-    b = io.StringIO()
+    b = io.StringIO(); err = ''
     try:
-        with redirect_stdout(b): m.cli(argv)
-    except SystemExit: pass
-    return b.getvalue()
-o1 = cap(['init'])
-o2 = cap(['agent', 'register', 'ci-agent'])
+        with redirect_stdout(b), redirect_stderr(b): m.cli(argv)
+    except SystemExit as e: err = 'SystemExit: %r' % (e.code,)
+    except Exception: err = traceback.format_exc()
+    return b.getvalue(), err
+o1, e1 = cap(['init'])
+o2, e2 = cap(['agent', 'register', 'ci-agent'])
 ct = re.search(r'CONCEALER_TOKEN=([A-Za-z0-9_-]+)', o1)
 at = re.search(r'CONCEALER_TOKEN"\s*:\s*"([^"]+)"', o2)
-sys.stderr.write('RECOVERY=%s\n' % ('RECOVERY CODES' in o1.upper()))
+# redact any recovery-code block before logging (dummy vault, but stay disciplined)
+diag = re.sub(r'(?is)recovery codes.*', '[omitted]', o1)
+sys.stderr.write('RECOVERY=%s\nINIT_ERR=%s\nINIT_TAIL=%r\n' % ('RECOVERY CODES' in o1.upper(), e1, diag[-500:]))
 print('CLITOKEN=' + (ct.group(1) if ct else 'NONE'))
 print('AGENTTOKEN=' + (at.group(1) if at else 'NONE'))
 """
@@ -139,7 +142,8 @@ def test_cli():
     log(f"  init + agent register OK (single-level age via pywinpty; token {cli_tok[:6]}…, recovery codes shown)")
 
     ce = env({"CONCEALER_TOKEN": cli_tok})
-    subprocess.run(["concealer", "set", "--name", "winci", "--value", DUMMY,
+    # value is POSITIONAL for api_key (flags are stripped, the leftover arg is the value)
+    subprocess.run(["concealer", "set", "--name", "winci", DUMMY,
                     "--project", "ci", "--repo", "ci", "--environment", "test"],
                    env=ce, check=True, capture_output=True, text=True)
     got = subprocess.run(["concealer", "get", "--name", "winci"], env=ce,

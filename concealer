@@ -203,9 +203,24 @@ def load():
 
 def save(d):
     cmd = ["sops", "--encrypt", "--input-type", "json", "--output-type", "yaml",
-           "--filename-override", FILE, "/dev/stdin"]
+           "--filename-override", FILE]
     if os.path.exists(SOPSCFG): cmd[1:1] = ["--config", SOPSCFG]
-    r = subprocess.run(cmd, input=json.dumps(d), env=_env(), capture_output=True, text=True)
+    payload = json.dumps(d)
+    if sys.platform.startswith("win"):
+        # Windows has no /dev/stdin, so sops must read a real file. Write it inside the
+        # ACL-locked keys/ dir (inherits user-only access), then delete right after.
+        # Documented caveat (docs/WINDOWS.md): the vault plaintext briefly touches an
+        # ACL-restricted temp file here, unlike the /dev/stdin (no-disk) path on Unix.
+        import concealer_win
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(KEY), suffix=".json")
+        try:
+            os.write(fd, payload.encode()); os.close(fd); concealer_win.secure_file(tmp)
+            r = subprocess.run(cmd + [tmp], env=_env(), capture_output=True, text=True)
+        finally:
+            try: os.remove(tmp)
+            except OSError: pass
+    else:
+        r = subprocess.run(cmd + ["/dev/stdin"], input=payload, env=_env(), capture_output=True, text=True)
     if r.returncode: sys.exit(f"encrypt error: {r.stderr.strip()}")
     with open(FILE, "w") as f: f.write(r.stdout)
 

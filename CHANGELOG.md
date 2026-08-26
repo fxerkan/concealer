@@ -21,6 +21,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   the `concealer` package with `webui.html` bundled and `pywinpty`/`windows-curses` as Windows-only
   deps. Cross-platform; `sops`/`age` remain external binaries (install via scoop/winget/brew/apt).
   Draft **Scoop** and **winget** manifests live under `packaging/`.
+- **Windows portability fixes found by the CI smoke test** (`packaging/ci/win_smoke.py`,
+  run on `windows-latest`): (a) force UTF-8 on `stdout`/`stderr` — a redirected Windows
+  stream defaults to cp1252, so printing `→`/box-drawing raised `UnicodeEncodeError` in
+  pipes/CI; (b) `save()` can't use `/dev/stdin` on Windows, so it now writes the plaintext
+  to an ACL-locked temp file in `keys/` and deletes it immediately (documented at-rest
+  caveat in `docs/WINDOWS.md`). Both are Windows-only branches; Unix is byte-for-byte unchanged.
 
 ## [0.9.11] — 2026-08-26
 
