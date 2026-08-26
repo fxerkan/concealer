@@ -1,14 +1,14 @@
 <p align="center">
-  <img src="assets/hero.png" alt="concealer — Local‑only, single‑file secret manager for the AI‑coding era" width="820">
+  <img src="docs/assets/hero.png" alt="concealer — Local‑only, single‑file secret manager for the AI‑coding era" width="820">
 </p>
 
 # conceal**er**
 
 <p align="center">
-  <a href="https://github.com/fxerkan/concealer/stargazers"><img src="https://img.shields.io/github/stars/fxerkan/concealer?style=for-the-badge&logo=github&color=ffb020&labelColor=0a0b0d" alt="GitHub stars"></a>
-  <a href="https://github.com/fxerkan/concealer/blob/main/LICENSE"><img src="https://img.shields.io/github/license/fxerkan/concealer?style=for-the-badge&color=ffb020&labelColor=0a0b0d" alt="MIT License"></a>
-  <a href="https://github.com/fxerkan/homebrew-tap"><img src="https://img.shields.io/badge/brew-fxerkan%2Ftap%2Fconcealer-ffb020?style=for-the-badge&logo=homebrew&labelColor=0a0b0d" alt="Homebrew"></a>
-  <a href="https://fxerkan.github.io/concealer/"><img src="https://img.shields.io/badge/docs-fxerkan.github.io-ffb020?style=for-the-badge&labelColor=0a0b0d" alt="Docs"></a>
+  <a href="https://github.com/fxerkan/concealer/stargazers"><img src="https://img.shields.io/github/stars/fxerkan/concealer?style=for-the-badge&logo=github&color=ff4d4d&labelColor=0a0b0d" alt="GitHub stars"></a>
+  <a href="https://github.com/fxerkan/concealer/blob/main/LICENSE"><img src="https://img.shields.io/github/license/fxerkan/concealer?style=for-the-badge&color=ff4d4d&labelColor=0a0b0d" alt="MIT License"></a>
+  <a href="https://github.com/fxerkan/homebrew-tap"><img src="https://img.shields.io/badge/brew-fxerkan%2Ftap%2Fconcealer-ff4d4d?style=for-the-badge&logo=homebrew&labelColor=0a0b0d" alt="Homebrew"></a>
+  <a href="https://fxerkan.github.io/concealer/"><img src="https://img.shields.io/badge/docs-fxerkan.github.io-ff4d4d?style=for-the-badge&labelColor=0a0b0d" alt="Docs"></a>
 </p>
 
 > **Local‑only, single‑file secret manager for the AI‑coding era.**
@@ -26,7 +26,7 @@
 **Agents use a secret (token) without ever seeing it:**
 
 <p align="center">
-  <img src="assets/demo-ha-token.gif" alt="Claude Code injecting a Home Assistant token via concealer MCP — the value is redacted from its context" width="820">
+  <img src="docs/assets/demo-ha-token.gif" alt="Claude Code injecting a Home Assistant token via concealer MCP — the value is redacted from its context" width="820">
 </p>
 
 
@@ -52,7 +52,7 @@ I didn't want a **cloud** secret manager (Doppler, Infisical, Vault, 1Password) 
 If you've ever pasted a secret into a chat window and immediately regretted it — that's the itch this scratches.
 
 <p align="center">
-  <img src="assets/app-secrets.png" alt="concealer Secrets — one searchable, scoped home for every credential across all your projects" width="820">
+  <img src="docs/assets/app-secrets.png" alt="concealer Secrets — one searchable, scoped home for every credential across all your projects" width="820">
   <br><sub>One searchable, scoped home for every credential — typed, tagged, masked, and disambiguated by tenant / project / environment / repo.</sub>
 </p>
 
@@ -188,11 +188,11 @@ Each type has its own **type‑aware form** so you only enter the fields that ma
 Each type renders exactly the inputs it needs — an API key is a single value, a cloud credential carries its client/secret/URLs, a database its host/port/user/password, a website its URL/login:
 
 <p align="center">
-  <img src="assets/secrets-cloud.png" alt="Cloud credential form" width="450">
-  <img src="assets/secrets-db.png" alt="Database secret form" width="410">
+  <img src="docs/assets/secrets-cloud.png" alt="Cloud credential form" width="450">
+  <img src="docs/assets/secrets-db.png" alt="Database secret form" width="410">
   <br>
-  <img src="assets/secrets-custom.png" alt="Custom key/value secret form" width="450">  
-  <img src="assets/secrets-web.png" alt="Website login form" width="410">
+  <img src="docs/assets/secrets-custom.png" alt="Custom key/value secret form" width="450">  
+  <img src="docs/assets/secrets-web.png" alt="Website login form" width="410">
   <br><sub>Type‑aware entry: cloud tokens · database connections · website logins · free‑form custom fields. Secret fields are masked; plain fields (host, url, username) stay readable and become optional table columns.</sub>
 </p>
 
@@ -211,15 +211,15 @@ Opens **http://127.0.0.1:8787** (localhost only). Features:
 - **Audit Log viewer**: filter by action/source/key/date, pagination, row detail, **chain verification**, CSV/JSON export
 
 <p align="center">
-  <img src="assets/app-audit-logs.png" alt="Tamper-evident audit log with chain verification" width="640">
+  <img src="docs/assets/app-audit-logs.png" alt="Tamper-evident audit log with chain verification" width="640">
   <br><sub><b>Audit Logs</b> — every read/write/copy/inject is HMAC‑chained; verify integrity or export to CSV/JSON.</sub>
 </p>
 <p align="center">
-  <img src="assets/app-risks.png" alt="Risk view: reused secret values scored by leak risk" width="640">
+  <img src="docs/assets/app-risks.png" alt="Risk view: reused secret values scored by leak risk" width="640">
   <br><sub><b>Risks</b> — finds the same value reused across projects and scores the blast radius. </sub>
 </p>
 <p align="center">
-  <img src="assets/app-scan-folder.png" alt="Scan a folder or shell history for leaked secrets" width="640">
+  <img src="docs/assets/app-scan-folder.png" alt="Scan a folder or shell history for leaked secrets" width="640">
   <br><sub><b>Scan folder</b> — sweep a directory (or shell history) for stray secrets and import them, tagged by origin.</sub>
 </p>
 
@@ -244,7 +244,7 @@ The agent can use a DB password to run a query, but the password never appears i
 **Agents list secret names — values stay hidden:**
 
 <p align="center">
-  <img src="assets/mcp-secret-list.gif" alt="Claude Code listing concealer secrets over MCP — names and scopes only, never values" width="820">
+  <img src="docs/assets/mcp-secret-list.gif" alt="Claude Code listing concealer secrets over MCP — names and scopes only, never values" width="820">
 </p>
 
 

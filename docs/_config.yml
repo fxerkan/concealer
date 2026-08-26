@@ -38,3 +38,5 @@ exclude:
   - Gemfile
   - Gemfile.lock
   - feature-plan.md   # internal roadmap — not published to GitHub Pages
+  - assets/hero.html  # PNG render-source templates — not served
+  - assets/icon.html
