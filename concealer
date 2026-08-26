@@ -91,14 +91,29 @@ def _save_rate(s):
         os.chmod(RATESTATE, 0o600)
     except OSError: pass
 
-def rate_gate(label, rows):
+def rate_gate(label, rows, atomic=False):
     """Aciklama kotasi. Doner (allowed_rows, note).
     per_call: tek cagri tavani; window_quota: kayan pencerede DISTINCT isim tavani.
-    Onceden acilan isimler 'bedava' (tekrar sorgu ile daha fazlasi acilmaz)."""
+    Onceden acilan isimler 'bedava' (tekrar sorgu ile daha fazlasi acilmaz).
+    atomic=True (run_with_secrets/inject): ya hepsi ya hicbiri — kismi env enjeksiyonu
+    (sessizce kirik komut + kismi sizinti) olmasin diye. Inject degeri modele donmedigi icin
+    per_call satir-tavani uygulanmaz; koruma = pencerede kac AYRI secret'in cocuk komuta acildigi."""
     lim = agent_limits(label); now = time.time()
     st = _load_rate()
     log = [p for p in st.get(label, []) if now - p[0] < lim["window_sec"]]   # eski kayitlari bud
     disclosed = {n for _, n in log}
+    if atomic:
+        remaining = max(0, lim["window_quota"] - len(disclosed))
+        new_names = {e["name"] for e in rows if not (e["name"] in disclosed and lim["window_quota"] > 0)}
+        if lim["window_quota"] == 0 or len(new_names) > remaining:   # kota 0 = tam engel
+            return [], ("\n[limit] injection blocked — %d new secret(s) exceed agent '%s' window quota "
+                        "(distinct %d, %d left). Narrow the scope (project/repo/env) or raise the limit in Settings."
+                        % (len(new_names), label, lim["window_quota"], remaining))
+        for e in rows:
+            nm = e["name"]
+            if not (nm in disclosed and lim["window_quota"] > 0): log.append([now, nm]); disclosed.add(nm)
+        st[label] = log; _save_rate(st)
+        return rows, ""
     capped = rows[:lim["per_call"]]
     remaining = max(0, lim["window_quota"] - len(disclosed))
     allowed, newn, held = [], 0, 0
@@ -1133,19 +1148,30 @@ def collect_secrets(target, d=None):
         if e["type"] == "api_key": kv[name] = str(e["fields"].get("value", ""))
         else:
             for fn, fv in e["fields"].items(): kv[f"{name}_{fn.upper()}"] = str(fv)
-    return kv, d
+    return kv, d, [e for sp, e in chosen.values()]
 
-def inject_env(target, source="cli", actor=None):
-    kv, d = collect_secrets(target)
+def inject_env(target, source="cli", actor=None, command=None, gate=None):
+    """gate=<agent label> verilirse enjeksiyon rate_gate(atomic)'ten gecer — kota asilirsa
+    (None, d, note) doner ve HICBIR secret enjekte edilmez. command verilirse audit detail'ine
+    calistirilan komut (redakte edilmis) eklenir."""
+    kv, d, recs = collect_secrets(target)
+    if gate is not None:
+        allowed, note = rate_gate(gate, recs, atomic=True)
+        if recs and not allowed:
+            audit("inject_denied", key=",".join(sorted(e["name"] for e in recs)), source=source, detail=label(target), actor=actor)
+            return None, d, note
     env = dict(os.environ); env.update(kv)
-    if kv: audit("inject", key=",".join(sorted(kv)), source=source, detail=label(target), actor=actor)
-    return env, d
+    if kv:
+        det = label(target)
+        if command is not None: det = redact(f"{det} ↦ {command}", d)   # komut audit'e; secret degeri sizmaz
+        audit("inject", key=",".join(sorted(kv)), source=source, detail=det, actor=actor)
+    return env, d, note if gate is not None else None
 
 # ---------------- deploy / hedef formatlarina render ----------------
 DEPLOY_TARGETS = ["dotenv", "export", "docker", "json", "k8s", "aws-secrets", "aws-ssm", "github"]
 def deploy_render(scope, target):
     """Kapsama uyan secret'lari secili deploy hedefi icin metne render eder (komut/manifest uretir)."""
-    kv, d = collect_secrets(scope)
+    kv, d, _ = collect_secrets(scope)
     stem = "-".join(scope.get(x) for x in DIMS if scope.get(x)) or "concealer"
     return _render_target(kv, stem, target)
 
@@ -2215,7 +2241,7 @@ def cli(argv):
     elif cmd == "run":
         sel = _sel(a)
         for dim in ("repo", "project"): sel.setdefault(dim, detect(dim))
-        env, _ = inject_env(sel, source="cli", actor=_cli_actor())
+        env, _, _ = inject_env(sel, source="cli", actor=_cli_actor(), command=" ".join(a))
         sys.stderr.write(f"[concealer] {label(sel)}\n")
         os.execvpe(a[0], a, env)
     elif cmd == "leaks":
@@ -2615,7 +2641,8 @@ def _mcp_call(name, args):
     if name == "run_with_secrets":
         target = {d: args[d] for d in DIMS if args.get(d)}
         for dim in ("repo", "project"): target.setdefault(dim, detect(dim))
-        env, d = inject_env(target, source="mcp", actor=agent)
+        env, d, note = inject_env(target, source="mcp", actor=agent, command=args["command"], gate=agent)
+        if env is None: return "error: injection blocked — rate limit reached." + (note or "")
         r = subprocess.run(["/bin/sh", "-c", args["command"]], env=env, capture_output=True, text=True)
         return redact(f"[{label(target)}]\n" + r.stdout + r.stderr, d) or "(no output)"
     if name == "set_secret":

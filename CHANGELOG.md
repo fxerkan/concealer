@@ -6,6 +6,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.2] — 2026-08-26
+
+### Security
+- **`run_with_secrets` (MCP inject) is now rate-gated.** Injection passes `rate_gate`
+  in a new all-or-nothing `atomic` mode: the distinct secret names a scope would inject
+  count against the agent's rolling `window_quota` (already-disclosed names re-inject
+  free; `window_quota=0` = full block). Exceeding the quota **refuses the whole call**
+  (no partial env) and audits `inject_denied`. Closes the gap where one scope-wide inject
+  bypassed the anti-bulk-exfiltration quota that already covered `list`/`search`.
+- **Inject audit now records the executed command.** The `inject` audit `detail` appends
+  the `run_with_secrets`/`run` shell command (run through `redact()` so no secret value
+  leaks), so the log shows *what ran*, not just which secret names were injected.
+
+### Fixed
+- **Audit Logs table:** sticky column headers now stay pinned on scroll (previously only
+  the Secrets table had sticky headers). Column widths no longer break when a KEY cell is
+  very long — the audit grid uses `table-layout:fixed` with sensible default widths and
+  persists manual column resizes.
+
 ## [0.9.0] — 2026-08-20
 
 ### Added

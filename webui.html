@@ -159,8 +159,9 @@ label.fld{display:block;margin-bottom:4px;color:var(--mut);font-size:12px;font-w
 .subrow .search{flex:1;min-width:200px;width:auto}
 .actionrow{display:flex;gap:10px;justify-content:flex-start;flex-wrap:wrap;margin-top:10px}
 /* thead sticks to viewport just under header+subbar (no scroll wrapper, or sticky breaks) */
-#view-secrets thead th{position:sticky;top:calc(var(--hh) + var(--sh));z-index:10}
+#view-secrets thead th,#view-audit thead th,#view-leaks thead th{position:sticky;top:calc(var(--hh) + var(--sh));z-index:10}
 .tablewrap{overflow:visible}
+#atable{table-layout:fixed}   /* uzun KEY degeri kolonlari bozmasin; resize genislikleri korunsun */
 .btn-filter{display:inline-flex;gap:6px;align-items:center}
 .btn-filter.on{border-color:var(--acc);color:var(--acc)}
 .pagesize{display:flex;gap:6px;align-items:center;color:var(--mut);font-size:12px}
@@ -677,11 +678,12 @@ const ACTL={
    unlock_fail:"kilit açma başarısız",get:"getir",list:"listele",search:"ara",rotate:"döndür",scan:"tara",
    scan_import:"tarama içe aktarımı",leak_scan:"risk taraması",settings:"ayarlar",settings_fail:"ayar başarısız",
    init:"ilklendir",harden:"sıkılaştır",recover:"kurtar",recovery_regen:"kurtarma yenile",passwd:"parola değiştir",
-   agent_register:"ajan kaydı",agent_revoke:"ajan iptali",
+   agent_register:"ajan kaydı",agent_revoke:"ajan iptali",inject_denied:"enjekte engellendi",get_denied:"erişim engellendi",
    backup:"yedek",backup_auto:"oto-yedek",backup_cfg:"yedek ayarı",backup_cfg_fail:"yedek ayarı başarısız"},
  en:{leak_scan:"leak scan",export_fail:"export failed",unlock_fail:"unlock failed",settings_fail:"settings failed",
    scan_import:"scan import",recovery_regen:"recovery regen",agent_register:"agent register",agent_revoke:"agent revoke",
-   backup:"backup",backup_auto:"auto-backup",backup_cfg:"backup settings",backup_cfg_fail:"backup settings failed"}
+   backup:"backup",backup_auto:"auto-backup",backup_cfg:"backup settings",backup_cfg_fail:"backup settings failed",
+   inject_denied:"inject blocked",get_denied:"access denied"}
 };
 function actLabel(a){ return (ACTL[LANG] && ACTL[LANG][a]) || a; }
 function setLang(l){
@@ -768,7 +770,7 @@ function startIdle(){ clearInterval(idleTimer); idleTimer=setInterval(()=>{ idle
 
 // header/subbar yuksekliklerini olcup sticky ofsetlerini CSS degiskenlerine yaz
 function measureSticky(){
-  const h=document.querySelector('header'), sb=$('#view-secrets .subbar');
+  const h=document.querySelector('header'), sb=document.querySelector('section:not(.hidden) .subbar')||$('#view-secrets .subbar');
   if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');
   if(sb)document.documentElement.style.setProperty('--sh',sb.offsetHeight+'px');
 }
@@ -1186,9 +1188,9 @@ async function doDeploy(){
 // ---------- grid ortak yardimcilari (secrets/audit/leaks model-driven gridleri kullanir) ----------
 function gridCmp(a,b){ const na=parseFloat(a.replace(/[^\d.\-]/g,'')),nb=parseFloat(b.replace(/[^\d.\-]/g,''));
   if(!isNaN(na)&&!isNaN(nb)&&/\d/.test(a)&&/\d/.test(b))return na-nb; return a.localeCompare(b,undefined,{numeric:true}); }
-function gridRz(e,h){ e.preventDefault(); e.stopPropagation(); const sx=e.pageX, sw=h.offsetWidth;
+function gridRz(e,h,done){ e.preventDefault(); e.stopPropagation(); const sx=e.pageX, sw=h.offsetWidth;
   const mv=ev=>h.style.width=Math.max(50,sw+ev.pageX-sx)+'px';
-  const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);};
+  const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);done&&done(parseInt(h.style.width));};
   document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up); }
 
 // ---------- secrets (model-driven grid: base + custom-field kolonlari, gizle/goster + sirala) ----------
@@ -1487,14 +1489,16 @@ function clampCell(s){ s=String(s==null?'':s); if(s.length<=255) return esc(s);
   return `<span class="clamp"><span class="ct">${esc(s.slice(0,255))}</span><span class="cf" hidden>${esc(s)}</span> <a class="cx" title="${s.length} chars" onclick="event.stopPropagation();clampTog(this)">… ▾</a></span>`; }
 function clampTog(a){ const w=a.parentNode, o=w.classList.toggle('open'); w.querySelector('.ct').hidden=o; w.querySelector('.cf').hidden=!o; a.textContent=o?'▴':'… ▾'; }
 function aColDefs(){ return [
-  {k:'n',      l:'#',            cls:'mut',      v:r=>r.n,          r:r=>r.n},
-  {k:'ts',     l:t('th_time'),   cls:'mono mut', v:r=>r.ts||'',     r:r=>fmtTs(r.ts)},
-  {k:'source', l:t('th_source'),                 v:r=>r.source||'', r:r=>tagChip(r.source)},
-  {k:'actor',  l:t('th_actor'),  cls:'mono mut', v:r=>r.actor||'',  r:r=>esc(r.actor||'')},
-  {k:'action', l:t('th_action'),                 v:r=>r.action||'', r:r=>`<b>${esc(actLabel(r.action))}</b>`},
-  {k:'key',    l:t('th_key'),    cls:'mono',     v:r=>r.key||'',    r:r=>clampCell(r.key)},
-  {k:'detail', l:t('th_detail'), cls:'mut',      v:r=>r.detail||'', r:r=>clampCell(r.detail)},
+  {k:'n',      l:'#',            cls:'mut',      w:52,  v:r=>r.n,          r:r=>r.n},
+  {k:'ts',     l:t('th_time'),   cls:'mono mut', w:158, v:r=>r.ts||'',     r:r=>fmtTs(r.ts)},
+  {k:'source', l:t('th_source'),                 w:82,  v:r=>r.source||'', r:r=>tagChip(r.source)},
+  {k:'actor',  l:t('th_actor'),  cls:'mono mut', w:120, v:r=>r.actor||'',  r:r=>esc(r.actor||'')},
+  {k:'action', l:t('th_action'),                 w:110, v:r=>r.action||'', r:r=>`<b>${esc(actLabel(r.action))}</b>`},
+  {k:'key',    l:t('th_key'),    cls:'mono',            v:r=>r.key||'',    r:r=>clampCell(r.key)},   // w yok → kalan alanı doldurur
+  {k:'detail', l:t('th_detail'), cls:'mut',      w:240, v:r=>r.detail||'', r:r=>clampCell(r.detail)},
 ]; }
+function aColW(k,px){ const m=JSON.parse(localStorage.getItem('a_col_w')||'{}'); m[k]=px; localStorage.setItem('a_col_w',JSON.stringify(m)); }
+function aColWof(c){ const m=JSON.parse(localStorage.getItem('a_col_w')||'{}'); return m[c.k]||c.w||null; }
 function aCols(){
   const all=aColDefs(), byk=Object.fromEntries(all.map(c=>[c.k,c]));
   const order=JSON.parse(localStorage.getItem('a_col_order')||'[]'), hidden=new Set(JSON.parse(localStorage.getItem('a_col_hidden')||'[]'));
@@ -1518,7 +1522,7 @@ function aSort(k,ev){ if(ev&&(ev.target.classList.contains('rsz')||ev.target.cla
   AC_SORT.dir=(AC_SORT.k===k)?-AC_SORT.dir:1; AC_SORT.k=k; aRender(); }
 function aRender(){
   const cols=aCols(), vis=cols.filter(c=>!c.hidden);
-  $('#ahead').innerHTML='<tr>'+vis.map(c=>`<th class="sortable" onclick="aSort('${c.k}',event)">${esc(c.l)}<span class="sarr">${AC_SORT.k===c.k?(AC_SORT.dir>0?' ▲':' ▼'):''}</span><span class="rsz" onmousedown="gridRz(event,this.parentElement)"></span></th>`).join('')
+  $('#ahead').innerHTML='<tr>'+vis.map(c=>{const w=aColWof(c);return `<th class="sortable"${w?` style="width:${w}px"`:''} onclick="aSort('${c.k}',event)">${esc(c.l)}<span class="sarr">${AC_SORT.k===c.k?(AC_SORT.dir>0?' ▲':' ▼'):''}</span><span class="rsz" onmousedown="gridRz(event,this.parentElement,px=>aColW('${c.k}',px))"></span></th>`}).join('')
     +`<th style="width:38px;text-align:right"><span class="colbtn" title="${t('columns')}" onclick="event.stopPropagation();aColsMenu()">⚙</span></th></tr>`;
   let rows=auditFiltered();
   if(AC_SORT.k){ const col=cols.find(c=>c.k===AC_SORT.k); if(col)rows.sort((a,b)=>gridCmp(col.v(a)+'',col.v(b)+'')*AC_SORT.dir); }
