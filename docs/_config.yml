@@ -37,3 +37,4 @@ plugins:
 exclude:
   - Gemfile
   - Gemfile.lock
+  - feature-plan.md   # internal roadmap — not published to GitHub Pages
