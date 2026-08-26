@@ -1,13 +1,13 @@
 {
-  "##": "DRAFT Scoop manifest — finalize `version` + the wheel `url`/`hash` after the first PyPI/GitHub release. Untested on a Windows host yet. See docs/WINDOWS.md.",
+  "##": "Scoop manifest for concealer. Installs the published PyPI wheel (pip pulls pywinpty/windows-curses). Not yet exercised on a real Scoop host, but url/hash are the live PyPI artifacts. See docs/WINDOWS.md.",
   "version": "0.9.12",
   "description": "Local-only secret manager: a typed, scoped, audited wrapper over SOPS + age with a web UI and MCP server.",
   "homepage": "https://github.com/fxerkan/concealer",
   "license": "MIT",
   "depends": ["python", "sops", "age"],
   "##depends": "python provides pip; sops+age are the binaries concealer wraps. All three live in the Scoop 'main' bucket.",
-  "url": "https://github.com/fxerkan/concealer/releases/download/v0.9.12/concealer-0.9.12-py3-none-any.whl#/concealer.whl",
-  "hash": "TODO-sha256-of-the-published-wheel",
+  "url": "https://files.pythonhosted.org/packages/70/f5/8526247d1bbe022b73a53d07b2b49338bb3dd183b1521464e5c4de6df0d0/concealer-0.9.12-py3-none-any.whl#/concealer.whl",
+  "hash": "65aca90b1cd4c1b89d0935c7740e695cc7d89935dd1a87c20bb99e45f5f1d963",
   "installer": {
     "script": [
       "python -m pip install --disable-pip-version-check --no-warn-script-location --target=\"$dir\\lib\" \"$dir\\concealer.whl\"",
@@ -16,9 +16,7 @@
     ]
   },
   "bin": "concealer.cmd",
-  "##bin": "concealer.cmd sets PYTHONPATH to the vendored lib and runs `python -m concealer`. pywinpty/windows-curses arrive as wheel deps.",
-  "checkver": "github",
-  "autoupdate": {
-    "url": "https://github.com/fxerkan/concealer/releases/download/v$version/concealer-$version-py3-none-any.whl#/concealer.whl"
-  }
+  "##bin": "concealer.cmd sets PYTHONPATH to the vendored lib and runs `python -m concealer`. pip pulls pywinpty/windows-curses as wheel deps into lib.",
+  "checkver": { "url": "https://pypi.org/pypi/concealer/json", "jsonpath": "$.info.version" },
+  "##autoupdate": "pythonhosted URLs are content-addressed (not version-templatable), so autoupdate is manual: bump version + url + hash from the new PyPI release."
 }

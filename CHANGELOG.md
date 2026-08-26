@@ -17,10 +17,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   clipboard copy uses `clip` + PowerShell auto-clear. See `docs/WINDOWS.md` for setup and the security
   caveats (Windows `chmod` only flips the read-only bit — the vault relies on `icacls`/NTFS ACLs, and
   concealer best-effort-locks its `keys/` files to the current user).
-- **`pipx install concealer`** — PyPI packaging (`pyproject.toml`, hatchling) ships the flat script as
-  the `concealer` package with `webui.html` bundled and `pywinpty`/`windows-curses` as Windows-only
-  deps. Cross-platform; `sops`/`age` remain external binaries (install via scoop/winget/brew/apt).
-  Draft **Scoop** and **winget** manifests live under `packaging/`.
+- **Published to PyPI — `pipx install concealer`** now works on all platforms
+  ([pypi.org/project/concealer](https://pypi.org/project/concealer/)). PyPI packaging
+  (`pyproject.toml`, hatchling) ships the flat script as the `concealer` package with `webui.html`
+  bundled and `pywinpty`/`windows-curses` as Windows-only deps. `sops`/`age` remain external binaries
+  (install via scoop/winget/brew/apt). A **Scoop** manifest (real PyPI wheel url/hash) and **winget**
+  notes live under `packaging/`.
 - **Windows portability fixes found by the CI smoke test** (`packaging/ci/win_smoke.py`,
   run on `windows-latest`): (a) force UTF-8 on `stdout`/`stderr` — a redirected Windows
   stream defaults to cp1252, so printing `→`/box-drawing raised `UnicodeEncodeError` in

@@ -8,6 +8,7 @@
   <a href="https://github.com/fxerkan/concealer/stargazers"><img src="https://img.shields.io/github/stars/fxerkan/concealer?style=for-the-badge&logo=github&color=ff4d4d&labelColor=0a0b0d" alt="GitHub stars"></a>
   <a href="https://github.com/fxerkan/concealer/blob/main/LICENSE"><img src="https://img.shields.io/github/license/fxerkan/concealer?style=for-the-badge&color=ff4d4d&labelColor=0a0b0d" alt="MIT License"></a>
   <a href="https://github.com/fxerkan/homebrew-tap"><img src="https://img.shields.io/badge/brew-fxerkan%2Ftap%2Fconcealer-ff4d4d?style=for-the-badge&logo=homebrew&labelColor=0a0b0d" alt="Homebrew"></a>
+  <a href="https://pypi.org/project/concealer/"><img src="https://img.shields.io/pypi/v/concealer?style=for-the-badge&logo=pypi&logoColor=white&color=ff4d4d&labelColor=0a0b0d" alt="PyPI"></a>
   <a href="https://fxerkan.github.io/concealer/"><img src="https://img.shields.io/badge/docs-fxerkan.github.io-ff4d4d?style=for-the-badge&labelColor=0a0b0d" alt="Docs"></a>
 </p>
 
