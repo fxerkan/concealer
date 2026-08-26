@@ -63,4 +63,7 @@ pattern = 'VERSION = "(?P<version>[^"]+)"'
 "concealer_win.py" = "concealer_win.py"
 
 [tool.hatch.build.targets.sdist]
-include = ["concealer", "concealer_win.py", "webui.html", "README.md", "LICENSE", "CHANGELOG.md", "docs", "packaging"]
+# Keep the sdist small: the runnable script + its data + metadata. Docs/screenshots
+# and CI packaging live in the git repo, not the PyPI tarball.
+include = ["concealer", "concealer_win.py", "webui.html", "README.md", "LICENSE", "CHANGELOG.md",
+           "packaging/pypi/pkg_init.py"]   # force-include source, needed to build the wheel from the sdist

@@ -31,3 +31,6 @@ docs/Gemfile.lock
 # CI capture scratch
 packaging/ci/_demo/
 win-artifacts/
+dist/
+build/
+*.egg-info/
