@@ -27,6 +27,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   pipes/CI; (b) `save()` can't use `/dev/stdin` on Windows, so it now writes the plaintext
   to an ACL-locked temp file in `keys/` and deletes it immediately (documented at-rest
   caveat in `docs/WINDOWS.md`). Both are Windows-only branches; Unix is byte-for-byte unchanged.
+- **Verified green on a real `windows-latest` runner:** all five interfaces pass end-to-end —
+  `age/pty` (pywinpty round-trip), `CLI` (init + agent register + set/get/list, masking),
+  `web` (`/api/unlock` → age decrypt in-process, masked `/api/secrets`), `MCP`
+  (`tools/list` + `list_secrets`, value never leaked), and `TUI` (windows-curses render + quit).
 
 ## [0.9.11] — 2026-08-26
 
