@@ -1,4 +1,11 @@
+---
+title: Windows
+layout: default
+nav_order: 3.5
+---
+
 # concealer on Windows
+{: .no_toc }
 
 concealer runs **natively on Windows** — no WSL required. This page explains how
 to install it, how the Windows build differs from macOS/Linux, and the security
@@ -6,6 +13,12 @@ caveats you must understand before trusting a vault on Windows.
 
 If you prefer zero surprises, **WSL2 also works with zero changes** (concealer is
 just a Linux program there). Native Windows is for people who don't want WSL.
+
+1. TOC
+{:toc}
+
+> Verified end-to-end on a real `windows-latest` runner in CI (`.github/workflows/windows-test.yml`):
+> the CLI, web UI, MCP server, and TUI all pass. The screenshots below are captured on that runner.
 
 ---
 
@@ -49,6 +62,58 @@ cd concealer
 py -m pip install pywinpty windows-curses
 py concealer web 8799
 ```
+
+---
+
+## Environment variables (Windows)
+
+Set these per-session in PowerShell with `$env:NAME = "…"`, or persistently with
+`setx NAME "…"` (opens a new shell to take effect). Same variables as every
+platform — only the defaults/paths differ.
+
+| Variable | Purpose | Windows notes |
+|---|---|---|
+| `CONCEALER_HOME` | vault directory | Defaults to `%USERPROFILE%\.concealer`. Keep it on your **NTFS** user volume — not a FAT/removable drive (see [chmod caveat](#1-chmod-0600-does-not-mean-what-it-means-on-unix)). |
+| `CONCEALER_TOKEN` | CLI/MCP unlock token (from `init` / `unlock` / `agent register`) | `$env:CONCEALER_TOKEN = "…"`. For an MCP client, put it in the server's `env` block. |
+| `CONCEALER_IDLE` | web session idle auto-lock, seconds | default `300` |
+| `CONCEALER_NO_OPEN` | set to `1` to stop `concealer web` from opening a browser | useful over SSH/headless |
+| `PATH` | must contain `sops.exe`, `age.exe`, `age-keygen.exe` | `scoop install sops age` puts them on PATH automatically |
+
+```powershell
+# example: point at a throwaway vault, unlock, use it
+$env:CONCEALER_HOME = "$env:TEMP\cer-test"
+concealer init                        # sets master password, prints a CONCEALER_TOKEN + recovery codes
+$env:CONCEALER_TOKEN = "…paste from init…"
+concealer set --name GITHUB_TOKEN ghp_xxx --project demo
+concealer web 8799                    # opens the web UI
+```
+
+`sops`/`age` are **not** pip packages — install them with `scoop install sops age`
+(or winget). `concealer`'s preflight check fails loudly with a hint if they're missing.
+
+---
+
+## The Windows interfaces
+
+All four interfaces below are captured on a real `windows-latest` CI runner
+(dummy vault, dummy secrets).
+
+### CLI
+
+![concealer CLI on Windows]({{ site.baseurl }}/assets/win-cli.png)
+
+### Web UI
+
+![concealer web UI on Windows — unlock]({{ site.baseurl }}/assets/win-web-lock.png)
+![concealer web UI on Windows — dashboard]({{ site.baseurl }}/assets/win-web-dashboard.png)
+
+### TUI
+
+![concealer TUI on Windows (windows-curses)]({{ site.baseurl }}/assets/win-tui.png)
+
+### MCP (stdio JSON-RPC)
+
+![concealer MCP on Windows]({{ site.baseurl }}/assets/win-mcp.png)
 
 ---
 

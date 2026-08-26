@@ -19,19 +19,35 @@ nav_order: 3
 | **Python 3** | concealer is a single stdlib-only script | No `pip install` needed |
 | **[sops](https://github.com/getsops/sops)** | encrypt/decrypt the vault | |
 | **[age](https://github.com/FiloSottile/age)** | encryption backend + `age-keygen` | |
-| **expect** | drives age's passphrase prompt (age reads `/dev/tty`, not stdin) | ships with macOS and most Linux |
+| **expect** | drives age's passphrase prompt (age reads `/dev/tty`, not stdin) | **macOS/Linux only** — on Windows this role is filled by `pywinpty` (a pip dep) |
 
-concealer runs a **preflight check** on every command and exits with an install hint if any of `sops`, `age`, `age-keygen`, or `expect` are missing.
+concealer runs a **preflight check** on every command and exits with an install hint if any of `sops`, `age`, `age-keygen`, or `expect` (Windows: `pywinpty`) are missing.
+
+**Platforms:** macOS, Linux, and **Windows** (native — see the [Windows guide]({{ site.baseurl }}/WINDOWS)). All four interfaces (CLI · Web · MCP · TUI) are verified on each in CI.
 
 ---
 
-## Homebrew (recommended)
+## Homebrew (recommended, macOS/Linux)
 
 ```bash
 brew install fxerkan/tap/concealer
 ```
 
 This pulls in `sops`, `age`, and `expect` automatically.
+
+---
+
+## pipx (all platforms, incl. Windows)
+
+```bash
+pipx install concealer            # concealer itself (+ pywinpty/windows-curses on Windows)
+scoop install sops age            # the binaries it wraps (Windows); brew/apt elsewhere
+```
+
+`sops`/`age` are external binaries and are **not** pip packages — install them with
+your OS package manager. On Windows this is the recommended path; see the
+[Windows guide]({{ site.baseurl }}/WINDOWS) for Scoop, environment variables, and
+the security caveats.
 
 ---
 
