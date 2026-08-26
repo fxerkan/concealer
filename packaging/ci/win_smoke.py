@@ -36,6 +36,21 @@ def log(msg):
     print(msg, flush=True)
 
 
+def _watchdog(seconds):
+    """Hard backstop: no matter what hangs, force-exit with a summary so the CI
+    step always ends and its log becomes visible (a blocked ConPTY read has no
+    timeout of its own)."""
+    def bomb():
+        t0 = time.time()
+        while time.time() - t0 < seconds:
+            time.sleep(1)
+        log(f"\n!! WATCHDOG fired after {seconds}s — something hung. Partial results:")
+        for k in ("age/pty", "CLI", "web", "MCP", "TUI"):
+            log(f"  {k:8} {results.get(k, 'not reached')}")
+        os._exit(3)
+    threading.Thread(target=bomb, daemon=True).start()
+
+
 def env(extra=None):
     e = dict(os.environ, CONCEALER_HOME=HOME, CONCEALER_NO_OPEN="1")
     if extra:
@@ -44,10 +59,20 @@ def env(extra=None):
 
 
 # ---------- ConPTY driver (drives getpass/age via a real pseudo-console) ----------
-def pty_interact(argv, sends, timeout=120):
+def _kill(p):
+    for m in ("terminate", "close"):
+        try:
+            getattr(p, m)(force=True) if m == "terminate" else getattr(p, m)()
+        except Exception:
+            pass
+
+
+def pty_interact(argv, sends, timeout=60):
     """Spawn argv in a ConPTY; for each (needle, response) wait for `needle` in the
-    output then type `response`. Returns (exit_code, output_after_last_send)."""
+    output then type `response`. Bounded: always terminates the child, never blocks
+    on wait(). Returns (exit_code_or_None, full_output)."""
     from winpty import PtyProcess
+    log(f"    pty spawn: {' '.join(argv)}")
     p = PtyProcess.spawn(argv)
     buf = [""]
     done = threading.Event()
@@ -56,8 +81,6 @@ def pty_interact(argv, sends, timeout=120):
         while True:
             try:
                 c = p.read(1024)
-            except EOFError:
-                break
             except Exception:
                 break
             if c:
@@ -68,22 +91,56 @@ def pty_interact(argv, sends, timeout=120):
 
     threading.Thread(target=reader, daemon=True).start()
     deadline = time.time() + timeout
-    for needle, resp in sends:
-        while needle.lower() not in buf[0].lower():
-            if done.is_set():
-                raise RuntimeError(f"process exited before prompt {needle!r}. tail: {buf[0][-400:]!r}")
-            if time.time() > deadline:
-                raise TimeoutError(f"prompt {needle!r} never appeared. tail: {buf[0][-400:]!r}")
-            time.sleep(0.05)
-        p.write(resp)
-        buf[0] = ""          # only search new output for the next prompt / capture after last send
-    while not done.is_set() and time.time() < deadline:
-        time.sleep(0.05)
     try:
-        rc = p.wait()
-    except Exception:
+        for needle, resp in sends:
+            seen = ""
+            while needle.lower() not in buf[0].lower():
+                if done.is_set():
+                    raise RuntimeError(f"exited before prompt {needle!r}. tail: {buf[0][-400:]!r}")
+                if time.time() > deadline:
+                    raise TimeoutError(f"prompt {needle!r} never appeared in {timeout}s. tail: {buf[0][-400:]!r}")
+                time.sleep(0.05)
+            log(f"    saw {needle!r} → sending response")
+            full = buf[0]
+            p.write(resp)
+            buf[0] = ""
+        # brief drain for trailing output (e.g. the token line), then STOP — never block
+        drain_until = min(deadline, time.time() + 20)
+        while not done.is_set() and time.time() < drain_until:
+            time.sleep(0.05)
+    finally:
+        out = buf[0]
         rc = None
-    return rc, buf[0]
+        # bounded wait: poll isalive, then force-kill. Do NOT call p.wait() (it blocks).
+        w = time.time() + 8
+        while p.isalive() and time.time() < w:
+            time.sleep(0.1)
+        try:
+            rc = p.exitstatus if not p.isalive() else None
+        except Exception:
+            rc = None
+        _kill(p)
+    return rc, out
+
+
+# ---------- core: pywinpty drives age at all (single-level ConPTY, no vault) ----------
+def test_age_pty():
+    """The heart of the port: encrypt+decrypt a temp file with `age -p`/`-d` driven
+    by concealer_win.age_pw (pywinpty). Independent of init/getpass/nesting."""
+    import concealer_win
+    d = tempfile.mkdtemp()
+    plain, enc, dec = (os.path.join(d, n) for n in ("p.txt", "p.age", "p.out"))
+    with open(plain, "w") as f:
+        f.write("hello-conpty")
+    rc, out = concealer_win.age_pw(["-p", "-o", enc, plain], PW, confirm=True)
+    if rc != 0 or not os.path.exists(enc):
+        raise RuntimeError(f"age ENCRYPT via pywinpty failed rc={rc}: {out[-400:]!r}")
+    rc, out = concealer_win.age_pw(["-d", "-o", dec, enc], PW)
+    if rc != 0:
+        raise RuntimeError(f"age DECRYPT via pywinpty failed rc={rc}: {out[-400:]!r}")
+    if open(dec).read().strip() != "hello-conpty":
+        raise RuntimeError("age round-trip via pywinpty produced wrong plaintext")
+    log("  pywinpty drives age -p/-d round-trip OK (single-level ConPTY)")
 
 
 # ---------- CLI ----------
@@ -224,17 +281,14 @@ def test_tui():
     time.sleep(3.0)
     if not p.isalive():
         raise RuntimeError("TUI exited before we could interact (curses init failed?)")
-    p.write("q")
-    deadline = time.time() + 15
+    p.write("q")            # quit key
+    deadline = time.time() + 10
     while p.isalive() and time.time() < deadline:
-        try:
-            p.read(1024)
-        except EOFError:
-            break
-        time.sleep(0.1)
-    if p.isalive():
-        p.terminate(force=True)
-        raise RuntimeError("TUI did not quit on 'q'")
+        time.sleep(0.2)     # poll only — do NOT p.read() (it can block with no output)
+    alive = p.isalive()
+    _kill(p)
+    if alive:
+        raise RuntimeError("TUI did not quit on 'q' within 10s")
     log("  TUI started (windows-curses) and quit on 'q'")
 
 
@@ -250,7 +304,10 @@ def run(name, fn, *a):
 
 
 def main():
+    _watchdog(240)          # hard backstop so the CI step can never hang forever
     log("== concealer Windows smoke ==")
+    log("[age/pty]")
+    run("age/pty", test_age_pty)
     log("[CLI]")
     toks = run("CLI", test_cli)
     if toks:
@@ -266,8 +323,8 @@ def main():
     run("TUI", test_tui)
 
     log("\n== summary ==")
-    for k in ("CLI", "web", "MCP", "TUI"):
-        log(f"  {k:4} {results.get(k, 'SKIP')}")
+    for k in ("age/pty", "CLI", "web", "MCP", "TUI"):
+        log(f"  {k:8} {results.get(k, 'SKIP')}")
     if any(str(v).startswith("FAIL") for v in results.values()):
         sys.exit(1)
     log("ALL PASS")
