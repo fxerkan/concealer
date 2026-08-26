@@ -6,6 +6,151 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.9] — 2026-08-26
+
+### Changed
+- **Per-field secret toggle for custom secrets in the web editor.** Each custom field row
+  now has a 🔒/🔓 flag: flagged fields are masked (password + reveal), un-flagged fields show
+  their value in plaintext in both the edit and view screens. Defaults from the field-name
+  heuristic; the choice persists as a `field_meta.secret` override so non-secret values like
+  `REGION=eu-central-1` no longer render as `••••••`.
+
+### Fixed
+- **Exposure record-picker header now stays pinned.** The table lives in its own scroll
+  container, but the page-level `#view-leaks thead th` rule pinned headers at
+  `top:calc(--hh + --sh)` (the app header/subbar offset), so inside the container the header
+  floated mid-list over the rows. A more specific `#view-leaks .exgrid thead th` rule pins it
+  to `top:0` of its own scroll box (with a solid background + hairline shadow).
+
+## [0.9.8] — 2026-08-26
+
+### Changed
+- **Online leak check: record picker is now a table, not a dropdown.** The secret picker
+  is a Secrets-grid-style table (checkbox · Name · Type · Collection · Scope · Tags ·
+  Updated) with a left multi-select column and **Select all / Clear** at the top (plus a
+  header checkbox). Wider and easier to scan; each row is a distinct record so same-named
+  secrets in different scopes are picked individually. The scope/collection/tag filter row
+  narrows which rows appear; header checkbox reflects "all in-scope selected".
+- **Scan leaks shows live progress.** Clicking Scan opens a modal with a **determinate
+  progress bar** ("Checking N / total") that advances as records are checked in small
+  batches, so it's clear the work is running in the background. The modal is **cancellable**
+  (partial results are still shown), and it reiterates that only a SHA-1 prefix is sent.
+
+## [0.9.7] — 2026-08-26
+
+### Fixed
+- **Online leak check now targets exact records, not names.** The secret picker keyed on
+  **name**, so two records sharing a name across different scopes/collections/tags/repos
+  collapsed into one option — picking it silently checked *all* of them. The picker now
+  lists **distinct records by id**, each labelled with its scope/collection/tags so
+  duplicates are told apart, and `POST /api/exposure` accepts an `ids` list
+  (`exposure_scan(ids=…)`) that checks only those records.
+
+### Added
+- **Target-narrowing filters before picking.** A row of multi-select dropdowns
+  (tenant / project / environment / repo / collection / tag) above the secret picker
+  narrows which records are listed; an empty picker selection then means "all records in
+  the current scope" (count shown inline). The shared `msel` search now also matches an
+  option's display label, so you can search the record picker by name even though options
+  are id-valued.
+
+## [0.9.6] — 2026-08-26
+
+### Changed
+- **Exposure tab now drives off the vault, not free text.** The **Online leak check** picks
+  the secrets to check from a filterable/multi-select dropdown (the shared `msel` component)
+  of secret names — empty selection = all. The **Email breach check** picks from a dropdown
+  of email addresses **extracted from the vault** (only from non-secret fields — `url`,
+  `notes`, and plaintext fields like `username`; masked secret values are never scanned) and
+  checks each selected email, showing per-email results. No more hand-typing.
+- **Remediation guide is now rendered, not raw.** The cleanup-guide modal renders the
+  markdown (headings, blockquote, lists, bold, inline code) with a dependency-free
+  shell/PowerShell **syntax highlighter** (comments, strings, flags, commands). **Each code
+  block has its own copy button**, plus a **Copy all** in the footer. Highlighter is a
+  single-pass tokenizer (no CDN/lib), and all code content is HTML-escaped (XSS-safe).
+
+## [0.9.5] — 2026-08-26
+
+### Added
+- **Risks → "Exposure" tab — online leak research + git/log scanning.** A new tab that
+  answers "is this secret leaked / reused anywhere" **without ever sending the secret
+  value online**:
+  - **Online leak check (`pwned_count`, `exposure_scan`, `POST /api/exposure`, CLI
+    `expose`).** Checks each high-entropy secret value against HIBP Pwned Passwords using
+    **k-anonymity** — only the first 5 hex of the value's SHA-1 leaves the machine; the
+    full-hash comparison happens locally. **The value and its full hash never leave the
+    box** (verified by test). Scope it to one secret, a project/repo/environment, or all.
+    Results show breach count, severity, **CWE** references (798/259/321/…), and a
+    keyhacks-style validate hint per token type. Click a row to open its editor.
+  - **Email breach check (`hibp_breaches`, `POST /api/breach`).** HIBP account breach
+    lookup for a user-supplied email (needs the user's own HIBP API key — set in Settings
+    → HIBP API key, stored in the 0600 config, never returned; only the email is sent).
+    Without a key it links to the manual HIBP page.
+  - **Git / log / .gitignore scan (`git_scan`, `log_scan`, `gitignore_gaps`,
+    `POST /api/gitscan`, CLI `gitscan`).** Finds secrets **committed in git history**
+    (pickaxe `git log -S` on vault values — precise, local), present in **tracked files**
+    (`git grep` token patterns), or in **log files**, plus secret-bearing files **missing
+    from .gitignore/.claudeignore**. All read-only.
+  - **History cleanup guide (`git_remediation`, `POST /api/gitremedy`).** A remediation
+    document tailored to the repo/files/secrets (rotate-first, `git rm --cached`,
+    `git filter-repo`/BFG, force-push coordination, pre-commit scanners). **concealer
+    never runs history-rewriting commands** — it only generates the steps for you to run.
+- **Scan folder button** now keeps its 🔎 icon (was overwritten by the i18n label).
+
+### Security
+- The online leak check is **opt-in** (only runs when you click Scan / run `expose`) and
+  transmits only a SHA-1 prefix — a deliberate k-anonymity design so a full secret value
+  is never exposed to a third party. CWE-798 (hard-coded credentials) and related CWEs are
+  surfaced as reference links on findings.
+
+## [0.9.4] — 2026-08-26
+
+### Added
+- **Environment / global variable scan.** `env_scan()` inspects the local machine's live
+  environment (`os.environ`) plus shell profile files (`~/.bashrc`, `~/.zshrc`, `~/.zshenv`,
+  `~/.profile`, `~/.config/fish/config.fish`, `/etc/environment`, …) for secret-looking
+  `KEY=VALUE` / `set -x` assignments, reusing the same detection heuristics as the folder
+  scan. Values never leave the server (masked). Wired into Scan folder (new **"also scan
+  environment/global variables"** checkbox — path is now optional when history/env is
+  selected) and the CLI (`scan --envvars`). macOS + Linux; Windows system/user env
+  (registry) is deferred. Our own `SOPS_AGE_KEY*` / `CONCEALER_TOKEN` and noisy vars
+  (`PATH`, `LS_COLORS`, …) are skipped.
+- **Policy page — user-defined reminder rules + notifications.** A new **Policy** tab where
+  you add/edit/delete rules (`GET/POST /api/policies`, `DELETE /api/policies/<id>`;
+  `policy_eval()`), toggle each on/off and its notification bell, and see the secrets that
+  **violate** each rule — click a row to open that secret's editor, or **bulk-edit** all
+  violators at once (add tags / set rotation interval / set collection). Rule kinds:
+  `rotation` (max interval / overdue / missing policy), `expiry` (expired / expiring within
+  N days / missing expiry field), `reuse` (shared value), `naming` (name regex), `tagging`
+  (required tags). Each policy carries an **audience** (`user`/`agent`/`cli`/`web`/`tui`/
+  `mcp`/`all`) so different rules can target different consumers. Notify-enabled violations
+  surface as a badge on the Policy tab and (with permission) a browser notification on
+  unlock. CLI: `policy list` and `policy check` (exits non-zero if any violation —
+  cron-friendly). The **MCP access limits (anti-bulk-exfiltration)** editor moved from
+  Settings to the Policy page (same `CFG["limits"]` backing + `rate_gate`; unchanged
+  semantics) as the built-in agent-access policy.
+
+### Fixed
+- **Web UI: browser Back/Forward no longer exits the app.** The SPA now keeps its active
+  tab in history (`?v=<tab>` via `pushState`); Back/Forward moves between the last visited
+  tabs instead of leaving the page, and Back on an open dialog just closes it. Restoring a
+  view **never auto-reveals a secret** — values are only fetched on an explicit reveal, the
+  detail modal is destroyed on Back, and Forward never re-opens it.
+
+## [0.9.3] — 2026-08-26
+
+### Added
+- **Risks page — "Overview" tab.** A per-secret risk dashboard fed by a new read-only
+  `GET /api/health` endpoint (`health_scan()`). Groups secrets into: ❌ expired,
+  ⏰ expiring soon (≤30 days), 🔄 rotation overdue, ⚠️ high-risk reuse, and 🔥 most-used.
+  A filter box narrows by project / repo / name / tag. **Clicking any row opens that
+  secret's edit form directly.** Expiry is read from an `expires`-like field
+  (`expires`/`expiry`/`expires_at`/`expiration`/`valid_until`/`not_after`), parsed as
+  ISO date/datetime or unix epoch; usage counts + last-use come from the audit log
+  (`access_stats()`), reuse severity from `leak_scan()`. Web-only (human owner); no
+  secret values leave the server. The existing **Shell history** scan remains its own
+  tab on the same page.
+
 ## [0.9.2] — 2026-08-26
 
 ### Security
@@ -24,6 +169,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   the Secrets table had sticky headers). Column widths no longer break when a KEY cell is
   very long — the audit grid uses `table-layout:fixed` with sensible default widths and
   persists manual column resizes.
+
+## [0.9.1] — 2026-08-26
+
+### Changed
+
+- **Dark-theme accent recolored amber → redaction red (`#ff4d4d`).** The old amber-on-black
+  wordmark (black `conceal` + amber-boxed `er`) read too close to an unrelated adult-site logo.
+  The dark palette now uses a "classified redaction" red across the web UI, TUI (ANSI `203`),
+  and the GitHub Pages docs. **Light theme and the matrix theme are unchanged.** Regenerated the
+  logo (`logo-512/1024.png`, `logo.svg`), the og-image/hero (`hero.png`), the favicon, and the
+  README/docs badges to match.
 
 ## [0.9.0] — 2026-08-20
 

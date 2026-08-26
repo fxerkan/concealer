@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>concealer</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='116' fill='%230a0b0d'/><rect x='128' y='176' width='176' height='38' rx='19' fill='%23272c35'/><rect x='128' y='232' width='256' height='52' rx='26' fill='%23ffb020'/><rect x='128' y='302' width='136' height='38' rx='19' fill='%23272c35'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='116' fill='%230a0b0d'/><rect x='128' y='176' width='176' height='38' rx='19' fill='%23272c35'/><rect x='128' y='232' width='256' height='52' rx='26' fill='%23ff4d4d'/><rect x='128' y='302' width='136' height='38' rx='19' fill='%23272c35'/></svg>">
 <style>
 :root{
   /* Covert (Dark) — near-black + amber signal. amber = redaction / classified marker. */
   --bg:#0a0b0d; --panel:#101216; --panel2:#161a20; --line:#1c1f26; --line2:#2a2f38;
-  --txt:#e8e8e6; --mut:#8a909b; --acc:#ffb020; --acc2:#ffc247; --ok:#7ee787; --warn:#e3b341; --bad:#ff6b6b;
+  --txt:#e8e8e6; --mut:#8a909b; --acc:#ff4d4d; --acc2:#ff7a7a; --ok:#7ee787; --warn:#e3b341; --bad:#ff6b6b;
   --chip:#161a20; --ink:#0a0b0d; --th-bg:#232833; --th-fg:#cfd4de; --zebra:rgba(255,255,255,.022);
 }
 /* White — light surfaces, amber signal darkened for contrast on white */
@@ -29,7 +29,7 @@
 html{scrollbar-color:var(--line2) transparent;scrollbar-width:thin}
 body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
 /* browser surfaces themed from the palette (selection, caret, focus, scrollbar) */
-::selection{background:rgba(255,176,32,.26);color:var(--txt)}
+::selection{background:rgba(255,77,77,.26);color:var(--txt)}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
 ::-webkit-scrollbar{width:12px;height:12px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -51,7 +51,7 @@ a{color:var(--acc);text-decoration:none}
 .hidden{display:none!important}
 /* marka: "er" son eki = amber redaksiyon çubuğu (hem house-rule aksan, hem 'conceal' eylemi) */
 .brand{font-weight:700;letter-spacing:-.2px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-.brand .ac{display:inline-block;color:var(--ink);background:var(--acc);border-radius:4px;padding:0 .2em;margin-left:.05em;box-shadow:0 2px 8px rgba(255,176,32,.22)}
+.brand .ac{display:inline-block;color:var(--ink);background:var(--acc);border-radius:4px;padding:0 .12em;margin-left:0;box-shadow:0 2px 8px rgba(255,77,77,.22)}
 
 #login{min-height:100vh;display:flex;align-items:center;justify-content:center;
   background:radial-gradient(900px 500px at 78% -12%,#14161c 0%,#0c0d11 46%,var(--bg) 100%)}
@@ -187,7 +187,7 @@ button.b-import:disabled{opacity:.45;cursor:not-allowed;border-color:var(--line2
 #idle-m{display:none;font-variant-numeric:tabular-nums;color:var(--mut);font-size:12px}
 /* header logo chip + amber glow/halo (feature-graphic ile ayni) — user-requested */
 header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-right:8px;flex:0 0 auto;
-  box-shadow:0 0 0 1px rgba(255,176,32,.4),0 0 16px 3px rgba(255,176,32,.5)}
+  box-shadow:0 0 0 1px rgba(255,77,77,.4),0 0 16px 3px rgba(255,77,77,.5)}
 
 /* --- filter panel (collapsible) with labelled multi-selects --- */
 .filterpanel{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:10px}
@@ -206,6 +206,35 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
 .msel-opt input{width:auto}
 .msel-empty{color:var(--mut);padding:8px;font-size:12px}
 .msel-all{border-bottom:1px solid var(--line);margin-bottom:4px;padding-bottom:8px}
+
+/* --- exposure: target filter row (narrow before picking) --- */
+.exfilters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:6px}
+.exgrid{max-height:44vh;overflow:auto;border:1px solid var(--line);border-radius:10px}
+/* #view-leaks thead th kurali sayfa-seviyesi sticky icin top:calc(--hh+--sh) veriyor; exgrid KENDI
+   scroll-container'i oldugundan header'i kendi ustune (top:0) sabitle — id+class ile ozgulukte kazan */
+#view-leaks .exgrid thead th{position:sticky;top:0;z-index:5;background:var(--panel);box-shadow:0 1px 0 var(--line)}
+.exgrid tbody tr{cursor:pointer}
+.exgrid tbody tr.sel{background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.exgrid tbody tr:hover{background:var(--panel)}
+.pbar{height:9px;background:var(--panel2);border-radius:6px;overflow:hidden;margin-top:12px}
+.pbar>div{height:100%;background:var(--acc);border-radius:6px;transition:width .25s ease}
+
+/* --- remediation guide: markdown + shell syntax highlight --- */
+.mdbox{max-height:64vh;overflow:auto;padding-right:6px}
+.mdbox .mdh1{font-size:17px;margin:14px 0 6px}
+.mdbox .mdh2{font-size:14px;margin:14px 0 6px;color:var(--acc)}
+.mdbox .mdp{margin:6px 0;line-height:1.5}
+.mdbox .mdli{margin:2px 0 2px 6px}
+.mdbox .mdq{border-left:3px solid var(--acc);padding:8px 12px;margin:8px 0;color:var(--mut);background:rgba(255,77,77,.06);border-radius:0 6px 6px 0}
+.mdbox code.ic{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:12px;font-family:ui-monospace,Menlo,monospace}
+.cblock{border:1px solid var(--line2);border-radius:8px;margin:8px 0;overflow:hidden;background:var(--panel2)}
+.cbar{display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:var(--panel);border-bottom:1px solid var(--line)}
+pre.code{margin:0;padding:10px 12px;overflow-x:auto}
+pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.55;white-space:pre;color:var(--ink)}
+.tc-cmt{color:#6a7380;font-style:italic}
+.tc-str{color:#7fd39b}
+.tc-flag{color:#e3b341}
+.tc-kw{color:#ff6a6a;font-weight:600}
 
 /* --- scan: folder browser + indeterminate progress bar --- */
 .browse{border:1px solid var(--line2);border-radius:10px;margin-bottom:12px;overflow:hidden}
@@ -315,7 +344,7 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
 <div id="login">
   <div class="loginbg" id="loginbg" aria-hidden="true"></div>
   <div class="card">
-    <h1 class="brand"><svg viewBox="0 0 512 512" width="34" height="34" style="vertical-align:-8px;margin-right:4px"><rect width="512" height="512" rx="116" fill="#0a0b0d"/><rect x="12" y="12" width="488" height="488" rx="104" fill="none" stroke="#20242c" stroke-width="2"/><rect x="128" y="176" width="176" height="38" rx="19" fill="#272c35"/><rect x="128" y="232" width="256" height="52" rx="26" fill="#ffb020"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#272c35"/></svg>conceal<span class="ac">er</span></h1>
+    <h1 class="brand"><svg viewBox="0 0 512 512" width="34" height="34" style="vertical-align:-8px;margin-right:4px"><rect width="512" height="512" rx="116" fill="#0a0b0d"/><rect x="12" y="12" width="488" height="488" rx="104" fill="none" stroke="#20242c" stroke-width="2"/><rect x="128" y="176" width="176" height="38" rx="19" fill="#272c35"/><rect x="128" y="232" width="256" height="52" rx="26" fill="#ff4d4d"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#272c35"/></svg>conceal<span class="ac">er</span></h1>
     <p data-i18n="login_sub">Lokal secret vault — master password ile aç</p>
     <p class="cli">$ <b>cer</b> <span class="m">web</span> · <span class="m">tui</span> · <span class="m">mcp</span> · <span class="m">agent</span></p>
     <div class="pwrow">
@@ -324,20 +353,21 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
     </div>
     <div id="loginerr" style="color:var(--bad);margin-top:10px;min-height:18px"></div>
     <button class="primary" style="width:100%;margin-top:8px" data-i18n="unlock" onclick="unlock()">Aç</button>
-    <div class="foot">conceal<span class="ac">er</span> · v__VERSION__ · <a href="https://github.com/FXerkan/concealer" target="_blank" rel="noopener" title="GitHub"><svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" style="vertical-align:-2px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a> · by <a href="https://fxerkan.com" target="_blank" rel="noopener">FXerkan</a></div>
+    <div class="foot">conceal<span class="ac">er</span> · v__VERSION__ <a href="https://github.com/fxerkan/concealer" title="GitHub"><svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" style="vertical-align:-2px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a></div>
   </div>
 </div>
 
 <!-- APP -->
 <div id="app" class="hidden">
   <header>
-    <span class="brand"><svg class="logo" viewBox="0 0 512 512" width="32" height="32"><rect x="128" y="176" width="176" height="38" rx="19" fill="#8a909b"/><rect x="128" y="232" width="256" height="52" rx="26" fill="#ffb020"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#8a909b"/></svg>conceal<span class="ac">er</span></span>
+    <span class="brand"><svg class="logo" viewBox="0 0 512 512" width="32" height="32"><rect x="128" y="176" width="176" height="38" rx="19" fill="#8a909b"/><rect x="128" y="232" width="256" height="52" rx="26" fill="#ff4d4d"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#8a909b"/></svg>conceal<span class="ac">er</span></span>
     <div class="menu">
       <div class="tabs">
         <button id="tab-secrets" class="active" data-i18n="secrets" onclick="showTab('secrets')">Secrets</button>
         <button id="tab-audit" data-i18n="audit_log" onclick="showTab('audit')">Audit Logs</button>
         <button id="tab-stats" data-i18n="stats" onclick="showTab('stats')">Stats</button>
         <button id="tab-leaks" data-i18n="leaks" onclick="showTab('leaks')">Risks</button>
+        <button id="tab-policy" data-i18n="policy_tab" onclick="showTab('policy')">Policy<span id="pol_badge" class="hidden" style="display:inline-block;min-width:16px;padding:0 5px;margin-left:5px;border-radius:9px;background:var(--bad,#f85149);color:#fff;font-size:11px;line-height:16px;text-align:center;vertical-align:middle"></span></button>
         <button id="tab-settings" data-i18n="settings_tab" onclick="showTab('settings')">Settings</button>
       </div>
       <span class="grow"></span>
@@ -374,7 +404,7 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
         </div>
         <div class="actionrow">
           <button class="b-new" data-i18n="new_secret" onclick="openEditor()">+ New Secret</button>
-          <button class="b-scan" data-i18n="scan_folder" onclick="openScan()">🔎 Scan folder</button>
+          <button class="b-scan" onclick="openScan()">🔎 <span data-i18n="scan_folder">Scan folder</span></button>
           <button class="gen" data-i18n="generate" onclick="openGen()">🎲 Generate</button>
         </div>
       </div>
@@ -451,11 +481,81 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
 
     <section id="view-leaks" class="hidden">
       <div class="tabs" style="width:max-content;margin-bottom:14px">
-        <button id="rtab-reuse" class="active" data-i18n="risk_reuse" onclick="riskTab('reuse')">Reused values</button>
+        <button id="rtab-health" class="active" data-i18n="risk_health" onclick="riskTab('health')">Overview</button>
+        <button id="rtab-reuse" data-i18n="risk_reuse" onclick="riskTab('reuse')">Reused values</button>
         <button id="rtab-hist" data-i18n="risk_hist" onclick="riskTab('hist')">Shell history</button>
+        <button id="rtab-expose" data-i18n="risk_expose" onclick="riskTab('expose')">Exposure</button>
       </div>
 
-      <div id="risk-reuse">
+      <div id="risk-expose" class="hidden">
+        <div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:18px">
+          <label class="fld">🌐 <span data-i18n="ex_online_title">Online leak check</span></label>
+          <div style="border:1px solid #2f9e57;background:rgba(60,180,90,.07);border-radius:8px;padding:8px 10px;margin:8px 0;font-size:13px" class="mut" data-i18n="ex_safety">🔒 Only a short SHA-1 prefix of each value is sent (k-anonymity, like Pwned Passwords). The secret value itself never leaves this machine.</div>
+          <label class="fld" style="margin-top:6px" data-i18n="ex_narrow">1) Narrow the target (optional)</label>
+          <div class="exfilters">
+            <div class="msel" id="ms-ex_ftenant"></div>
+            <div class="msel" id="ms-ex_fproject"></div>
+            <div class="msel" id="ms-ex_fenv"></div>
+            <div class="msel" id="ms-ex_frepo"></div>
+            <div class="msel" id="ms-ex_fcoll"></div>
+            <div class="msel" id="ms-ex_ftag"></div>
+          </div>
+          <label class="fld" style="margin-top:12px">2) <span data-i18n="ex_pick">Pick records to check</span></label>
+          <div class="toolbar" style="margin:6px 0">
+            <button class="ghost" onclick="exSelectAll(true)">☑ <span data-i18n="ex_select_all">Select all</span></button>
+            <button class="ghost" onclick="exSelectAll(false)">☐ <span data-i18n="ex_clear_all">Clear</span></button>
+            <span class="mut" style="font-size:12px" id="ex_count"></span>
+            <span class="grow"></span>
+            <button class="b-scan" onclick="runExposure()">🌐 <span data-i18n="ex_scan">Scan leaks</span></button>
+          </div>
+          <div class="tablewrap exgrid">
+            <table class="cards">
+              <thead><tr>
+                <th style="width:34px"><input type="checkbox" id="ex_all_chk" onclick="exSelectAll(this.checked)"></th>
+                <th data-i18n="th_name">Name</th><th data-i18n="th_type">Type</th>
+                <th data-i18n="th_collection">Collection</th><th data-i18n="th_scope">Scope</th>
+                <th data-i18n="th_tags">Tags</th><th data-i18n="th_updated">Updated</th>
+              </tr></thead>
+              <tbody id="ex_rows"></tbody>
+            </table>
+          </div>
+          <div id="ex_result" class="mut" style="margin-top:10px"></div>
+        </div>
+
+        <div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:18px">
+          <label class="fld">📧 <span data-i18n="ex_breach_title">Email breach check (Have I Been Pwned)</span></label>
+          <div class="toolbar" style="margin-top:8px">
+            <div class="msel" id="ms-ex_email" style="min-width:260px;max-width:340px"></div>
+            <span class="grow"></span>
+            <button onclick="runBreach()">🔎 <span data-i18n="ex_breach_btn">Check emails</span></button>
+          </div>
+          <div id="ex_breach" class="mut" style="margin-top:8px"></div>
+        </div>
+
+        <div style="border:1px solid var(--line);border-radius:12px;padding:14px">
+          <label class="fld">🗂 <span data-i18n="ex_git_title">Git history, tracked files & logs</span></label>
+          <p class="mut" style="margin:4px 0 8px;font-size:13px" data-i18n="ex_git_hint">Finds secrets committed in git history, present in tracked files or log files, and secret-bearing files missing from .gitignore. Read-only — concealer never rewrites your history.</p>
+          <div class="toolbar">
+            <input id="ex_path" data-i18n-ph="scan_path" placeholder="/Users/…/repo" style="max-width:280px">
+            <button class="ghost" type="button" onclick="exBrowse()">📁 <span data-i18n="browse">Browse</span></button>
+            <button class="b-scan" onclick="runGitScan()">🗂 <span data-i18n="ex_git_btn">Scan repo</span></button>
+          </div>
+          <div id="ex_git" style="margin-top:10px"></div>
+        </div>
+      </div>
+
+      <div id="risk-health" class="hidden">
+        <div class="toolbar">
+          <input id="hl_filter" data-i18n-ph="hl_filter_ph" placeholder="proje / repo / ad…" oninput="hlRender()" style="max-width:280px">
+          <span class="mut" data-i18n="hl_hint">Rotate, süresi biten, en çok kullanılan ve yüksek riskli secret'lar — düzenlemek için tıkla.</span>
+          <span class="grow"></span>
+          <button onclick="loadHealth()">↻</button>
+        </div>
+        <div id="hl_sections"></div>
+        <div class="count" id="hlcount"></div>
+      </div>
+
+      <div id="risk-reuse" class="hidden">
         <div class="toolbar">
           <span class="mut" data-i18n="leaks_hint">Aynı değeri paylaşan (yeniden kullanılan) secret'lar — sızma riski skorlanır.</span>
           <span class="grow"></span>
@@ -490,19 +590,33 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
       </div>
     </section>
 
+    <section id="view-policy" class="hidden">
+      <div class="toolbar">
+        <span class="mut" data-i18n="policy_hint">Kendine hatırlatma kuralları tanımla; kurala uymayan secret'ları topluca bul ve düzenle.</span>
+        <span class="grow"></span>
+        <button class="b-new" onclick="editPolicy()">+ <span data-i18n="policy_add">New policy</span></button>
+        <button onclick="loadPolicies()">↻</button>
+      </div>
+      <div id="pol_list"></div>
+
+      <hr style="border-color:var(--line);margin:26px 0;max-width:820px">
+      <label class="fld" data-i18n="set_limits">MCP access limits (anti-bulk-exfiltration)</label>
+      <p class="mut" style="max-width:820px;margin:4px 0 10px" data-i18n="set_limits_hint">AI agents may only read secrets through a registered agent token. Per call caps a single response; the window quota caps how many distinct secrets an agent may reveal within the window — repeated queries can't reassemble the whole vault. Set the window quota to 0 to fully block an agent.</p>
+      <div id="limits_wrap" style="max-width:820px"></div>
+      <button class="primary" data-i18n="save" onclick="saveLimits()">Save</button>
+    </section>
+
     <section id="view-settings" class="hidden">
       <div class="grid" style="max-width:680px">
         <div class="field"><label class="fld" data-i18n="set_idle">Auto-lock (seconds)</label>
           <input id="set_idle" type="number" min="30" max="86400"></div>
         <div class="field"><label class="fld" data-i18n="set_confirm">Ask master password before</label>
           <div id="set_confirm" style="display:flex;flex-direction:column;gap:6px;padding-top:4px"></div></div>
+        <div class="field full"><label class="fld" data-i18n="set_hibp">HIBP API key <span id="hibp_set" class="mut"></span></label>
+          <input id="set_hibp" type="password" data-i18n-ph="set_hibp_ph" placeholder="leave blank to keep — for email breach checks">
+          <p class="mut" style="font-size:12px;margin:4px 0 0" data-i18n="set_hibp_hint">Optional. Only used for the email breach check (Risks → Exposure). Get one at haveibeenpwned.com/API/Key.</p></div>
       </div>
       <button class="primary" data-i18n="save" onclick="saveSettings()">Save</button>
-      <hr style="border-color:var(--line);margin:22px 0;max-width:680px">
-      <label class="fld" data-i18n="set_limits">MCP access limits (anti-bulk-exfiltration)</label>
-      <p class="mut" style="max-width:680px;margin:4px 0 10px" data-i18n="set_limits_hint">AI agents may only read secrets through a registered agent token. Per call caps a single response; the window quota caps how many distinct secrets an agent may reveal within the window — repeated queries can't reassemble the whole vault. Set the window quota to 0 to fully block an agent.</p>
-      <div id="limits_wrap" style="max-width:680px"></div>
-      <button class="primary" data-i18n="save" onclick="saveLimits()">Save</button>
       <hr style="border-color:var(--line);margin:22px 0;max-width:680px">
       <label class="fld" data-i18n="set_portability">Portability (move between machines)</label>
       <div class="toolbar" style="margin-top:8px">
@@ -547,8 +661,10 @@ const DIMS=['tenant','project','environment','repo'];
 const FDIMS=['type','collection','tenant','project','environment','repo','tags'];   // filter dropdown alanlari
 let TYPES={}, idleLeft=IDLE, idleTimer=null, LANG='tr';
 // coklu-secim filtre durumu + secenekler + istemci-tarafi sayfalama
-const FILT={type:new Set(),collection:new Set(),tenant:new Set(),environment:new Set(),project:new Set(),repo:new Set(),tags:new Set()};
-const FOPTS={type:[],collection:[],tenant:[],project:[],environment:[],repo:[],tags:[]};
+const FILT={type:new Set(),collection:new Set(),tenant:new Set(),environment:new Set(),project:new Set(),repo:new Set(),tags:new Set(),ex_secret:new Set(),ex_email:new Set(),
+  ex_ftenant:new Set(),ex_fproject:new Set(),ex_fenv:new Set(),ex_frepo:new Set(),ex_fcoll:new Set(),ex_ftag:new Set()};
+const FOPTS={type:[],collection:[],tenant:[],project:[],environment:[],repo:[],tags:[],ex_secret:[],ex_email:[],
+  ex_ftenant:[],ex_fproject:[],ex_fenv:[],ex_frepo:[],ex_fcoll:[],ex_ftag:[]};
 let SPAGE=1; let SPAGE_SIZE=parseInt(localStorage.getItem('concealer_psize'))||25; let SROWS=[];
 
 // ---------- i18n ----------
@@ -563,7 +679,7 @@ const I18N={
   idle_lock:"⏱ oto-kilit",idle_locked:"Boşta kalma — kilitlendi",
   name_req:"ad gerekli",save:"Kaydet",cancel:"İptal",close:"Kapat",fields:"alanlar",notes:"notlar",
   add_field:"+ alan ekle",field:"alan",value:"değer",type:"tip",scope:"kapsam",tags:"etiketler",url:"url",
-  json_split:"JSON'u alanlara böl",json_bad:"Geçerli JSON nesnesi değil",
+  json_split:"JSON'u alanlara böl",json_bad:"Geçerli JSON nesnesi değil",field_secret_tip:"Gizli/plaintext olarak işaretle",
   collection:"Koleksiyon",th_collection:"Koleksiyon",rotation:"Rotasyon",rot_days:"Her (gün)",rot_mode:"Mod",
   rot_generate:"otomatik üret",rot_manual:"elle",rot_none:"politika yok",overdue:"gecikmiş",rot_overdue_d:d=>`${d} gün gecikmiş`,
   move_to:"Koleksiyona taşı",copy_to:"Çoğalt (Duplicate)",coll_root:"(kök)",copied:"çoğaltıldı",moved:"taşındı",
@@ -576,12 +692,48 @@ const I18N={
   leaks:"Riskler",leaks_hint:"Aynı değeri paylaşan (yeniden kullanılan) secret'lar — sızma riski skorlanır.",
   th_score:"Skor",th_shared:"Paylaşılan değer",th_uses:"Kullanım",th_projects:"Projeler",th_envs:"Ortamlar",th_records:"Kayıtlar",
   no_leaks:"paylaşılan değer yok 🎉",leak_groups:"grup",
-  risk_reuse:"Yeniden kullanım",risk_hist:"Shell history",
+  risk_reuse:"Yeniden kullanım",risk_hist:"Shell history",risk_health:"Genel bakış",
+  hl_hint:"Rotate, süresi biten, en çok kullanılan ve yüksek riskli secret'lar — düzenlemek için tıkla.",
+  hl_filter_ph:"proje / repo / ad…",hl_secrets:"secret",hl_clean:"risk bulunmadı 🎉",
+  hl_expired:"Süresi geçmiş",hl_expiring:"Süresi dolmak üzere",hl_needs_rotation:"Rotate gecikmiş",
+  hl_high_risk:"Yüksek riskli (yeniden kullanım)",hl_most_used:"En çok kullanılan",
+  hl_expired_by:"% gün önce doldu",hl_expires_in:"% gün kaldı",hl_overdue_by:"% gün gecikmiş",hl_reuse:"yeniden kullanım",
+  policy_tab:"Politika",policy_hint:"Kendine hatırlatma kuralları tanımla; kurala uymayan secret'ları topluca bul ve düzenle.",
+  policy_add:"Yeni politika",policy_edit:"Politika düzenle",policy_empty:"Henüz politika yok — “Yeni politika” ile ekle.",
+  pol_aud:"hedef",pol_off:"kapalı",pol_violations:"ihlal",pol_ok:"uyumlu ✓",pol_enabled:"etkin",pol_notify:"bildir",pol_bulk:"Toplu düzenle",
+  pol_kind:"Kural türü",pol_params:"Kural ayarları",pol_match:"Kapsam filtresi",pol_match_hint:"boş = tüm secret'lar",
+  pol_name_req:"ad gerekli",pol_del_confirm:"Bu politika silinsin mi?",
+  pk_rotation:"Rotasyon",pk_expiry:"Süre bitimi",pk_reuse:"Yeniden kullanım",pk_naming:"Adlandırma",pk_tagging:"Etiketleme",
+  pp_max_days:"En fazla rotasyon aralığı (gün)",pp_warn_days:"Uyarı eşiği (gün)",pp_require:"Süre bitimi alanı zorunlu olsun",
+  pp_regex:"Ad deseni (regex)",pp_tags:"Zorunlu etiketler (virgüllü)",pp_reuse_hint:"Aynı değeri paylaşan (yeniden kullanılan) secret'ları işaretler.",
+  pol_bulk_hint:"% secret'a toplu değişiklik uygulanacak (boş alanlar atlanır).",
+  bulk_add_tags:"Etiket ekle (virgüllü)",bulk_rot_days:"Rotasyon aralığı (gün)",bulk_skip:"boş = değiştirme",
+  bulk_nothing:"değişecek bir şey yok",bulk_done:"% secret güncellendi",apply:"Uygula",
+  pol_notify_msg:"% secret politika kurallarını ihlal ediyor",
+  risk_expose:"Maruz kalma",
+  ex_online_title:"Online sızıntı kontrolü",ex_safety:"🔒 Her değerin yalnızca kısa bir SHA-1 ön-eki gönderilir (k-anonimlik, Pwned Passwords gibi). Secret değerinin kendisi bu makineden asla çıkmaz.",
+  ex_all:"Tüm secret'lar",ex_name:"Secret adı",ex_val_ph:"değer…",ex_scan:"Sızıntı tara",ex_val_req:"bir değer gir",
+  ex_checking:"kontrol ediliyor…",ex_no_secrets:"kontrol edilecek yüksek-entropili secret yok",
+  ex_breaches:"sızıntı",ex_validate:"Doğrulama ipucu",ex_neterr:"ağ hatası",ex_pwned:"% sızıntıda görüldü",ex_clean:"temiz",
+  ex_checked:"kontrol edildi",ex_found:"sızıntıda bulundu",
+  ex_breach_title:"E-posta sızıntı kontrolü (Have I Been Pwned)",ex_breach_btn:"E-postaları kontrol et",ex_bad_email:"geçerli e-posta gir",
+  ex_pick_secret:"Secret seç",ex_pick_email:"E-posta seç",ex_empty_all:"boş = tüm secret'lar",ex_email_req:"en az bir e-posta seç",ex_copy_all:"Tümünü kopyala",
+  ex_narrow:"1) Hedefi daralt (scope / collection / tag — opsiyonel)",ex_picked:"kayıt seçildi",ex_in_scope:"kayıt kapsamda",ex_empty_scope:"seçim yok = tümü kontrol edilir",
+  ex_pick:"Kontrol edilecek kayıtları seç",ex_select_all:"Tümünü seç",ex_clear_all:"Temizle",ex_no_records:"kapsamda kayıt yok",
+  ex_bg_hint:"Kontrol arka planda çalışıyor — yalnızca SHA-1 ön-eki gönderilir, değer gönderilmez. Lütfen bekleyin.",ex_aborted:"tarama iptal edildi (kısmi sonuç)",
+  ex_no_key:"HIBP API anahtarı ayarlı değil (Ayarlar).",ex_manual:"tarayıcıda manuel kontrol",ex_key_hint:"Ayarlar → HIBP API key alanına anahtarını girip otomatik sorgu yapabilirsin.",
+  ex_email_clean:"bilinen sızıntı yok 🎉",
+  ex_git_title:"Git geçmişi, izlenen dosyalar ve loglar",ex_git_hint:"Git geçmişinde commitlenmiş, izlenen dosyalarda ya da log dosyalarında geçen secret'ları ve .gitignore'da olmayan secret dosyalarını bulur. Salt-okunur — concealer geçmişini asla yeniden yazmaz.",
+  ex_git_btn:"Repo tara",ex_add_ignore:".gitignore'a ekle",ex_not_git:"git deposu değil (yine de loglar tarandı)",
+  ex_committed:"Geçmişte commitlenmiş",ex_tracked:"İzlenen dosyalarda",ex_logs:"Log dosyalarında",ex_gaps:"Ignore edilmemiş secret dosyaları",
+  ex_guide:"Temizleme rehberini göster",ex_git_clean:"secret bulunamadı 🎉",ex_copy:"Kopyala",ex_copied:"panoya kopyalandı",
+  set_hibp:"HIBP API anahtarı",set_hibp_ph:"boş = değiştirme — e-posta sızıntı kontrolü için",set_hibp_hint:"İsteğe bağlı. Yalnızca e-posta sızıntı kontrolünde (Riskler → Maruz kalma) kullanılır. haveibeenpwned.com/API/Key adresinden alınır.",
   hist_title:"Shell history sızıntıları",hist_hint:"bash/zsh history'sinde açıkça yazılmış secret/credential değerleri — history'den silinebilir.",
   hist_purge:"Seçilenleri sil",th_file:"Dosya",th_reason:"Neden",th_cmd:"Komut",
   hist_none:"history'de secret yok 🎉",hist_found:"bulgu",
   hist_confirm:"% satır shell history'den silinecek (yedek: *.concealer.bak). Devam?",hist_purged:"% satır history'den silindi",
   scan_folder:"Klasör Tara",scan_path:"Klasör yolu",browse:"Gözat",browse_use:"Bu klasörü seç",scan_history:"shell history'yi de tara (~/.zsh_history, ~/.bash_history)",
+  scan_env:"ortam/global değişkenleri de tara (env + shell profilleri)",
   scan_project_ph:"boş = klasör adı",scan_result_hint:"Bir yol gir ve 'Tara'ya bas.",scan_running:"taranıyor…",
   scan_found:"aday bulundu",scan_none:"aday sır bulunamadı",scan_btn:"Tara",scan_import_sel:"Seçilenleri Al",
   scan_path_req:"klasör yolu gerekli",scan_pick:"en az bir aday seç",scan_imported:(n,s)=>`${n} içeri aktarıldı, ${s} atlandı`,
@@ -624,7 +776,7 @@ const I18N={
   idle_lock:"⏱ auto-lock",idle_locked:"Idle — locked",
   name_req:"name required",save:"Save",cancel:"Cancel",close:"Close",fields:"fields",notes:"notes",
   add_field:"+ add field",field:"field",value:"value",type:"type",scope:"scope",tags:"tags",url:"url",
-  json_split:"Split JSON into fields",json_bad:"Not a valid JSON object",
+  json_split:"Split JSON into fields",json_bad:"Not a valid JSON object",field_secret_tip:"Toggle secret / plaintext",
   collection:"Collection",th_collection:"Collection",rotation:"Rotation",rot_days:"Every (days)",rot_mode:"Mode",
   rot_generate:"auto-generate",rot_manual:"manual",rot_none:"no policy",overdue:"overdue",rot_overdue_d:d=>`${d} days overdue`,
   move_to:"Move to collection",copy_to:"Duplicate",coll_root:"(root)",copied:"duplicated",moved:"moved",
@@ -637,12 +789,48 @@ const I18N={
   leaks:"Risks",leaks_hint:"Secrets that share the same value (reuse) — leak risk is scored.",
   th_score:"Score",th_shared:"Shared value",th_uses:"Uses",th_projects:"Projects",th_envs:"Envs",th_records:"Records",
   no_leaks:"no shared values 🎉",leak_groups:"groups",
-  risk_reuse:"Reused values",risk_hist:"Shell history",
+  risk_reuse:"Reused values",risk_hist:"Shell history",risk_health:"Overview",
+  hl_hint:"Rotation, expiring, most-used and high-risk secrets — click a row to edit it.",
+  hl_filter_ph:"project / repo / name…",hl_secrets:"secrets",hl_clean:"no risks found 🎉",
+  hl_expired:"Expired",hl_expiring:"Expiring soon",hl_needs_rotation:"Rotation overdue",
+  hl_high_risk:"High risk (reuse)",hl_most_used:"Most used",
+  hl_expired_by:"expired % day(s) ago",hl_expires_in:"% day(s) left",hl_overdue_by:"% day(s) overdue",hl_reuse:"reuse",
+  policy_tab:"Policy",policy_hint:"Define reminder rules; find and bulk-edit the secrets that violate them.",
+  policy_add:"New policy",policy_edit:"Edit policy",policy_empty:"No policies yet — add one with “New policy”.",
+  pol_aud:"target",pol_off:"off",pol_violations:"violation(s)",pol_ok:"compliant ✓",pol_enabled:"enabled",pol_notify:"notify",pol_bulk:"Bulk edit",
+  pol_kind:"Rule type",pol_params:"Rule settings",pol_match:"Scope filter",pol_match_hint:"empty = all secrets",
+  pol_name_req:"name required",pol_del_confirm:"Delete this policy?",
+  pk_rotation:"Rotation",pk_expiry:"Expiry",pk_reuse:"Reuse",pk_naming:"Naming",pk_tagging:"Tagging",
+  pp_max_days:"Max rotation interval (days)",pp_warn_days:"Warn threshold (days)",pp_require:"Require an expiry field",
+  pp_regex:"Name pattern (regex)",pp_tags:"Required tags (comma-separated)",pp_reuse_hint:"Flags secrets that share the same value (reuse).",
+  pol_bulk_hint:"A bulk change will be applied to % secret(s) (blank fields are skipped).",
+  bulk_add_tags:"Add tags (comma-separated)",bulk_rot_days:"Rotation interval (days)",bulk_skip:"blank = leave unchanged",
+  bulk_nothing:"nothing to change",bulk_done:"% secret(s) updated",apply:"Apply",
+  pol_notify_msg:"% secret(s) violate policy rules",
+  risk_expose:"Exposure",
+  ex_online_title:"Online leak check",ex_safety:"🔒 Only a short SHA-1 prefix of each value is sent (k-anonymity, like Pwned Passwords). The secret value itself never leaves this machine.",
+  ex_all:"All secrets",ex_name:"Secret name",ex_val_ph:"value…",ex_scan:"Scan leaks",ex_val_req:"enter a value",
+  ex_checking:"checking…",ex_no_secrets:"no high-entropy secret values to check",
+  ex_breaches:"breach(es)",ex_validate:"Validate hint",ex_neterr:"network error",ex_pwned:"seen in % breaches",ex_clean:"clean",
+  ex_checked:"checked",ex_found:"found in breaches",
+  ex_breach_title:"Email breach check (Have I Been Pwned)",ex_breach_btn:"Check emails",ex_bad_email:"enter a valid email",
+  ex_pick_secret:"Pick secret",ex_pick_email:"Pick email",ex_empty_all:"empty = all secrets",ex_email_req:"pick at least one email",ex_copy_all:"Copy all",
+  ex_narrow:"1) Narrow the target (scope / collection / tag — optional)",ex_picked:"record(s) picked",ex_in_scope:"in scope",ex_empty_scope:"none picked = all are checked",
+  ex_pick:"Pick records to check",ex_select_all:"Select all",ex_clear_all:"Clear",ex_no_records:"no records in scope",
+  ex_bg_hint:"The check runs in the background — only a SHA-1 prefix is sent, never the value. Please wait.",ex_aborted:"scan cancelled (partial results)",
+  ex_no_key:"No HIBP API key set (Settings).",ex_manual:"check manually in browser",ex_key_hint:"Add your key in Settings → HIBP API key to query automatically.",
+  ex_email_clean:"no known breaches 🎉",
+  ex_git_title:"Git history, tracked files & logs",ex_git_hint:"Finds secrets committed in git history, present in tracked files or log files, and secret-bearing files missing from .gitignore. Read-only — concealer never rewrites your history.",
+  ex_git_btn:"Scan repo",ex_add_ignore:"add to .gitignore",ex_not_git:"not a git repo (logs still scanned)",
+  ex_committed:"Committed in history",ex_tracked:"In tracked files",ex_logs:"In log files",ex_gaps:"Un-ignored secret files",
+  ex_guide:"Show cleanup guide",ex_git_clean:"no secrets found 🎉",ex_copy:"Copy",ex_copied:"copied to clipboard",
+  set_hibp:"HIBP API key",set_hibp_ph:"leave blank to keep — for email breach checks",set_hibp_hint:"Optional. Only used for the email breach check (Risks → Exposure). Get one at haveibeenpwned.com/API/Key.",
   hist_title:"Shell history leaks",hist_hint:"secret/credential values typed in the clear into bash/zsh history — removable from history.",
   hist_purge:"Purge selected",th_file:"File",th_reason:"Reason",th_cmd:"Command",
   hist_none:"no secrets in history 🎉",hist_found:"found",
   hist_confirm:"% line(s) will be removed from shell history (backup: *.concealer.bak). Continue?",hist_purged:"% line(s) removed from history",
   scan_folder:"Scan folder",scan_path:"Folder path",browse:"Browse",browse_use:"Use this folder",scan_history:"also scan shell history (~/.zsh_history, ~/.bash_history)",
+  scan_env:"also scan environment/global variables (env + shell profiles)",
   scan_project_ph:"empty = folder name",scan_result_hint:"Enter a path and press 'Scan'.",scan_running:"scanning…",
   scan_found:"candidates found",scan_none:"no candidate secrets found",scan_btn:"Scan",scan_import_sel:"Import selected",
   scan_path_req:"folder path required",scan_pick:"pick at least one candidate",scan_imported:(n,s)=>`${n} imported, ${s} skipped`,
@@ -759,7 +947,7 @@ async function unlock(){
   else $('#loginerr').textContent=t('wrong_pw');
 }
 async function lock(){ await fetch('/api/lock',{method:'POST'}); showLogin(); }
-function showLogin(){ clearInterval(idleTimer); closeModal(); $('.menu').classList.remove('open'); $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#pw').focus(); }
+function showLogin(){ clearInterval(idleTimer); closeModal(); $('.menu').classList.remove('open'); $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#pw').focus(); history.replaceState({}, '', location.pathname); }
 async function showApp(startSecs){
   $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
   TYPES=await (await api('/api/types')).json();
@@ -770,7 +958,10 @@ async function showApp(startSecs){
   const wide=window.innerWidth>820;
   ['filter','afilter','stfilter'].forEach(p=>{ $('#'+p+'panel').classList.toggle('hidden',!wide); $('#'+p+'btn').classList.toggle('on',wide); });
   measureSticky();
-  idleLeft=(startSecs!=null?startSecs:IDLE); startIdle(); showTab('secrets');
+  idleLeft=(startSecs!=null?startSecs:IDLE); startIdle();
+  _navlock=true; showTab('secrets'); _navlock=false;
+  history.replaceState({app:1,tab:'secrets'}, '', '?v=secrets');   // uygulamanin taban gecmis girisi
+  policyNotifyCheck();   // arka planda: bildirimli policy ihlallerini badge'e say
 }
 function rebuildSelects(){ /* audit filtreleri artik veri-gudumlu coklu-secim (loadAudit) — onceden doldurma yok */ }
 // hard auto-lock: aktivite sayaci sifirlamaz; unlock'tan itibaren sabit geri sayim
@@ -807,7 +998,7 @@ function renderMsel(dim){
 }
 function mselFilter(dim){
   const q=($('#pop-'+dim+' .msel-search')?.value||'').toLowerCase();
-  const opts=FOPTS[dim].filter(v=>v.toLowerCase().includes(q));
+  const opts=FOPTS[dim].filter(v=>v.toLowerCase().includes(q)||mselVlabel(dim,v).toLowerCase().includes(q));
   const list=$('#list-'+dim), n=FILT[dim].size;
   const allRow=`<label class="msel-opt msel-all"><input type="checkbox" ${n===0?'checked':''} onchange="mselAll('${dim}')"><span><b>${t('all')}</b></span></label>`;
   list.innerHTML=allRow+(opts.length?opts.map(v=>`<label class="msel-opt">
@@ -834,14 +1025,21 @@ async function refreshFilterOptions(){
   updateFilterCount();
 }
 
+// aktif sekme + geri/ileri kilidi (popstate ile geri yuklerken push'u bastirir)
+let CURTAB='secrets', _navlock=false;
 function showTab(tab){
+  CURTAB=tab;
   $('.menu').classList.remove('open');
-  ['secrets','audit','stats','leaks','settings'].forEach(x=>{
+  ['secrets','audit','stats','leaks','policy','settings'].forEach(x=>{
     $('#view-'+x).classList.toggle('hidden',tab!==x);
     $('#tab-'+x).classList.toggle('active',tab===x);
   });
   if(tab==='secrets'){ refreshFilterOptions(); loadSecrets(); } else if(tab==='audit')loadAudit();
-  else if(tab==='stats')loadStats(); else if(tab==='leaks')riskTab(RISK_TAB); else loadSettings();
+  else if(tab==='stats')loadStats(); else if(tab==='leaks')riskTab(RISK_TAB);
+  else if(tab==='policy')loadPolicies(); else loadSettings();
+  // gecmise sekmeyi yaz — ayni sekmeye tekrar tiklamak yeni giris eklemez
+  if(!_navlock && !(history.state && history.state.tab===tab && !history.state.modal))
+    history.pushState({app:1,tab}, '', '?v='+tab);
 }
 
 // ---------- master-parola onay modali ----------
@@ -859,7 +1057,7 @@ async function loadSettings(){
   $('#set_idle').value=s.idle;
   $('#set_confirm').innerHTML=['export','delete','settings','create','update'].map(o=>
     `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="cop" value="${o}" ${s.confirm_ops.includes(o)?'checked':''} style="width:auto"> ${esc(actLabel(o))}</label>`).join('');
-  renderLimits(s);
+  if($('#set_hibp')){ $('#set_hibp').value=''; $('#hibp_set').textContent=s.hibp_key_set?t('bk_pw_isset'):t('bk_pw_unset'); }
   loadBackup();
 }
 async function loadBackup(){
@@ -961,13 +1159,150 @@ function saveLimits(){
     window.CFG=await r.json(); renderLimits(window.CFG); toast(t('saved'));
   });
 }
+// ---------- policy ----------
+const POL_KINDS=['rotation','expiry','reuse','naming','tagging'];
+const POL_AUD=['all','user','agent','cli','web','tui','mcp'];
+let POLS=[];
+async function loadPolicies(){
+  const pd=await (await api('/api/policies')).json(); POLS=pd.policies||[];
+  polRender(); updatePolicyBadge();
+  const s=await (await api('/api/settings')).json(); window.CFG=s; renderLimits(s);   // MCP erisim limitleri = agent policy'si
+}
+function polKindLabel(k){ return t('pk_'+k); }
+function polRender(){
+  const wrap=$('#pol_list');
+  if(!POLS.length){ wrap.innerHTML=`<div class="mut" style="padding:24px;text-align:center">${t('policy_empty')}</div>`; return; }
+  wrap.innerHTML=POLS.map(p=>{
+    const bad=p.count>0;
+    const head=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <b>${esc(p.name)}</b>
+      <span class="chip">${esc(polKindLabel(p.kind))}</span>
+      <span class="chip">${t('pol_aud')}: ${esc(p.audience)}</span>
+      ${p.enabled?'':`<span class="pill" style="${hlSev('low')}">${t('pol_off')}</span>`}
+      <span class="grow"></span>
+      <span class="pill" style="${hlSev(bad?'high':'low')}">${bad?p.count+' '+t('pol_violations'):t('pol_ok')}</span>
+      <label class="mut" style="display:flex;gap:5px;align-items:center"><input type="checkbox" ${p.enabled?'checked':''} onchange="polToggle('${p.id}','enabled',this.checked)" style="width:auto"> ${t('pol_enabled')}</label>
+      <label class="mut" style="display:flex;gap:5px;align-items:center"><input type="checkbox" ${p.notify?'checked':''} onchange="polToggle('${p.id}','notify',this.checked)" style="width:auto"> 🔔 ${t('pol_notify')}</label>
+      <button class="ghost" onclick="editPolicy('${p.id}')">✏️</button>
+      <button class="ghost danger" onclick="delPolicy('${p.id}')">🗑</button></div>`;
+    const rows=p.violations.map(v=>`<tr onclick="openEditor('${v.id}')" style="cursor:pointer">
+      <td class="mono"><b>${esc(v.name)}</b></td><td class="mut mono" style="font-size:12px">${esc(v.scope)}</td>
+      <td class="mut">${esc(v.reason)}</td></tr>`).join('');
+    const bodyTbl=bad?`<div class="tablewrap" style="margin-top:10px"><table class="cards"><tbody>${rows}</tbody></table></div>
+      <div class="toolbar" style="margin-top:8px"><button class="b-import" onclick="bulkEdit('${p.id}')">✎ ${t('pol_bulk')}</button></div>`:'';
+    return `<div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px">${head}${bodyTbl}</div>`;
+  }).join('');
+}
+async function polToggle(id,field,val){
+  const p=POLS.find(x=>x.id===id); if(!p)return; p[field]=val;
+  if(field==='notify'&&val&&'Notification'in window&&Notification.permission==='default')Notification.requestPermission();
+  await api('/api/policies',{method:'POST',body:JSON.stringify(p)}); loadPolicies();
+}
+function editPolicy(id){
+  const p=id?POLS.find(x=>x.id===id):{name:'',kind:'rotation',audience:'all',enabled:true,notify:false,match:{},params:{}};
+  const kindSel=POL_KINDS.map(k=>`<option value="${k}" ${k===p.kind?'selected':''}>${esc(polKindLabel(k))}</option>`).join('');
+  const audSel=POL_AUD.map(k=>`<option value="${k}" ${k===p.audience?'selected':''}>${esc(k)}</option>`).join('');
+  const m=p.match||{};
+  const body=`<div class="grid">
+    <div class="field"><label class="fld">${t('fname')} *</label><input id="p_name" value="${esc(p.name)}"></div>
+    <div class="field"><label class="fld">${t('pol_kind')}</label><select id="p_kind" onchange="polParamsRender()">${kindSel}</select></div>
+    <div class="field"><label class="fld">${t('pol_aud')}</label><select id="p_aud">${audSel}</select></div>
+    </div>
+    <label class="fld" style="margin-top:6px">${t('pol_params')}</label><div id="p_params"></div>
+    <label class="fld" style="margin-top:10px">${t('pol_match')} <span class="mut">— ${t('pol_match_hint')}</span></label>
+    <div class="grid">
+      <div class="field"><label class="fld">${t('fproj')}</label><input id="pm_project" value="${esc(m.project||'')}"></div>
+      <div class="field"><label class="fld">${t('fenv')}</label><input id="pm_environment" value="${esc(m.environment||'')}"></div>
+      <div class="field"><label class="fld">${t('frepo')}</label><input id="pm_repo" value="${esc(m.repo||'')}"></div>
+      <div class="field"><label class="fld">${t('type')}</label><input id="pm_type" value="${esc(m.type||'')}"></div>
+      <div class="field"><label class="fld">${t('collection')}</label><input id="pm_collection" value="${esc(m.collection||'')}"></div>
+      <div class="field"><label class="fld">${t('tags')}</label><input id="pm_tag" value="${esc(m.tag||'')}"></div>
+    </div>
+    <div style="display:flex;gap:18px;margin-top:12px">
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="p_enabled" ${p.enabled?'checked':''} style="width:auto"> ${t('pol_enabled')}</label>
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="p_notify" ${p.notify?'checked':''} style="width:auto"> 🔔 ${t('pol_notify')}</label>
+    </div>`;
+  modal(id?'✏️ '+t('policy_edit'):'+ '+t('policy_add'),body,[{x:t('save'),p:1,f:()=>savePolicy(id)},{x:t('cancel'),f:closeModal}]);
+  window._polParams=p.params||{}; polParamsRender();
+}
+function polParamsRender(){
+  const k=$('#p_kind').value, c=$('#p_params'), pr=window._polParams||{}; let h='';
+  if(k==='rotation') h=`<div class="field"><label class="fld">${t('pp_max_days')}</label><input id="pp_max_days" type="number" min="0" value="${esc(pr.max_days!=null?pr.max_days:90)}"></div>`;
+  else if(k==='expiry') h=`<div class="field"><label class="fld">${t('pp_warn_days')}</label><input id="pp_warn_days" type="number" min="0" value="${esc(pr.warn_days!=null?pr.warn_days:30)}"></div>
+    <label style="display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" id="pp_require" ${pr.require?'checked':''} style="width:auto"> ${t('pp_require')}</label>`;
+  else if(k==='naming') h=`<div class="field"><label class="fld">${t('pp_regex')}</label><input id="pp_regex" value="${esc(pr.regex||'')}" placeholder="^[A-Z][A-Z0-9_]+$"></div>`;
+  else if(k==='tagging') h=`<div class="field"><label class="fld">${t('pp_tags')}</label><input id="pp_tags" value="${esc((pr.tags||[]).join(', '))}" placeholder="prod, owner"></div>`;
+  else if(k==='reuse') h=`<p class="mut">${t('pp_reuse_hint')}</p>`;
+  c.innerHTML=h;
+}
+function polParamsCollect(k){
+  if(k==='rotation')return {max_days:parseInt($('#pp_max_days').value)||0};
+  if(k==='expiry')return {warn_days:parseInt($('#pp_warn_days').value)||0,require:$('#pp_require').checked};
+  if(k==='naming')return {regex:$('#pp_regex').value.trim()};
+  if(k==='tagging')return {tags:$('#pp_tags').value.split(',').map(s=>s.trim()).filter(Boolean)};
+  return {};
+}
+async function savePolicy(id){
+  const name=$('#p_name').value.trim(); if(!name){toast(t('pol_name_req'));return;}
+  const k=$('#p_kind').value;
+  const pol={id:id||'',name,kind:k,audience:$('#p_aud').value,enabled:$('#p_enabled').checked,notify:$('#p_notify').checked,
+    match:{project:$('#pm_project').value.trim(),environment:$('#pm_environment').value.trim(),repo:$('#pm_repo').value.trim(),
+      type:$('#pm_type').value.trim(),collection:$('#pm_collection').value.trim(),tag:$('#pm_tag').value.trim()},
+    params:polParamsCollect(k)};
+  await api('/api/policies',{method:'POST',body:JSON.stringify(pol)});
+  closeModal(); toast(t('saved')); loadPolicies();
+}
+async function delPolicy(id){
+  if(!confirm(t('pol_del_confirm')))return;
+  await api('/api/policies/'+id,{method:'DELETE'}); toast(t('deleted')); loadPolicies();
+}
+function bulkEdit(pid){
+  const p=POLS.find(x=>x.id===pid); if(!p||!p.violations.length)return;
+  const ids=p.violations.map(v=>v.id);
+  const body=`<p class="mut">${t('pol_bulk_hint').replace('%',ids.length)}</p>
+    <div class="field"><label class="fld">${t('bulk_add_tags')}</label><input id="bk_tags" placeholder="prod, review"></div>
+    <div class="field"><label class="fld">${t('bulk_rot_days')}</label><input id="bk_rot" type="number" min="0" placeholder="${t('bulk_skip')}"></div>
+    <div class="field"><label class="fld">${t('collection')}</label><input id="bk_coll" placeholder="${t('bulk_skip')}"></div>`;
+  modal('✎ '+t('pol_bulk'),body,[{x:t('apply'),p:1,f:()=>bulkApply(ids)},{x:t('cancel'),f:closeModal}]);
+}
+async function bulkApply(ids){
+  const tags=$('#bk_tags').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const rot=$('#bk_rot').value.trim(), coll=$('#bk_coll').value.trim();
+  if(!tags.length && !rot && !coll){toast(t('bulk_nothing'));return;}
+  closeModal(); let n=0;
+  for(const id of ids){
+    const e=await (await api('/api/secret/'+id+'?reveal=1&intent=edit')).json();
+    const fields={}; Object.entries(e.fields).forEach(([k,f])=>fields[k]=f.value??'');
+    const payload={name:e.name,type:e.type,tenant:e.tenant,project:e.project,environment:e.environment,repo:e.repo,
+      url:e.url,notes:e.notes,fields,collection:coll||e.collection||'',
+      tags:[...new Set([...(e.tags||[]),...tags])],
+      rotation:rot?{...(e.rotation||{}),every_days:parseInt(rot)||0,mode:(e.rotation||{}).mode||'generate'}:(e.rotation||{})};
+    await api('/api/secret/'+id,{method:'PUT',body:JSON.stringify(payload)}); n++;
+  }
+  toast(t('bulk_done').replace('%',n)); loadPolicies();
+}
+function updatePolicyBadge(){
+  const b=$('#pol_badge'); if(!b)return;
+  const n=POLS.filter(p=>p.enabled&&p.notify).reduce((s,p)=>s+p.count,0);
+  b.classList.toggle('hidden',n===0); b.textContent=n||'';
+}
+async function policyNotifyCheck(){
+  try{ const d=await (await api('/api/policies')).json(); POLS=d.policies||[]; updatePolicyBadge();
+    const n=POLS.filter(p=>p.enabled&&p.notify).reduce((s,p)=>s+p.count,0);
+    if(n>0&&'Notification'in window&&Notification.permission==='granted') new Notification('concealer',{body:t('pol_notify_msg').replace('%',n)});
+  }catch(e){}
+}
 function saveSettings(){
   const idle=Math.max(30,Math.min(86400,parseInt($('#set_idle').value)||300));
   const ops=[...document.querySelectorAll('.cop:checked')].map(c=>c.value);
+  const hibp=$('#set_hibp')?$('#set_hibp').value:'';   // bos = degistirme (gonderme)
   askPw(t('settings'),async pw=>{
-    const r=await api('/api/settings',{method:'POST',body:JSON.stringify({pw,idle,confirm_ops:ops})});
+    const payload={pw,idle,confirm_ops:ops}; if(hibp)payload.hibp_key=hibp;
+    const r=await api('/api/settings',{method:'POST',body:JSON.stringify(payload)});
     if(r.status===403){toast(t('wrong_pw'));return;}
-    window.CFG=await r.json(); idleLeft=window.CFG.idle; toast(t('saved'));
+    window.CFG=await r.json(); idleLeft=window.CFG.idle;
+    if($('#set_hibp')){ $('#set_hibp').value=''; $('#hibp_set').textContent=window.CFG.hibp_key_set?t('bk_pw_isset'):t('bk_pw_unset'); }
+    toast(t('saved'));
   });
 }
 function doExport(){
@@ -999,14 +1334,55 @@ function doImport(){
 const SEV_COLOR={high:'#f85149',med:'#e3b341',low:'#3fb950'};
 // leaks: model-driven grid (secrets/audit ile ayni: sort/resize/reorder/hide + ⚙-header)
 let LROWS=[], LC_SORT={k:null,dir:1};
-let RISK_TAB='reuse';
+let RISK_TAB='health';
 function riskTab(which){
   RISK_TAB=which;
-  $('#risk-reuse').classList.toggle('hidden',which!=='reuse');
-  $('#risk-hist').classList.toggle('hidden',which!=='hist');
-  $('#rtab-reuse').classList.toggle('active',which==='reuse');
-  $('#rtab-hist').classList.toggle('active',which==='hist');
-  if(which==='reuse')loadLeaks(); else loadHistory();
+  ['health','reuse','hist','expose'].forEach(w=>{
+    $('#risk-'+w).classList.toggle('hidden',which!==w);
+    $('#rtab-'+w).classList.toggle('active',which===w);
+  });
+  if(which==='health')loadHealth(); else if(which==='reuse')loadLeaks();
+  else if(which==='hist')loadHistory();
+  else if(which==='expose')exLoadOptions();   // dropdown'lari doldur; tarama kullanici tetikler (ag cagrisi)
+}
+// ---------- health / overview ----------
+let HLROWS=[];
+async function loadHealth(){ HLROWS=await (await api('/api/health')).json(); hlRender(); }
+function hlSev(sev){ const c=SEV_COLOR[sev]||'#9aa3b2'; return `color:${c};background:color-mix(in srgb,${c} 18%,transparent)`; }
+function hlRow(x,badge){ return `<tr onclick="closeModal();openEditor('${x.id}')" style="cursor:pointer">
+  <td class="mono"><b>${esc(x.name)}</b></td>
+  <td class="mut mono" style="font-size:12px">${esc(x.scope)}</td>
+  <td>${badge}</td></tr>`; }
+function hlSection(title,rows){ if(!rows.length)return '';
+  return `<div style="margin-bottom:22px"><label class="fld">${title} <span class="mut">· ${rows.length}</span></label>
+    <div class="tablewrap"><table class="cards"><tbody>${rows.join('')}</tbody></table></div></div>`; }
+function hlRender(){
+  const q=($('#hl_filter').value||'').trim().toLowerCase();
+  const rows=HLROWS.filter(x=>!q||[x.name,x.scope,x.project,x.repo,(x.tags||[]).join(' ')].join(' ').toLowerCase().includes(q));
+  const pill=(txt,sev)=>`<span class="pill" style="${hlSev(sev)}">${esc(txt)}</span>`;
+  const expired=rows.filter(x=>x.expires_in!=null&&x.expires_in<0)
+    .sort((a,b)=>a.expires_in-b.expires_in)
+    .map(x=>hlRow(x,pill(t('hl_expired_by').replace('%',-x.expires_in),'high')));
+  const expSoon=rows.filter(x=>x.expires_in!=null&&x.expires_in>=0&&x.expires_in<=30)
+    .sort((a,b)=>a.expires_in-b.expires_in)
+    .map(x=>hlRow(x,pill(t('hl_expires_in').replace('%',x.expires_in),x.expires_in<=7?'high':'med')));
+  const overdue=rows.filter(x=>x.overdue!=null)
+    .sort((a,b)=>b.overdue-a.overdue)
+    .map(x=>hlRow(x,pill(t('hl_overdue_by').replace('%',x.overdue),x.overdue>=30?'high':'med')));
+  const risky=rows.filter(x=>x.leak_sev==='high'||x.leak_sev==='med')
+    .sort((a,b)=>b.leak_score-a.leak_score)
+    .map(x=>hlRow(x,pill(t('hl_reuse')+' · '+x.leak_score,x.leak_sev)));
+  const topUsed=rows.filter(x=>x.uses>0).sort((a,b)=>b.uses-a.uses).slice(0,10)
+    .map(x=>hlRow(x,`<b>${x.uses}</b> <span class="mut">${t('th_uses').toLowerCase()}</span>`));
+  const out=[
+    hlSection('❌ '+t('hl_expired'),expired),
+    hlSection('⏰ '+t('hl_expiring'),expSoon),
+    hlSection('🔄 '+t('hl_needs_rotation'),overdue),
+    hlSection('⚠️ '+t('hl_high_risk'),risky),
+    hlSection('🔥 '+t('hl_most_used'),topUsed),
+  ].join('');
+  $('#hl_sections').innerHTML=out||`<div class="mut" style="text-align:center;padding:30px">${t('hl_clean')}</div>`;
+  $('#hlcount').textContent=rows.length+' '+t('hl_secrets');
 }
 async function loadLeaks(){
   LROWS=await (await api('/api/leaks')).json();
@@ -1073,13 +1449,229 @@ async function purgeHistory(){
   toast(t('hist_purged').replace('%',r.removed)); loadHistory();
 }
 
+// ---------- exposure (online leak / breach / git) ----------
+function exPill(sev,txt){ return `<span class="pill" style="${hlSev(sev)}">${esc(txt)}</span>`; }
+// Exposure: once scope/collection/tag ile daralt, sonra KAYITLARI (id bazli) tek tek/topluca sec.
+// Ayni isimli farkli scope/collection kayitlari AYRI gorunur — yanlislikla hepsi gonderilmez.
+const _EMAIL_RX=/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+let EX_ALL=[], EX_RECMAP={};   // EX_ALL: tum kayitlar; EX_RECMAP: id -> gorunum etiketi
+const EX_FILT_DIMS=['ex_ftenant','ex_fproject','ex_fenv','ex_frepo','ex_fcoll','ex_ftag'];
+const EX_FILT_FIELD={ex_ftenant:'tenant',ex_fproject:'project',ex_fenv:'environment',ex_frepo:'repo',ex_fcoll:'collection',ex_ftag:'tags'};
+MSEL_LABEL.ex_ftenant='ften'; MSEL_LABEL.ex_fproject='fproj'; MSEL_LABEL.ex_fenv='fenv';
+MSEL_LABEL.ex_frepo='frepo'; MSEL_LABEL.ex_fcoll='collection'; MSEL_LABEL.ex_ftag='tags';
+MSEL_LABEL.ex_email='ex_pick_email';
+EX_FILT_DIMS.forEach(d=>MSEL_ON[d]=exApplyFilters);
+MSEL_ON.ex_email=()=>renderMsel('ex_email');
+function exUpdateCount(){
+  const inScope=exMatchingRecords().length, picked=FILT.ex_secret.size;
+  $('#ex_count').textContent=picked?`${picked} ${t('ex_picked')}`:`${inScope} ${t('ex_in_scope')} · ${t('ex_empty_scope')}`;
+}
+async function exLoadOptions(){
+  EX_ALL=await (await api('/api/secrets')).json();
+  const uniq=(f)=>[...new Set(EX_ALL.flatMap(f).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b)));
+  FOPTS.ex_ftenant=uniq(e=>[e.tenant]); FOPTS.ex_fproject=uniq(e=>[e.project]);
+  FOPTS.ex_fenv=uniq(e=>[e.environment]); FOPTS.ex_frepo=uniq(e=>[e.repo]);
+  FOPTS.ex_fcoll=uniq(e=>[e.collection]); FOPTS.ex_ftag=uniq(e=>e.tags||[]);
+  // e-posta secenekleri: yalniz GIZLI-OLMAYAN alanlardan (url/notes/plaintext) — maskeli secret degerleri taranmaz
+  const emails=new Set();
+  EX_ALL.forEach(e=>{
+    const plain=[e.url||'',e.notes||''];
+    Object.values(e.fields||{}).forEach(f=>{ if(f&&!f.secret&&f.value)plain.push(String(f.value)); });
+    plain.join(' ').replace(_EMAIL_RX,m=>{emails.add(m.toLowerCase());return m;});
+  });
+  FOPTS.ex_email=[...emails].sort((a,b)=>a.localeCompare(b));
+  [...FILT.ex_email].forEach(v=>{ if(!FOPTS.ex_email.includes(v))FILT.ex_email.delete(v); });
+  EX_FILT_DIMS.forEach(renderMsel); renderMsel('ex_email');
+  exApplyFilters();
+}
+function exMatchingRecords(){
+  return EX_ALL.filter(e=>EX_FILT_DIMS.every(d=>{
+    const sel=FILT[d]; if(!sel.size)return true;
+    const fld=EX_FILT_FIELD[d];
+    if(fld==='tags')return (e.tags||[]).some(t=>sel.has(t));
+    return sel.has(e[fld]||'');
+  }));
+}
+function exApplyFilters(){
+  const recs=exMatchingRecords();
+  const valid=new Set(recs.map(e=>e.id));
+  [...FILT.ex_secret].forEach(id=>{ if(!valid.has(id))FILT.ex_secret.delete(id); });  // daralinca gecersiz secimi dus
+  EX_FILT_DIMS.forEach(renderMsel); exRenderTable(recs);
+}
+// secrets grid'ine benzer tablo + soldan multi-select (kayit bazli — id)
+function exRenderTable(recs){
+  recs=recs||exMatchingRecords();
+  $('#ex_rows').innerHTML=recs.map(e=>{
+    const on=FILT.ex_secret.has(e.id);
+    return `<tr class="${on?'sel':''}" onclick="exToggle('${e.id}')">
+      <td><input type="checkbox" class="exchk" ${on?'checked':''} onclick="event.stopPropagation();exToggle('${e.id}')"></td>
+      <td class="mono"><b>${esc(e.name)}</b></td>
+      <td><span class="type-badge t-${esc(e.type)}">${esc(e.type)}</span></td>
+      <td class="mut mono">${e.collection?`<span class="coll">📁 ${esc(e.collection)}</span>`:'<span class="mut">—</span>'}</td>
+      <td class="mut mono" style="font-size:12px">${DIMS.map(d=>esc(e[d]||'*')).join(' / ')}</td>
+      <td>${(e.tags||[]).map(tagChip).join('')||'<span class="mut">—</span>'}</td>
+      <td class="mut" style="font-size:12px">${fmtTs(e.updated)}</td></tr>`;
+  }).join('')||`<tr><td colspan="7" class="mut" style="text-align:center;padding:24px">${t('ex_no_records')}</td></tr>`;
+  const all=$('#ex_all_chk'); if(all)all.checked=recs.length>0 && recs.every(e=>FILT.ex_secret.has(e.id));
+  exUpdateCount();
+}
+function exToggle(id){ FILT.ex_secret.has(id)?FILT.ex_secret.delete(id):FILT.ex_secret.add(id); exRenderTable(); }
+function exSelectAll(on){
+  const recs=exMatchingRecords();
+  recs.forEach(e=>on?FILT.ex_secret.add(e.id):FILT.ex_secret.delete(e.id));
+  exRenderTable(recs);
+}
+// ilerleme popup'i: islem arka planda calisirken kullaniciyi bilgilendirir (iptal edilebilir)
+function exProgressOpen(total){
+  window._exAbort=false;
+  const body=`<div class="mut">${t('ex_checking')} <b id="exp_n">0</b> / ${total}</div>
+    <div class="pbar"><div id="exp_fill" style="width:0%"></div></div>
+    <div class="mut" style="font-size:12px;margin-top:10px">🔒 ${t('ex_bg_hint')}</div>`;
+  modal('🌐 '+t('ex_online_title'),body,[{x:t('cancel'),f:()=>{window._exAbort=true;closeModal();}}]);
+}
+function exProgressUpdate(done,total){
+  const f=$('#exp_fill'); if(f)f.style.width=Math.round(done/total*100)+'%';
+  const n=$('#exp_n'); if(n)n.textContent=done;
+}
+let EX_BUSY=false;
+async function runExposure(){
+  if(EX_BUSY)return;
+  let ids=[...FILT.ex_secret];
+  if(!ids.length) ids=exMatchingRecords().map(e=>e.id);   // secim yoksa = daraltilmis kitlenin tamami
+  if(!ids.length){toast(t('ex_no_secrets'));return;}
+  EX_BUSY=true; exProgressOpen(ids.length);
+  const CHUNK=6; let all=[], done=0, aborted=false;
+  try{
+    for(let i=0;i<ids.length;i+=CHUNK){
+      if(window._exAbort){aborted=true;break;}
+      const part=ids.slice(i,i+CHUNK);
+      const r=await (await api('/api/exposure',{method:'POST',body:JSON.stringify({ids:part,online:true})})).json();
+      all=all.concat(r.results||[]);
+      done+=part.length; exProgressUpdate(done,ids.length);
+    }
+  }catch(e){ aborted=true; }
+  finally{ EX_BUSY=false; if(!window._exAbort)closeModal(); }
+  all.sort((a,b)=>(b.pwned||0)-(a.pwned||0));
+  exRenderResults(all,aborted);
+}
+function exRenderResults(rows,aborted){
+  if(!rows.length){ $('#ex_result').innerHTML=`<span class="mut">${aborted?t('ex_aborted'):t('ex_no_secrets')}</span>`; return; }
+  $('#ex_result').innerHTML=(aborted?`<div class="mut" style="margin-bottom:6px">⚠ ${t('ex_aborted')}</div>`:'')+
+    `<div class="tablewrap"><table class="cards"><thead><tr>
+    <th>${t('fname')}</th><th>${t('th_shared')}</th><th>${t('ex_breaches')}</th><th>CWE</th><th>${t('ex_validate')}</th></tr></thead><tbody>`+
+    rows.map(x=>{
+      const pw=x.pwned;
+      const badge=pw===-1?exPill('med',t('ex_neterr')):pw>0?exPill('high','⚠ '+t('ex_pwned').replace('%',pw)):pw===0?exPill('low',t('ex_clean')):'<span class="mut">—</span>';
+      const cwe=(x.cwe||[]).map(c=>`<a href="${c.url}" target="_blank" rel="noopener" class="chip" title="${esc(c.title)}">${esc(c.id)}</a>`).join(' ');
+      return `<tr onclick="openEditor('${x.id}')" style="cursor:pointer">
+        <td class="mono"><b>${esc(x.name)}</b><div class="mut" style="font-size:11px">${esc(x.scope)} · ${esc(x.field)}</div></td>
+        <td class="mono">${esc(x.mask)}</td><td>${badge}</td><td>${cwe||'—'}</td>
+        <td class="mut" style="font-size:12px">${x.validate?esc(x.validate):'—'}</td></tr>`;
+    }).join('')+`</tbody></table></div>
+    <div class="count">${rows.length} ${t('ex_checked')} · ${rows.filter(x=>x.pwned>0).length} ${t('ex_found')}</div>`;
+}
+async function runBreach(){
+  const emails=[...FILT.ex_email]; if(!emails.length){toast(t('ex_email_req'));return;}
+  $('#ex_breach').innerHTML=`<span class="mut">${t('ex_checking')}</span>`;
+  let html='';
+  for(const email of emails){
+    const r=await (await api('/api/breach',{method:'POST',body:JSON.stringify({email})})).json();
+    let row;
+    if(!r.ok){
+      if(r.error==='no_key'){ $('#ex_breach').innerHTML=`<span class="mut">${t('ex_no_key')} </span><a href="${r.manual}" target="_blank" rel="noopener">${t('ex_manual')} ↗</a><div class="mut" style="font-size:12px;margin-top:4px">${t('ex_key_hint')}</div>`; return; }
+      row=`<span class="pill" style="${hlSev('med')}">${esc(r.error||'error')}</span> `+(r.manual?`<a href="${r.manual}" target="_blank" rel="noopener">${t('ex_manual')} ↗</a>`:'');
+    } else {
+      const bs=r.breaches||[];
+      row=bs.length?exPill('high',bs.length+' '+t('ex_breaches'))+`<div class="tablewrap" style="margin-top:6px"><table class="cards"><tbody>`+
+        bs.map(b=>`<tr><td><b>${esc(b.title||b.name)}</b></td><td class="mut mono" style="font-size:12px">${esc(b.date||'')}</td>
+          <td class="mut" style="font-size:12px">${(b.data||[]).slice(0,6).map(esc).join(', ')}</td></tr>`).join('')+`</tbody></table></div>`
+        :exPill('low',t('ex_email_clean'));
+    }
+    html+=`<div style="margin-bottom:12px"><div class="mono" style="font-size:13px;margin-bottom:4px"><b>${esc(email)}</b></div>${row}</div>`;
+    $('#ex_breach').innerHTML=html;   // her e-posta bitince artimli goster
+  }
+}
+async function exBrowse(){ const d=await (await api('/api/pickdir')).json(); if(d.path)$('#ex_path').value=d.path.replace(/\/$/,''); }
+let EX_GIT=null;
+async function runGitScan(){
+  const path=$('#ex_path').value.trim(); if(!path){toast(t('scan_path_req'));return;}
+  $('#ex_git').innerHTML=`<div class="scanbar"><div></div></div><div class="mut" style="margin-top:8px">${t('scan_running')}</div>`;
+  const r=await (await api('/api/gitscan',{method:'POST',body:JSON.stringify({path})})).json(); EX_GIT={path,res:r};
+  const sec=(title,html,n)=>n?`<div style="margin-bottom:16px"><label class="fld">${title} <span class="mut">· ${n}</span></label>${html}</div>`:'';
+  const committed=(r.committed||[]).map(c=>`<tr><td class="mono">${esc(c.mask)}</td><td class="mut mono" style="font-size:12px">${c.commits.map(x=>esc(x.hash)).join(', ')}</td><td class="mut" style="font-size:12px">${esc((c.commits[0]||{}).subject||'')}</td></tr>`).join('');
+  const tracked=(r.tracked||[]).map(x=>`<tr><td class="mut mono" style="font-size:12px">${esc(x.file)}:${x.line}</td><td class="mono">${esc(x.mask)}</td></tr>`).join('');
+  const logs=(r.logs||[]).map(x=>`<tr><td>${exPill(x.severity,x.severity)}</td><td class="mut mono" style="font-size:12px">${esc(x.file)}:${x.line}</td><td class="mono">${esc(x.mask)}</td><td class="mut mono" style="font-size:12px;word-break:break-all">${esc(x.cmd)}</td></tr>`).join('');
+  const gaps=(r.gitignore_gaps||[]).map(g=>`<tr><td class="mono">${esc(g)}</td><td class="mut" style="font-size:12px">${t('ex_add_ignore')}</td></tr>`).join('');
+  const tbl=(h)=>`<div class="tablewrap"><table class="cards"><tbody>${h}</tbody></table></div>`;
+  let html='';
+  if(r.git===false) html+=`<div class="mut" style="margin-bottom:10px">${t('ex_not_git')}</div>`;
+  html+=sec('📦 '+t('ex_committed'),tbl(committed),committed?r.committed.length:0);
+  html+=sec('📄 '+t('ex_tracked'),tbl(tracked),tracked?r.tracked.length:0);
+  html+=sec('🧾 '+t('ex_logs'),tbl(logs),logs?r.logs.length:0);
+  html+=sec('🙈 '+t('ex_gaps'),tbl(gaps),gaps?r.gitignore_gaps.length:0);
+  const has=(r.committed||[]).length||(r.tracked||[]).length;
+  if(has) html+=`<button class="b-import" onclick="showRemedy()">📋 ${t('ex_guide')}</button>`;
+  const total=(r.committed||[]).length+(r.tracked||[]).length+(r.logs||[]).length+(r.gitignore_gaps||[]).length;
+  $('#ex_git').innerHTML=html||`<div class="mut" style="padding:16px;text-align:center">${t('ex_git_clean')}</div>`;
+  if(total) $('#ex_git').insertAdjacentHTML('beforeend',`<div class="count">${total} ${t('hist_found')}</div>`);
+}
+async function showRemedy(){
+  if(!EX_GIT)return;
+  const files=[...new Set([...(EX_GIT.res.tracked||[]).map(x=>x.file),...(EX_GIT.res.gitignore_gaps||[])])];
+  const r=await (await api('/api/gitremedy',{method:'POST',body:JSON.stringify({path:EX_GIT.path,files,names:[]})})).json();
+  window._remedyText=r.text;
+  const body=`<div class="mdbox">${renderMd(r.text)}</div>`;
+  modal('📋 '+t('ex_guide'),body,[{x:'⧉ '+t('ex_copy_all'),f:()=>{copyText(window._remedyText);}},{x:t('close'),p:1,f:closeModal}]);
+}
+function copyText(s){ if(navigator.clipboard)navigator.clipboard.writeText(s); toast(t('ex_copied')); }
+function copyCode(btn){ const ta=btn.closest('.cblock').querySelector('.cbsrc'); copyText(ta.value); }
+// kucuk shell/powershell vurgulayici (bagimsizlik: harici lib yok; tek-gecis token regex)
+const _SH_KW=/^(git|bfg|printf|pip|pip3|cd|rm|gc|reflog|push|commit|clone|expire|prune|sudo|bash|sh|echo|export|curl|aws|npm|npx|node|python3?|filter-repo)$/;
+function shHighlight(code){
+  const rx=/(#[^\n]*)|("(?:[^"\\]|\\.)*")|('(?:[^'\\]|\\.)*')|(--?[A-Za-z][\w-]*)|([A-Za-z_][\w.-]*)|([\s\S])/g;
+  let out='',m;
+  while((m=rx.exec(code))){
+    if(m[1])out+=`<span class="tc-cmt">${esc(m[1])}</span>`;
+    else if(m[2]||m[3])out+=`<span class="tc-str">${esc(m[2]||m[3])}</span>`;
+    else if(m[4])out+=`<span class="tc-flag">${esc(m[4])}</span>`;
+    else if(m[5])out+=_SH_KW.test(m[5])?`<span class="tc-kw">${esc(m[5])}</span>`:esc(m[5]);
+    else out+=esc(m[6]);
+  }
+  return out;
+}
+// hafif markdown: baslik / blockquote / liste / **kalin** / `kod` + ``` fenced code (kopyalanabilir, vurgulu)
+function renderMd(text){
+  const parts=String(text).split('```'); let html='';
+  parts.forEach((seg,i)=>{
+    if(i%2===1){
+      const nl=seg.indexOf('\n'); const lang=(nl<0?'':seg.slice(0,nl)).trim()||'sh';
+      const code=(nl<0?seg:seg.slice(nl+1)).replace(/\n$/,'');
+      html+=`<div class="cblock"><div class="cbar"><span class="mut mono" style="font-size:11px">${esc(lang)}</span>
+        <button class="ghost" onclick="copyCode(this)" style="padding:2px 8px">⧉ ${t('ex_copy')}</button></div>
+        <pre class="code"><code>${shHighlight(code)}</code></pre>
+        <textarea class="cbsrc" style="display:none">${esc(code)}</textarea></div>`;
+    } else {
+      seg.split('\n').forEach(line=>{
+        if(!line.trim()){ return; }
+        let l=esc(line).replace(/`([^`]+)`/g,'<code class="ic">$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+        if(/^#\s/.test(line))html+=`<h3 class="mdh1">${l.replace(/^#\s/,'')}</h3>`;
+        else if(/^##\s/.test(line))html+=`<h4 class="mdh2">${l.replace(/^##\s/,'')}</h4>`;
+        else if(/^&gt;\s/.test(l))html+=`<blockquote class="mdq">${l.replace(/^&gt;\s/,'')}</blockquote>`;
+        else if(/^-\s/.test(line))html+=`<div class="mdli">• ${l.replace(/^-\s/,'')}</div>`;
+        else html+=`<p class="mdp">${l}</p>`;
+      });
+    }
+  });
+  return html;
+}
 // ---------- scan folder ----------
 function openScan(){
   const body=`<div class="field"><label class="fld">${t('scan_path')}</label>
       <div class="secretrow"><input id="sc_path" placeholder="/Users/…/project" ${NOPM}>
         <button class="ghost" type="button" onclick="browseNative()">📁 ${t('browse')}</button></div></div>
     <div id="sc_browse" class="hidden"></div>
-    <label style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><input type="checkbox" id="sc_hist" style="width:auto"> ${t('scan_history')}</label>
+    <label style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input type="checkbox" id="sc_hist" style="width:auto"> ${t('scan_history')}</label>
+    <label style="display:flex;gap:8px;align-items:center;margin-bottom:12px"><input type="checkbox" id="sc_env" style="width:auto"> ${t('scan_env')}</label>
     <div class="grid">
       <div class="field"><label class="fld">${t('fproj')}</label><input id="sc_project" placeholder="${t('scan_project_ph')}" ${NOPM}></div>
       <div class="field"><label class="fld">${t('fenv')}</label><input id="sc_environment" ${NOPM}></div>
@@ -1109,24 +1701,25 @@ async function browseLoad(path){
 }
 function browsePick(path){ $('#sc_path').value=path; $('#sc_browse').classList.add('hidden'); }
 async function doScan(){
-  const path=$('#sc_path').value.trim(); if(!path){toast(t('scan_path_req'));return;}
+  const path=$('#sc_path').value.trim(); const env=$('#sc_env').checked, hist=$('#sc_hist').checked;
+  if(!path && !env && !hist){toast(t('scan_path_req'));return;}
   $('#sc_browse').classList.add('hidden');
   $('#sc_result').innerHTML=`<div class="scanbar"><div></div></div><div class="mut" style="margin-top:8px">${t('scan_running')}</div>`;
-  const r=await (await api('/api/scan',{method:'POST',body:JSON.stringify({path,history:$('#sc_hist').checked})})).json();
+  const r=await (await api('/api/scan',{method:'POST',body:JSON.stringify({path,history:hist,env})})).json();
   const cs=r.cands||[];
   $('#sc_result').innerHTML=cs.length?`<label class="fld">${cs.length} ${t('scan_found')}</label>`+cs.map(c=>
     `<label class="kv" style="align-items:center"><input type="checkbox" class="sc-c" value="${esc(c.name)}" checked style="width:auto">
       <span class="mono" style="flex:1">${esc(c.name)}</span><span class="mut mono">${esc(c.mask)}</span>
-      <span class="chip">${/history$/.test(c.source)?'📜 history':'📁 '+esc(c.source)}</span></label>`).join('')
+      <span class="chip">${c.source==='env'||/^\.|environment|profile|config\.fish$/.test(c.source)?'🌐 '+esc(c.source):/history$/.test(c.source)?'📜 history':'📁 '+esc(c.source)}</span></label>`).join('')
     :`<span class="mut">${t('scan_none')}</span>`;
   const ib=$('#sc_import_btn'); if(ib)ib.disabled=cs.length===0;   // Import selected sadece aday varsa aktif
 }
 async function doScanImport(){
-  const path=$('#sc_path').value.trim(); if(!path){toast(t('scan_path_req'));return;}
+  const path=$('#sc_path').value.trim();
   const names=[...document.querySelectorAll('.sc-c:checked')].map(c=>c.value);
   if(!names.length){toast(t('scan_pick'));return;}
   const r=await (await api('/api/scan/import',{method:'POST',body:JSON.stringify({
-    path,history:$('#sc_hist').checked,names,
+    path,history:$('#sc_hist').checked,env:$('#sc_env').checked,names,
     project:$('#sc_project').value.trim(),environment:$('#sc_environment').value.trim()})})).json();
   closeModal(); toast(t('scan_imported',r.imported,r.skipped)); refreshFilterOptions(); loadSecrets();
 }
@@ -1379,7 +1972,9 @@ function doCopy(v){ navigator.clipboard.writeText(v).then(()=>{ toast(t('copied'
 
 async function openEditor(id, preset){
   let e={name:'',type:'api_key',tenant:'',project:'',environment:'',repo:'',tags:[],url:'',notes:'',fields:{},collection:'',rotation:{}};
-  if(id){ e=await (await api('/api/secret/'+id+'?reveal=1&intent=edit')).json(); const fv={}; Object.entries(e.fields).forEach(([k,f])=>fv[k]=f.value??''); e.fields=fv; }
+  window._editSec={}; window._editFmRaw={};
+  if(id){ e=await (await api('/api/secret/'+id+'?reveal=1&intent=edit')).json(); const fv={}; window._editFmRaw=e.field_meta||{};
+    Object.entries(e.fields).forEach(([k,f])=>{fv[k]=f.value??''; window._editSec[k]=f.secret!==false;}); e.fields=fv; }
   else if(preset){ Object.assign(e, preset); }
   const body=`<div class="grid">
     <div class="field"><label class="fld">${t('fname')} *</label><input id="e_name" value="${esc(e.name)}" placeholder="OPENAI_API_KEY"></div>
@@ -1404,7 +1999,8 @@ function renderFields(){
   const type=$('#e_type').value,cont=$('#e_fields'),cur=window._editFields||{};
   if(type==='custom'){
     const en=Object.entries(cur); if(!en.length)en.push(['','']);
-    cont.innerHTML=en.map(([k,v])=>kvRow(k,v)).join('')+`<button class="ghost" onclick="addKv()">${t('add_field')}</button>`;
+    const sec=window._editSec||{};
+    cont.innerHTML=en.map(([k,v])=>kvRow(k,v,k in sec?sec[k]:fieldIsSecretName(k))).join('')+`<button class="ghost" onclick="addKv()">${t('add_field')}</button>`;
   }else{
     const tmpl=TYPES[type].map(f=>f.name);
     let html=TYPES[type].map(f=>fieldRow(f.name,f.secret,cur[f.name]??'')).join('');
@@ -1413,26 +2009,40 @@ function renderFields(){
     cont.innerHTML=html;
   }
 }
-function kvRow(k,v){
+function kvRow(k,v,secret){
+  secret=secret!==false;   // varsayilan: gizli
   let obj=null; try{ const p=JSON.parse(v); if(p&&typeof p==='object') obj=p; }catch(e){}
-  const val=obj?`<textarea class="kv-v jsonv masked" rows="${Math.min((JSON.stringify(obj,null,2).match(/\n/g)||[]).length+1,14)}" placeholder="${t('value')}" ${NOPM}>${esc(JSON.stringify(obj,null,2))}</textarea>`
-                :`<input class="kv-v" type="password" placeholder="${t('value')}" value="${esc(v)}" ${NOPM}>`;
+  const val=obj?`<textarea class="kv-v jsonv ${secret?'masked':''}" rows="${Math.min((JSON.stringify(obj,null,2).match(/\n/g)||[]).length+1,14)}" placeholder="${t('value')}" ${NOPM}>${esc(JSON.stringify(obj,null,2))}</textarea>`
+                :`<input class="kv-v" type="${secret?'password':'text'}" placeholder="${t('value')}" value="${esc(v)}" ${NOPM}>`;
   const split=`<button class="ghost jbtn ${obj?'':'off'}" type="button" title="${t('json_split')}" onclick="explodeJson(this)">{}</button>`;
-  return `<div class="kv"><input class="kv-k" placeholder="${t('field')}" value="${esc(k)}">${val}${split}<button class="ghost" type="button" onclick="togglePw(this.parentElement.querySelector('.kv-v'),this)">👁</button><button class="ghost danger" onclick="this.parentElement.remove()">✕</button></div>`;
+  const lock=`<button class="ghost lockbtn" type="button" title="${t('field_secret_tip')}" onclick="toggleFieldSecret(this)">${secret?'🔒':'🔓'}</button>`;
+  const eye=`<button class="ghost eyebtn" type="button" ${secret?'':'style="display:none"'} onclick="togglePw(this.parentElement.querySelector('.kv-v'),this)">👁</button>`;
+  return `<div class="kv" data-secret="${secret?1:0}"><input class="kv-k" placeholder="${t('field')}" value="${esc(k)}">${val}${split}${lock}${eye}<button class="ghost danger" onclick="this.parentElement.remove()">✕</button></div>`;
+}
+function toggleFieldSecret(btn){
+  const row=btn.closest('.kv'), sec=row.dataset.secret!=='1';
+  row.dataset.secret=sec?'1':'0'; btn.textContent=sec?'🔒':'🔓';
+  const val=row.querySelector('.kv-v'), eye=row.querySelector('.eyebtn');
+  if(val.tagName==='TEXTAREA') val.classList.toggle('masked',sec); else val.type=sec?'password':'text';
+  if(eye){ eye.style.display=sec?'':'none'; eye.textContent='👁'; }
 }
 // JSON blob -> nested keys flattened to dotted key/value rows (installed.client_id, …)
 function flattenJson(obj,prefix,out){ out=out||{}; Object.entries(obj).forEach(([k,v])=>{ const key=prefix?prefix+'.'+k:k; if(v&&typeof v==='object'&&!Array.isArray(v)) flattenJson(v,key,out); else out[key]=typeof v==='object'?JSON.stringify(v):String(v); }); return out; }
 function explodeJson(btn){ const row=btn.closest('.kv'); let obj; try{ obj=JSON.parse(row.querySelector('.kv-v').value); }catch(e){ toast(t('json_bad')); return; } if(!obj||typeof obj!=='object'||Array.isArray(obj)){ toast(t('json_bad')); return; } const flat=flattenJson(obj); row.insertAdjacentHTML('beforebegin',Object.entries(flat).map(([k,v])=>kvRow(k,v)).join('')); row.remove(); }
 function addKv(){ const d=document.createElement('div'); d.innerHTML=kvRow('',''); $('#e_fields').insertBefore(d.firstChild,$('#e_fields').lastElementChild); }
 async function saveSecret(id){
-  const type=$('#e_type').value; let fields={};
-  if(type==='custom')document.querySelectorAll('#e_fields .kv').forEach(r=>{const k=r.querySelector('.kv-k').value.trim();if(k)fields[k]=r.querySelector('.kv-v').value;});
+  const type=$('#e_type').value; let fields={}; const fm={...(window._editFmRaw||{})};
+  if(type==='custom'){
+    document.querySelectorAll('#e_fields .kv').forEach(r=>{const k=r.querySelector('.kv-k').value.trim();if(!k)return;
+      fields[k]=r.querySelector('.kv-v').value; fm[k]={...(fm[k]||{}),secret:r.dataset.secret==='1'};});
+    Object.keys(fm).forEach(k=>{ if(!(k in fields)) delete fm[k]; });   // silinen alanlarin meta'sini at
+  }
   else document.querySelectorAll('#e_fields input[data-f]').forEach(i=>fields[i.dataset.f]=i.value);
   const rd=parseInt($('#e_rotdays').value)||0;
   const rotation=rd>0?{every_days:rd,mode:$('#e_rotmode').value,last:(window._editRotLast||new Date().toISOString())}:{};
   const b={name:$('#e_name').value.trim(),type,tenant:$('#e_tenant').value.trim(),project:$('#e_project').value.trim(),
     environment:$('#e_environment').value.trim(),repo:$('#e_repo').value.trim(),url:$('#e_url').value.trim(),
-    notes:$('#e_notes').value,tags:$('#e_tags').value.split(',').map(s=>s.trim()).filter(Boolean),fields,
+    notes:$('#e_notes').value,tags:$('#e_tags').value.split(',').map(s=>s.trim()).filter(Boolean),fields,field_meta:fm,
     collection:collPickVal('ecol'),rotation};
   if(!b.name){toast(t('name_req'));return;}
   if(id)await api('/api/secret/'+id,{method:'PUT',body:JSON.stringify(b)}); else await api('/api/secrets',{method:'POST',body:JSON.stringify(b)});
@@ -1670,6 +2280,7 @@ async function verifyChain(){
 
 // ---------- modal ----------
 function modal(title,bodyHtml,actions){
+  const _wasModal = history.state && history.state.modal;   // ust uste modal — tek gecmis girisi yeter
   closeModal();
   const ov=document.createElement('div'); ov.className='overlay'; ov.onclick=e=>{if(e.target===ov)closeModal();};
   ov.innerHTML=`<div class="modal"><div class="head"><h2>${title}</h2><span style="flex:1"></span><button class="ghost" onclick="closeModal()">✕</button></div><div class="body">${bodyHtml}</div><div class="foot"></div></div>`;
@@ -1677,9 +2288,20 @@ function modal(title,bodyHtml,actions){
   const foot=ov.querySelector('.foot');
   (actions||[]).forEach(a=>{ const b=document.createElement('button'); b.textContent=a.x; if(a.p)b.className='primary'; if(a.c)b.className=a.c; if(a.id)b.id=a.id; if(a.dis)b.disabled=true; b.onclick=a.f; foot.appendChild(b); });
   window._ov=ov;
+  if(!_wasModal) history.pushState({app:1,tab:CURTAB,modal:1}, '', location.search);  // geri = modali kapat
 }
 function closeModal(){ if(window._ov){window._ov.remove();window._ov=null;} }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeModal(); });
+// ---- tarayici geri/ileri: gezinme SPA icinde kalir; ASLA otomatik secret acmaz ----
+// Gecmis yalnizca aktif sekmeyi tasir. Secret degerleri sadece acik istekle (reveal=1)
+// yeniden cekilir; bir gorunumu geri getirmek deger sizdirmaz. Modal acikken geri once
+// onu kapatir, ileri asla bir secret-detay modalini kendiliginden yeniden acmaz.
+window.addEventListener('popstate', e=>{
+  if(window._ov){ closeModal(); return; }        // acik dialog: geri once onu kapatir, sekme degismez
+  const st=e.state;
+  if(!st || !st.app) return;                     // login oncesi giris — tarayici uygulamadan ciksin
+  _navlock=true; showTab(st.tab||'secrets'); _navlock=false;
+});
 
 // ---------- login redaksiyon arkaplani ----------
 // [prefix, DUMMY-deger, suffix] — tum degerler sahte (…DUMMY…); asla gercek secret basma.

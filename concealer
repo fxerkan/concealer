@@ -11,11 +11,11 @@ Depo (tek sifreli JSON, sops YAML olarak saklar):
 Audit: keys/audit.log (JSONL, HMAC-zincirli, tamper-evident). Sadece anahtar
 ISIMLERI ve eylemleri tutar, secret DEGERLERINI tutmaz.
 """
-import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse, urllib.request, html, getpass, time
-import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil
+import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse, urllib.request, html, getpass, time, webbrowser
+import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil, fnmatch
 from datetime import datetime, timezone, timedelta
 
-VERSION = "0.9.0"   # 0.x boyunca ilerler; 1.0 = tam canli/yayin surumu icin ayrilmistir
+VERSION = "0.9.9"   # 0.x boyunca ilerler; 1.0 = tam canli/yayin surumu icin ayrilmistir
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Depo checkout'u: vault script'in yaninda yasar → BASE'i koru (mevcut kurulumlar bozulmasin).
@@ -50,6 +50,7 @@ FLAGS = {"--tenant": "tenant", "--project": "project", "--env": "environment",
 _DEFAULT_LIMITS = {"per_call": 10, "window_quota": 25, "window_sec": 3600}
 _DEFAULT_CFG = {"idle": 300, "confirm_ops": ["export", "delete", "settings"],
                 "limits": {"default": dict(_DEFAULT_LIMITS), "agents": {}},
+                "policies": [],   # kullanici-tanimli hatirlatma politikalari (bkz policy_eval)
                 # audit_anchor: head hash'i MAKINE-DISI append-only hedefe iter (tam yeniden-forge tespiti)
                 "audit_anchor": {"file": "", "webhook": "", "syslog": False}}
 def load_cfg():
@@ -64,8 +65,8 @@ def save_cfg(cfg):
     with open(CONFIG, "w") as f: json.dump(cfg, f)
     os.chmod(CONFIG, 0o600)
 CFG = load_cfg()
-def _cfg_persist():   # ayar POST'larindan cagrilir: idle/confirm_ops/limits'i kalici yaz
-    save_cfg({k: CFG[k] for k in ("idle", "confirm_ops", "limits", "audit_anchor") if k in CFG})
+def _cfg_persist():   # ayar POST'larindan cagrilir: idle/confirm_ops/limits/policies/hibp'yi kalici yaz
+    save_cfg({k: CFG[k] for k in ("idle", "confirm_ops", "limits", "policies", "hibp_key", "audit_anchor") if k in CFG})
 
 def _clean_limit(v):
     """Web'den gelen limit sozlugunu sinirla/temizle (per_call>=1, quota>=0 ⇒ 0=engelle)."""
@@ -402,6 +403,149 @@ def last_access():
                                 "action": r["action"], "actor": r.get("actor", "")}
     return acc
 
+def access_stats():
+    """name -> {count, last}: audit'ten turetilen kullanim sayisi + son erisim (sadece deger-erisimi eylemleri)."""
+    st = {}
+    _USE_ACTS = _ACCESS_ACTS - {"create"}   # 'create' kullanim degil (olusturma) — sayimdan dus
+    for r in audit_rows():
+        if r.get("action") in _USE_ACTS:
+            for k in str(r.get("key", "")).split(","):
+                k = k.strip()
+                if not k: continue
+                s = st.setdefault(k, {"count": 0, "last": None})
+                s["count"] += 1; s["last"] = r["ts"]   # audit_rows kronolojik → son kazanir
+    return st
+
+_EXP_FIELDS = ("expires", "expiry", "expires_at", "expiration", "valid_until", "not_after")
+def expiry_days(e, now=None):
+    """expires-benzeri alandan kalan gun (negatif = suresi gecmis) ya da None (alan yok/parse edilemez).
+    ponytail: ISO tarih/datetime + unix epoch(s/ms) sezgisi; egzotik formatlar None doner."""
+    now = now or datetime.now(timezone.utc)
+    for fn in _EXP_FIELDS:
+        v = e["fields"].get(fn)
+        if not v: continue
+        v = str(v).strip(); dt = None
+        try:
+            if re.fullmatch(r"\d{10,13}", v):
+                ts = int(v); ts = ts / 1000 if ts > 1e11 else ts
+                dt = datetime.fromtimestamp(ts, timezone.utc)
+            else:
+                dt = datetime.fromisoformat(v.replace("Z", "+00:00"))
+        except Exception:
+            try: dt = datetime.strptime(v[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            except Exception: dt = None
+        if dt:
+            if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
+            return (dt - now).days
+    return None
+
+def health_scan(d=None):
+    """Her kayit icin risk metrikleri: rotasyon gecikmesi, sure bitimi, kullanim, yeniden-kullanim (deger sizmaz)."""
+    d = d or load()
+    use = access_stats(); now = datetime.now(timezone.utc)
+    leak_by_name = {}
+    for g in leak_scan(d):
+        for u in g["uses"]:
+            prev = leak_by_name.get(u["name"])
+            if not prev or g["score"] > prev["score"]:
+                leak_by_name[u["name"]] = {"score": g["score"], "severity": g["severity"]}
+    out = []
+    for e in secs(d):
+        name = e["name"]; u = use.get(name, {}); lk = leak_by_name.get(name, {})
+        rot = e.get("rotation") or {}
+        out.append({"id": e["id"], "name": name, "type": e["type"], "scope": label(e),
+                    "project": e.get("project", ""), "repo": e.get("repo", ""),
+                    "environment": e.get("environment", ""), "tags": e.get("tags", []),
+                    "overdue": rotation_overdue(e), "has_policy": bool(rot.get("every_days")),
+                    "expires_in": expiry_days(e, now),
+                    "uses": u.get("count", 0), "last_used": u.get("last"),
+                    "leak_score": lk.get("score"), "leak_sev": lk.get("severity")})
+    return out
+
+# ---------------- politikalar (hatirlatma kurallari) ----------------
+# Bir policy: {id,name,kind,audience,enabled,notify,match{...},params{...}}. Deger sizmaz — sadece
+# kayitlarin META'sina bakar (rotasyon/expiry/ad/tag) ve leak_scan (yeniden-kullanim, deger maskeli).
+_POLICY_KINDS = ("rotation", "expiry", "reuse", "naming", "tagging")
+_POLICY_AUD = ("all", "user", "agent", "cli", "web", "tui", "mcp")
+def _policy_match(e, m):
+    """Kayit bu policy'nin hedef filtresine giriyor mu (bos alan = kisitlama yok)."""
+    m = m or {}
+    for k in ("project", "environment", "repo", "type", "collection"):
+        want = (m.get(k) or "").strip()
+        if want and str(e.get(k, "")) != want: return False
+    tag = (m.get("tag") or "").strip()
+    if tag and tag not in (e.get("tags") or []): return False
+    return True
+def _as_int(v, dflt=0):
+    try: return int(v)
+    except (TypeError, ValueError): return dflt
+def _policy_violation(p, e, now, reuse_names):
+    """Kayit policy'yi ihlal ediyorsa insan-okur sebep (str), yoksa None."""
+    k = p.get("kind"); pr = p.get("params") or {}
+    if k == "rotation":
+        maxd = _as_int(pr.get("max_days")); rot = e.get("rotation") or {}; ev = rot.get("every_days")
+        over = rotation_overdue(e)
+        if not ev: return "no rotation policy"
+        if maxd and ev > maxd: return f"rotates every {ev}d (> {maxd}d)"
+        if over is not None: return f"{over}d overdue"
+        return None
+    if k == "expiry":
+        warn = _as_int(pr.get("warn_days"), 30); ed = expiry_days(e, now)
+        if ed is None: return "no expiry set" if pr.get("require") else None
+        if ed < 0: return f"expired {-ed}d ago"
+        if ed <= warn: return f"expires in {ed}d"
+        return None
+    if k == "reuse":
+        return "value reused across records" if e["name"] in reuse_names else None
+    if k == "naming":
+        rx = pr.get("regex") or ""
+        if not rx: return None
+        try: return None if re.search(rx, e["name"]) else f"name must match /{rx}/"
+        except re.error: return None
+    if k == "tagging":
+        req = [t for t in (pr.get("tags") or []) if t]
+        miss = [t for t in req if t not in (e.get("tags") or [])]
+        return "missing tag(s): " + ", ".join(miss) if miss else None
+    return None
+def policy_eval(d=None):
+    """Her policy icin ihlal eden kayitlar. reuse yalniz gerekince hesaplanir (leak_scan pahali)."""
+    d = d or load(); pols = CFG.get("policies") or []
+    reuse_names = set()
+    if any(p.get("kind") == "reuse" and p.get("enabled", True) for p in pols):
+        for g in leak_scan(d):
+            for u in g["uses"]: reuse_names.add(u["name"])
+    now = datetime.now(timezone.utc); out = []
+    for p in pols:
+        viols = []
+        if p.get("enabled", True):
+            for e in secs(d):
+                if not _policy_match(e, p.get("match")): continue
+                r = _policy_violation(p, e, now, reuse_names)
+                if r: viols.append({"id": e["id"], "name": e["name"], "scope": label(e), "reason": r})
+        out.append({**p, "violations": viols, "count": len(viols)})
+    return out
+def _policy_clean(pol):
+    """Web/CLI'den gelen policy sozlugunu semaya oturt (id uret/koru)."""
+    pid = (pol.get("id") or "").strip() or hashlib.sha1((pol.get("name", "") + now_iso()).encode()).hexdigest()[:12]
+    match = pol.get("match") or {}
+    params = pol.get("params") if isinstance(pol.get("params"), dict) else {}
+    return {"id": pid, "name": (pol.get("name") or "policy").strip()[:60],
+            "kind": pol.get("kind") if pol.get("kind") in _POLICY_KINDS else "rotation",
+            "audience": pol.get("audience") if pol.get("audience") in _POLICY_AUD else "all",
+            "enabled": bool(pol.get("enabled", True)), "notify": bool(pol.get("notify", False)),
+            "match": {k: str(match.get(k, "") or "").strip() for k in ("project", "environment", "repo", "type", "collection", "tag")},
+            "params": params}
+def policy_upsert(pol):
+    pol = _policy_clean(pol); pols = CFG.get("policies") or []
+    for i, x in enumerate(pols):
+        if x.get("id") == pol["id"]: pols[i] = pol; break
+    else: pols.append(pol)
+    CFG["policies"] = pols; _cfg_persist(); return pol
+def policy_delete(pid):
+    pols = CFG.get("policies") or []; n = len(pols)
+    CFG["policies"] = [x for x in pols if x.get("id") != pid]; _cfg_persist()
+    return n != len(CFG["policies"])
+
 # ---------------- leak / yeniden-kullanim taramasi ----------------
 def leak_scan(d=None):
     """Ayni secret DEGERINI paylasan kayitlari bulur ve risk skorlar. Deger sizmaz (maskeli)."""
@@ -466,9 +610,47 @@ def _clean_fields(fields):
     fields = fields or {}
     bad = [k for k in fields if _bad_field_name(k)]
     return ({k: v for k, v in fields.items() if k not in bad}, bad)
-def scan_folder(root, history=False):
-    """Klasordeki .env/.tfvars/.envrc + (opsiyonel) shell history icinden secret-benzeri
-    KEY=VALUE ciftlerini aday olarak dondurur. Deger disari verilmez (mask ile listelenir)."""
+# ---- ortam degiskeni / global degisken taramasi (macOS + Linux; Windows sonra) ----
+# canli process env'i + shell profil dosyalari (login/interactive) — export/set KEY=VALUE
+_ENV_PROFILES = ("~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zshenv",
+                 "~/.zprofile", "~/.kshrc", "~/.config/fish/config.fish",
+                 "/etc/environment", "/etc/profile")
+_ENV_SKIP = {"SOPS_AGE_KEY", "SOPS_AGE_KEY_FILE", "CONCEALER_TOKEN", "PATH", "PWD", "OLDPWD",
+             "LS_COLORS", "MANPATH", "INFOPATH", "TERMCAP"}
+# terminal/editor/oturum gurultusu — ad gercekten sir degilse (bkz _SECRETY) taramadan dus
+_ENV_NAME_NOISE = re.compile(r"SESSION|ASKPASS|DEBUGPY|ENDPOINTS|TERM_FEATURES|_SOCK$|_PID$|_PATH$|COLORTERM", re.I)
+_FISH_SET = re.compile(r"^\s*set\s+(?:-[gxUl]+\s+)*([A-Za-z_][A-Za-z0-9_]*)\s+(.+?)\s*$")
+def env_scan():
+    """Yerel makinenin ORTAM/GLOBAL degiskenlerinden secret-benzeri olanlari aday dondurur:
+    canli os.environ + shell profil dosyalari (export/set KEY=VALUE). Deger disari verilmez (mask).
+    macOS + Linux. ponytail: Windows system/user env (registry) sonra."""
+    cands = {}
+    def add(name, val, src):
+        val = _unquote(str(val))
+        if name in _ENV_SKIP or not val or re.search(r"\s", val): return   # bosluklu = yol/cumle, token degil
+        if not _SECRETY.search(name):   # adi sir demiyorsa: yol/oturum-gurultusu degerleri ele
+            if val.startswith(("/", "~", "./", "../", "http://", "https://")): return
+            if _ENV_NAME_NOISE.search(name): return
+        if _looks_secret(name, val):
+            cands.setdefault((name, val), {"name": name, "value": val, "mask": mask(val), "source": src})
+    for k, v in os.environ.items(): add(k, v, "env")
+    for pf in _ENV_PROFILES:
+        p = os.path.expanduser(pf)
+        if not os.path.isfile(p): continue
+        try: txt = open(p, errors="ignore").read()
+        except Exception: continue
+        for line in txt.splitlines():
+            if line.lstrip().startswith("#"): continue
+            m = _ENV_LINE.match(line)
+            if m: add(m.group(1), m.group(2), os.path.basename(p))
+            else:
+                mf = _FISH_SET.match(line)
+                if mf: add(mf.group(1), mf.group(2), os.path.basename(p))
+    return sorted(cands.values(), key=lambda c: c["name"])
+
+def scan_folder(root, history=False, env=False):
+    """Klasordeki .env/.tfvars/.envrc + (opsiyonel) shell history + (opsiyonel) ortam degiskenleri
+    icinden secret-benzeri KEY=VALUE ciftlerini aday dondurur. Deger disari verilmez (mask ile listelenir)."""
     root = os.path.expanduser(root or ""); cands = {}
     def add(name, val, src):
         val = _unquote(val)
@@ -494,6 +676,8 @@ def scan_folder(root, history=False):
             except Exception: continue
             for m in re.finditer(r"(?:export\s+)?([A-Z][A-Z0-9_]{2,})=([^\s;|&'\"]+)", txt):
                 add(m.group(1), m.group(2), os.path.basename(hp))
+    if env:
+        for c in env_scan(): cands.setdefault((c["name"], c["value"]), c)
     return sorted(cands.values(), key=lambda c: c["name"])
 
 # ---------------- shell history sizinti taramasi ----------------
@@ -573,6 +757,210 @@ def history_purge(targets, d=None):
             with open(hp, "w") as f: f.writelines(kept)
             removed += drop
     return removed
+
+# ================= online sizinti / maruz-kalma (exposure) =================
+# GUVENLIK: TAM secret degeri ASLA ag'a gonderilmez. HIBP Pwned Passwords k-anonimlik kullanilir:
+# degerin SHA-1'inin yalnizca ilk 5 hex'i sorulur; eslesme yerelde yapilir. (bkz pwned_count)
+_PWNED_UA = "concealer-secret-manager"
+def pwned_count(value, timeout=8):
+    """HIBP Pwned Passwords k-anonimlik kontrolu. SADECE SHA-1 on-eki (5 hex) gonderilir; API o on-eki
+    paylasan binlerce suffix'i doner, tam-hash karsilastirmasi YERELDE yapilir. Tam deger/hash ag'a CIKMAZ.
+    Doner: gorulme sayisi (>=0) ya da -1 (ag hatasi). ponytail: tek saglayici (HIBP range) — kanit-guvenli olan bu."""
+    h = hashlib.sha1(value.encode("utf-8", "ignore")).hexdigest().upper()
+    prefix, suffix = h[:5], h[5:]
+    try:
+        req = urllib.request.Request("https://api.pwnedpasswords.com/range/" + prefix,
+                                     headers={"User-Agent": _PWNED_UA, "Add-Padding": "true"})
+        body = urllib.request.urlopen(req, timeout=timeout).read().decode("utf-8", "ignore")
+    except Exception: return -1
+    for line in body.splitlines():
+        sfx, _, cnt = line.partition(":")
+        if sfx.strip().upper() == suffix:
+            try: return int(cnt.strip().split()[0])
+            except (ValueError, IndexError): return 0
+    return 0
+
+# CWE referanslari (statik; kaynak: cwe.mitre.org) — bulgulara ilistirilir
+_CWE = {
+    "798": ("CWE-798", "Use of Hard-coded Credentials", "https://cwe.mitre.org/data/definitions/798.html"),
+    "259": ("CWE-259", "Use of Hard-coded Password", "https://cwe.mitre.org/data/definitions/259.html"),
+    "321": ("CWE-321", "Use of Hard-coded Cryptographic Key", "https://cwe.mitre.org/data/definitions/321.html"),
+    "312": ("CWE-312", "Cleartext Storage of Sensitive Information", "https://cwe.mitre.org/data/definitions/312.html"),
+    "532": ("CWE-532", "Insertion of Sensitive Information into Log File", "https://cwe.mitre.org/data/definitions/532.html"),
+    "540": ("CWE-540", "Inclusion of Sensitive Information in Source Code", "https://cwe.mitre.org/data/definitions/540.html"),
+}
+def _cwe(ids): return [{"id": _CWE[i][0], "title": _CWE[i][1], "url": _CWE[i][2]} for i in ids if i in _CWE]
+# keyhacks-benzeri dogrulama ipucu: token turune gore "canli mi/nasil kontrol edilir" REHBERI (deger GONDERMEZ)
+_VALIDATE = [
+    (re.compile(r"AKIA[0-9A-Z]{16}"), "AWS key — verify locally: `aws sts get-caller-identity`. keyhacks.md#aws-access-key-id"),
+    (re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"), "GitHub token — scopes via `curl -H 'Authorization: token <T>' https://api.github.com/user` (run locally). keyhacks.md#github"),
+    (re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"), "Slack token — test auth.test locally. keyhacks.md#slack-api-token"),
+    (re.compile(r"AIza[0-9A-Za-z_-]{35}"), "Google API key — restrict & rotate in Cloud Console. keyhacks.md#google-api-key"),
+    (re.compile(r"sk-[A-Za-z0-9_-]{20,}"), "OpenAI/Stripe-style key — rotate at the provider; never paste it into an online checker."),
+]
+def _validate_hint(value):
+    for rx, msg in _VALIDATE:
+        if rx.search(value): return msg
+    return ""
+def exposure_scan(names=None, ids=None, sel=None, online=True, d=None):
+    """Secilen secret'larin GIZLI alan degerlerini online sizinti kontrolunden gecirir (HIBP k-anonimlik).
+    ids verilirse yalniz o KAYITLAR (id — kesin; ayni isimli farkli scope/collection'lari KARISTIRMAZ);
+    names/sel geriye-uyum icin. Ayni deger tek kez sorulur.
+    GUVENLIK: tam deger ag'a CIKMAZ (yalniz SHA-1 on-eki). online=False → yalniz statik CWE/ipucu, ag yok."""
+    d = d or load(); out = []; seen = {}
+    idset = set(ids) if ids is not None else None
+    for e in secs(d):
+        if idset is not None and e["id"] not in idset: continue
+        if names is not None and e["name"] not in names: continue
+        if sel and not matches(e, sel): continue
+        for fn, fv in e["fields"].items():
+            fv = str(fv or "")
+            # vault'un KENDI secret degerleri — yanlis-pozitif kaygisi yok; zayif parolalar da kontrol edilmeli
+            # (HIBP zayif parolalarda en guclu). _high_entropy filtresi burada UYGULANMAZ; sadece onemsiz kisa degerler elenir.
+            if len(fv) < 6 or not rec_field_secret(e, fn): continue
+            cnt = None
+            if online:
+                if fv in seen: cnt = seen[fv]
+                else: cnt = pwned_count(fv); seen[fv] = cnt
+            ids = ["798"]
+            if e.get("type") in ("ssh_key", "certificate"): ids.append("321")
+            elif "pass" in fn.lower(): ids.append("259")
+            out.append({"id": e["id"], "name": e["name"], "field": fn, "scope": label(e), "mask": mask(fv),
+                        "pwned": cnt, "severity": "high" if (cnt and cnt > 0) else ("med" if cnt == -1 else "low"),
+                        "cwe": _cwe(ids), "validate": _validate_hint(fv)})
+    out.sort(key=lambda x: -((x["pwned"] or 0)))
+    return out
+
+def _hibp_key(): return (CFG.get("hibp_key") or os.environ.get("CONCEALER_HIBP_KEY") or "").strip()
+def hibp_breaches(email, timeout=8):
+    """HIBP hesap-sizintisi: e-postanin gectigi ihlaller. v3 API anahtari gerekir (kullanici saglar; CFG/env).
+    Sadece kullanicinin girdigi e-posta gonderilir. Doner {ok, breaches|error, manual?}."""
+    email = (email or "").strip()
+    if not email or "@" not in email: return {"ok": False, "error": "bad_email"}
+    key = _hibp_key()
+    manual = "https://haveibeenpwned.com/account/" + urllib.parse.quote(email)
+    if not key: return {"ok": False, "error": "no_key", "manual": manual}
+    url = "https://haveibeenpwned.com/api/v3/breachedaccount/" + urllib.parse.quote(email) + "?truncateResponse=false"
+    try:
+        req = urllib.request.Request(url, headers={"hibp-api-key": key, "User-Agent": _PWNED_UA})
+        rows = json.loads(urllib.request.urlopen(req, timeout=timeout).read().decode("utf-8", "ignore"))
+    except Exception as ex:
+        code = getattr(ex, "code", None)
+        if code == 404: return {"ok": True, "breaches": []}       # temiz — sizinti yok
+        return {"ok": False, "error": ("http_%s" % code) if code else "net", "manual": manual}
+    return {"ok": True, "breaches": [{"name": b.get("Name"), "title": b.get("Title"), "date": b.get("BreachDate"),
+             "count": b.get("PwnCount"), "data": b.get("DataClasses", [])} for b in rows]}
+
+# ---------------- git gecmisi / log / gitignore taramasi (YEREL — deger ag'a cikmaz) ----------------
+def _git(repo, *args, timeout=30):
+    try:
+        r = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True, timeout=timeout, errors="ignore")
+        return r.stdout if r.returncode == 0 else ""
+    except Exception: return ""
+def _is_git(repo): return bool(_git(repo, "rev-parse", "--is-inside-work-tree").strip())
+_TOKEN_RX_ALL = re.compile("|".join(rx.pattern for _, rx in _TOKEN_PATTERNS))
+_SECRET_FILE_RX = re.compile(
+    r"(^|/)(\.env(\.[\w.-]+)?|\.envrc|[^/]*\.pem|[^/]*\.key|[^/]*\.p12|[^/]*\.pfx|id_rsa|id_ed25519|"
+    r"[^/]*\.tfvars|credentials(\.json)?|\.npmrc|\.pypirc|secrets?\.(ya?ml|json))$", re.I)
+_LOG_FILE_RX = re.compile(r"\.log(\.[\w.-]+)?$", re.I)
+def gitignore_gaps(repo):
+    """secret tasiyabilecek dosyalar (.env/*.pem/id_rsa/...) git tarafinca ignore edilmiyorsa oner.
+    .gitignore (git check-ignore) + .claudeignore (fnmatch) birlikte degerlendirilir."""
+    repo = os.path.expanduser(repo or ""); cand = []
+    for dp, dns, fns in os.walk(repo):
+        dns[:] = [x for x in dns if x not in _SKIP_DIRS and x != ".git"]
+        for fn in fns:
+            rel = os.path.relpath(os.path.join(dp, fn), repo).replace(os.sep, "/")
+            if _SECRET_FILE_RX.search(rel): cand.append(rel)
+        if len(cand) > 500: break
+    extra = []
+    for ig in (".claudeignore", ".cursorignore", ".aiignore"):
+        p = os.path.join(repo, ig)
+        if os.path.isfile(p):
+            extra += [l.strip() for l in open(p, errors="ignore") if l.strip() and not l.startswith("#")]
+    gaps = []
+    for rel in sorted(set(cand))[:100]:
+        if _is_git(repo) and _git(repo, "check-ignore", rel).strip(): continue
+        if any(fnmatch.fnmatch(rel, pat) or fnmatch.fnmatch(os.path.basename(rel), pat) for pat in extra): continue
+        gaps.append(rel)
+    return gaps
+def git_scan(repo, d=None):
+    """Repo git gecmisi + calisma agacinda secret arar (YEREL). Doner:
+      committed: vault secret degerleri gecmiste commitlenmis mi (git log -S pickaxe — kesin, deger gonderilmez)
+      tracked:   HEAD'de izlenen dosyalarda token deseni (git grep)
+      gitignore_gaps: ignore'lanmamis secret-dosyalari"""
+    repo = os.path.expanduser(repo or "")
+    if not _is_git(repo): return {"git": False}
+    vals = _vault_vals(d); committed = []
+    for v in list(vals)[:200]:   # ponytail: deger basina pickaxe pahali; 200 tavan (uzatmak icin cok-thread)
+        if v.startswith("-"): continue
+        out = _git(repo, "log", "--all", "--oneline", "-S", v, timeout=20)
+        commits = [ln.split(" ", 1) for ln in out.splitlines() if ln.strip()][:10]
+        if commits:
+            committed.append({"mask": mask(v), "commits": [
+                {"hash": c[0], "subject": (c[1] if len(c) > 1 else "")[:80]} for c in commits]})
+    tracked = []
+    for ln in _git(repo, "grep", "-nIE", _TOKEN_RX_ALL.pattern, timeout=20).splitlines()[:200]:
+        m = re.match(r"([^:]+):(\d+):(.*)", ln)
+        if not m: continue
+        hit = _TOKEN_RX_ALL.search(m.group(3))
+        tracked.append({"file": m.group(1), "line": int(m.group(2)), "mask": mask(hit.group(0)) if hit else ""})
+    return {"git": True, "committed": committed, "tracked": tracked, "gitignore_gaps": gitignore_gaps(repo)}
+def log_scan(root, d=None):
+    """Dizin/repodaki *.log dosyalari (ve logs/ altindakiler) icinde vault secret + token deseni arar. Maskeli."""
+    root = os.path.expanduser(root or ""); vault_vals = _vault_vals(d); out = []
+    if not os.path.isdir(root): return out
+    for dp, dns, fns in os.walk(root):
+        dns[:] = [x for x in dns if x not in _SKIP_DIRS and x != ".git"]
+        in_logdir = os.path.basename(dp).lower() in ("logs", "log")
+        for fn in fns:
+            if not (_LOG_FILE_RX.search(fn) or (in_logdir and not fn.startswith("."))): continue
+            fp = os.path.join(dp, fn)
+            try:
+                if os.path.getsize(fp) > 20 * 1024 * 1024: continue     # 20MB tavan
+                for i, line in enumerate(open(fp, errors="ignore")):
+                    hits = _hist_hits(line, vault_vals)
+                    if not hits: continue
+                    red = line
+                    for v in sorted({h[0] for h in hits}, key=len, reverse=True): red = red.replace(v, mask(v))
+                    out.append({"file": os.path.relpath(fp, root), "line": i + 1, "mask": mask(hits[0][0]),
+                                "cmd": red.strip()[:240], "reasons": sorted({h[1] for h in hits}),
+                                "severity": "high" if any(h[2] == "high" for h in hits) else "med"})
+                    if len(out) >= 500: return out
+            except Exception: continue
+    return out
+def git_remediation(repo, files=None, names=None):
+    """git gecmisinden secret temizleme REHBERI (repo/dosya/isimlere gore uyarlanmis komut dokumani).
+    GUVENLIK: concealer bu komutlari ASLA calistirmaz; yalniz metni uretir — kullanici uygular."""
+    rname = os.path.basename(os.path.abspath(os.path.expanduser(repo or ""))) or "your-repo"
+    files = [f for f in (files or []) if f][:30]; names = [n for n in (names or []) if n][:50]
+    fl = files or ["path/to/secret-file"]
+    q = lambda s: shlex.quote(s)
+    md = [f"# Remediation — purge committed secrets from `{rname}`", "",
+          "> ⚠️ concealer never rewrites git history for you. Read each command, then run it yourself.", "",
+          "## 1. Rotate first (do this before anything else)", "",
+          "A secret is compromised the instant it is pushed — rewriting history does **not** un-leak it. "
+          "Rotate/revoke the affected credential at its provider now."]
+    if names: md += ["", "Affected secrets:"] + [f"- `{n}`" for n in names]
+    md += ["", "## 2. Stop tracking + ignore", "", "```sh"] + \
+          [f"git rm --cached {q(f)}" for f in fl] + \
+          ["printf '%s\\n' " + " ".join(q(f) for f in fl) + " >> .gitignore",
+           "git commit -m 'stop tracking secrets; add to .gitignore'", "```",
+           "", "## 3. Purge from history — git filter-repo (recommended)", "",
+           "```sh", "# pip install git-filter-repo"] + \
+          [f"git filter-repo --path {q(f)} --invert-paths" for f in fl] + \
+          ["```", "", "## 4. Alternative — BFG Repo-Cleaner", "", "```sh",
+           "# https://rtyley.github.io/bfg-repo-cleaner/",
+           f"bfg --delete-files {os.path.basename(fl[0])}",
+           "git reflog expire --expire=now --all && git gc --prune=now --aggressive", "```",
+           "", "## 5. Force-push + coordinate", "", "```sh", "git push --force --all",
+           "git push --force --tags", "```",
+           "Teammates must re-clone (old clones still hold the secret). Ask GitHub/GitLab support to expire cached views.",
+           "", "## 6. Prevent recurrence", "",
+           "Add pre-commit scanning: **gitleaks**, **TruffleHog**, or **detect-secrets**. "
+           "Validate whether a leaked key is still live with **keyhacks** (locally, never via an online paster).", ""]
+    return "\n".join(md)
+
 def _native_pickdir():
     """Yerel app: OS'un klasor secme diyalogunu (Finder/Explorer) ac, secilen yolu dondur (iptal=None)."""
     try:
@@ -987,8 +1375,8 @@ def _banner():
     # tum logo accent renginde basilir (blok sanatta tek harf renklendirmek pratik degil).
     utf8 = (sys.stdout.encoding or "").lower().startswith("utf")
     art = _LOGO if utf8 else ["concealer"]
-    for ln in art: print(_c(ln, "38;5;214;1"))   # amber, bold
-    print(_c("  local-only secret manager  ·  SOPS + age  ·  v" + VERSION, "38;5;214"))
+    for ln in art: print(_c(ln, "38;5;203;1"))   # amber, bold
+    print(_c("  local-only secret manager  ·  SOPS + age  ·  v" + VERSION, "38;5;203"))
     print()
 
 def init(force=False):
@@ -996,7 +1384,7 @@ def init(force=False):
         sys.exit(f"already set up: {KEY}\nto reinstall: concealer init --force")
     _banner()
     print(_c("Setting up vault…", "1") + f"  ({HOME})\n")
-    print(_c("Step 1/2", "38;5;214;1") + " — set a master password (this opens the vault; if lost you need a recovery code).")
+    print(_c("Step 1/2", "38;5;203;1") + " — set a master password (this opens the vault; if lost you need a recovery code).")
     os.makedirs(os.path.dirname(KEY), exist_ok=True)
     for f in (KEY, PUBKEY, BACKUP, MASTER):
         if os.path.exists(f): os.remove(f)
@@ -1018,7 +1406,7 @@ def init(force=False):
     save({"secrets": []}); audit("init", source="cli")
     with open(os.path.join(HOME, ".gitignore"), "w") as f:
         f.write("keys/age-key.txt\nkeys/audit.key\nkeys/audit.head\nkeys/recovery.json\nkeys/agents.json\nkeys/ratestate.json\nkeys/backup.json\n")
-    print("\n" + _c("Step 2/2", "38;5;214;1") + " — save the recovery codes (below, shown ONLY once).")
+    print("\n" + _c("Step 2/2", "38;5;203;1") + " — save the recovery codes (below, shown ONLY once).")
     _print_codes(codes)
     # key-at-rest: age private key'i diskten kaldir (yalniz sifreli BACKUP kalir).
     os.remove(KEY); audit("harden", source="cli")
@@ -1027,11 +1415,11 @@ def init(force=False):
     print(f"  public key: {pub}\n")
     print(_c("Next steps:", "1"))
     print("  1) Add the CLI token to your shell (~%dh valid, refresh: eval \"$(concealer unlock)\"):" % (TOKEN_TTL // 3600))
-    print("     " + _c(f"export CONCEALER_TOKEN={tok}", "38;5;214"))
-    print("  2) Web UI (opens with the master password):   " + _c("concealer web", "38;5;214"))
-    print("  3) Add your first secret:   " + _c('concealer set --name GITHUB_TOKEN --project myapp ghp_...', "38;5;214"))
-    print("  4) Grant an AI agent access (MCP):   " + _c("concealer agent register <name>", "38;5;214"))
-    print("  5) Set up automatic backups:   " + _c("concealer backup --dir <folder>", "38;5;214") + "  (details: web → Settings)")
+    print("     " + _c(f"export CONCEALER_TOKEN={tok}", "38;5;203"))
+    print("  2) Web UI (opens with the master password):   " + _c("concealer web", "38;5;203"))
+    print("  3) Add your first secret:   " + _c('concealer set --name GITHUB_TOKEN --project myapp ghp_...', "38;5;203"))
+    print("  4) Grant an AI agent access (MCP):   " + _c("concealer agent register <name>", "38;5;203"))
+    print("  5) Set up automatic backups:   " + _c("concealer backup --dir <folder>", "38;5;203") + "  (details: web → Settings)")
 
 def passwd():
     if not os.path.exists(BACKUP): sys.exit("run 'concealer init' first.")
@@ -1271,14 +1659,14 @@ _ASCII_MAP = str.maketrans({
     "→": "->", "←": "<-", "↑": "^", "↓": "v", "—": "-", "–": "-", "’": "'", "“": '"', "”": '"'})
 
 def _tui_palette(curses):
-    """Renk paleti — web 'Covert' temasi (amber accent). Barlar/secim icin
-    A_REVERSE|amber kullanilir: temadan bagimsiz olarak amber zemin + koyu yazi
-    verir (duz COLOR_BLACK bazi terminallerde amber uzerinde gorunmez kaliyordu)."""
+    """Renk paleti — web 'Covert' temasi (redaction-red accent). Barlar/secim icin
+    A_REVERSE|acc kullanilir: temadan bagimsiz olarak red zemin + koyu yazi
+    verir (duz COLOR_BLACK bazi terminallerde acc uzerinde gorunmez kaliyordu)."""
     if curses.has_colors():
         curses.start_color(); curses.use_default_colors()
-        amber = 214 if curses.COLORS >= 256 else curses.COLOR_YELLOW
+        acc_c = 203 if curses.COLORS >= 256 else curses.COLOR_RED   # redaction red (was amber 214)
         gray  = 245 if curses.COLORS >= 256 else curses.COLOR_WHITE
-        curses.init_pair(1, amber, -1); curses.init_pair(2, gray, -1)
+        curses.init_pair(1, acc_c, -1); curses.init_pair(2, gray, -1)
         curses.init_pair(3, curses.COLOR_GREEN, -1); curses.init_pair(4, curses.COLOR_RED, -1)
         curses.init_pair(5, curses.COLOR_CYAN, -1)
         curses.init_pair(6, gray, curses.COLOR_BLACK)   # modal icin OPAK siyah zemin
@@ -2035,7 +2423,10 @@ def _mkhelp():
         R("history [--purge]", "find (and optionally delete) secrets left in shell history"),
         "",
         "SCAN / DEPLOY",
-        R("scan <folder> [--import] [--history] [scope]", "extract secrets from .env/files/git history"),
+        R("scan <folder> [--import] [--history] [--envvars] [scope]", "extract secrets from .env/files/history/env vars"),
+        R("policy [list|check]", "list reminder policies / report violations (check: exit 1 if any — cron-friendly)"),
+        R("expose [scope] [--offline]", "check secret values against known breaches (HIBP k-anonymity — value never sent)"),
+        R("gitscan <repo>", "find secrets in git history / tracked files / logs + .gitignore gaps (local, read-only)"),
         R("deploy --target <t> [scope]", "render: dotenv|export|docker|json|k8s|aws-secrets|aws-ssm|github"),
         R("run [scope] <cmd...>", "inject secrets into env and run a command (no values leak)"),
         "",
@@ -2265,21 +2656,72 @@ def cli(argv):
         else:
             print(f"\n{len(hits)} findings. to delete from history: concealer history --purge")
     elif cmd == "scan":
-        if not a or a[0].startswith("--"):
-            sys.exit("usage: concealer scan <folder> [--import] [--history] [--project P --env E ..]")
-        root = a.pop(0)
+        scan_env = "--envvars" in a
+        if not a or (a[0].startswith("--") and not scan_env):
+            sys.exit("usage: concealer scan <folder> [--import] [--history] [--envvars] [--project P --env E ..]")
+        root = "" if a[0].startswith("--") else a.pop(0)
         do_import = "--import" in a; history = "--history" in a
-        a = [x for x in a if x not in ("--import", "--history")]
-        sel = _sel(a); cands = scan_folder(root, history)
+        a = [x for x in a if x not in ("--import", "--history", "--envvars")]
+        sel = _sel(a); cands = scan_folder(root, history, scan_env)
         if not cands: print("no candidate secrets found."); return
         print(f"{len(cands)} candidates:")
         for c in cands: print(f"  {c['name']:28} {c['mask']:14} <- {c['source']}")
         if not do_import: print("\n(dry run) add --import to import them"); return
         d = load(); scope = {dim: sel.get(dim, "") for dim in DIMS}
-        if not scope["project"]: scope["project"] = os.path.basename(os.path.abspath(os.path.expanduser(root)))
+        if not scope["project"] and root: scope["project"] = os.path.basename(os.path.abspath(os.path.expanduser(root)))
         n_new, n_skip = _import_cands(d, cands, scope); save(d)
         audit("scan_import", key=f"{n_new} secrets", source="scan", detail=root)
         print(f"\nimported: {n_new}, skipped (existing): {n_skip}  @ {label(scope)}")
+    elif cmd == "policy":
+        sub = a[0] if a else "list"
+        if sub == "check":   # cron dostu: ihlal varsa cikis kodu 1
+            ev = policy_eval(); tot = 0
+            for p in ev:
+                if not p.get("enabled", True) or not p["count"]: continue
+                tot += p["count"]
+                print(f"[{p['name']}] ({p['kind']}, {p['audience']}) — {p['count']} violation(s):")
+                for v in p["violations"]: print(f"  - {v['name']} @ {v['scope']}: {v['reason']}")
+            print(f"\n{tot} total violation(s).")
+            if tot: sys.exit(1)
+        else:   # list
+            pols = CFG.get("policies") or []
+            if not pols: return print("no policies. add them in the web UI (Policy tab).")
+            for p in pols:
+                print(f"{p['id']}  {p['name']:24} kind={p['kind']:9} audience={p['audience']:6} "
+                      f"{'on' if p.get('enabled', True) else 'off'}{'  🔔' if p.get('notify') else ''}")
+    elif cmd == "expose":
+        offline = "--offline" in a; a = [x for x in a if x != "--offline"]
+        sel = _sel(a) or None
+        if not offline: print("checking online (HIBP k-anonymity: only a SHA-1 prefix leaves this machine)…")
+        res = exposure_scan(sel=sel, online=not offline)
+        audit("exposure_scan", key=f"{len(res)} checked", source="cli", detail="offline" if offline else "hibp-range")
+        if not res: return print("no high-entropy secret values to check.")
+        for r in res:
+            pw = r["pwned"]
+            tag = "NET-ERR" if pw == -1 else (f"PWNED x{pw}" if pw and pw > 0 else ("clean" if pw == 0 else "—"))
+            print(f"[{r['severity']:4}] {r['name']:24} {r['field']:12} {r['mask']:14} {tag}")
+            if r["validate"]: print(f"        ↳ {r['validate']}")
+        bad = sum(1 for r in res if (r["pwned"] or 0) > 0)
+        print(f"\n{len(res)} checked, {bad} found in known breaches. CWE-798 applies to any hard-coded credential.")
+        if bad: sys.exit(2)
+    elif cmd == "gitscan":
+        if not a or a[0].startswith("--"): sys.exit("usage: concealer gitscan <repo>")
+        repo = a[0]; res = git_scan(repo); logs = log_scan(repo)
+        audit("git_scan", source="cli", detail=repo)
+        if not res.get("git"): print("not a git repo (still scanning logs)…")
+        for c in res.get("committed", []):
+            print(f"COMMITTED  {c['mask']:14} in {len(c['commits'])} commit(s): " + ", ".join(x['hash'] for x in c['commits']))
+        for t in res.get("tracked", []):
+            print(f"TRACKED    {t['file']}:{t['line']}  {t['mask']}")
+        for g in res.get("gitignore_gaps", []):
+            print(f"NOT-IGNORED  {g}  (add to .gitignore)")
+        for l in logs:
+            print(f"LOG [{l['severity']:4}] {l['file']}:{l['line']}  {l['mask']}")
+        tot = len(res.get("committed", [])) + len(res.get("tracked", [])) + len(logs)
+        print(f"\n{tot} finding(s), {len(res.get('gitignore_gaps', []))} ignore gap(s).")
+        if res.get("committed") or res.get("tracked"):
+            print("history cleanup guide: run `concealer web` → Risks → Exposure → 'Show cleanup guide' "
+                  "(concealer NEVER rewrites history for you).")
     elif cmd == "export":
         out = a[0] if a and not a[0].startswith("--") else f"concealer-export-{now_iso()[:10]}.age"
         pw = getpass.getpass("Master password (bundle encryption): ")
@@ -2391,13 +2833,18 @@ def serve_web(port):
             if path == "/api/settings":
                 return self._json({"idle": CFG["idle"], "confirm_ops": CFG["confirm_ops"],
                                    "limits": CFG.get("limits") or {"default": dict(_DEFAULT_LIMITS), "agents": {}},
-                                   "agents": _agent_labels(), "hardened": not os.path.exists(KEY)})
+                                   "agents": _agent_labels(), "hardened": not os.path.exists(KEY),
+                                   "hibp_key_set": bool(_hibp_key())})   # anahtarin KENDISI donmez
             if path == "/api/backup":      # oto-yedek durumu (parola DONMEZ)
                 c = _backup_cfg()
                 return self._json({"enabled": c["enabled"], "interval_h": c["interval_h"], "dir": c["dir"],
                                    "keep": c["keep"], "last": c["last"], "has_pw": bool(c.get("pw_wrapped"))})
             if path == "/api/leaks":
                 audit("leak_scan", source="web"); return self._json(leak_scan())
+            if path == "/api/health":
+                audit("health_scan", source="web"); return self._json(health_scan())
+            if path == "/api/policies":
+                return self._json({"policies": policy_eval(), "kinds": list(_POLICY_KINDS), "audiences": list(_POLICY_AUD)})
             if path == "/api/history":
                 hits = history_scan(); audit("history_scan", key=f"{len(hits)} hits", source="web")
                 return self._json(hits)
@@ -2456,9 +2903,31 @@ def serve_web(port):
                 b = self._body(); audit("copy", key=b.get("key", ""), source="web", detail=b.get("field", ""))
                 return self._json({"ok": True})
             if path == "/api/scan":        # kuru tarama (deger vermez, mask)
-                b = self._body(); cands = scan_folder(b.get("path", ""), b.get("history", False))
-                audit("scan", source="web", detail=b.get("path", ""))
+                b = self._body(); cands = scan_folder(b.get("path", ""), b.get("history", False), b.get("env", False))
+                audit("scan", source="web", detail=b.get("path", "") or ("env" if b.get("env") else ""))
                 return self._json({"cands": [{"name": c["name"], "mask": c["mask"], "source": c["source"]} for c in cands]})
+            if path == "/api/policies":    # olustur/guncelle (session yeterli; deger acmaz)
+                b = self._body(); pol = policy_upsert(b)
+                audit("policy_set", key=pol["name"], source="web", detail=pol["kind"])
+                return self._json({"ok": True, "policy": pol})
+            if path == "/api/exposure":    # online sizinti kontrolu (HIBP k-anonimlik; TAM DEGER GITMEZ)
+                b = self._body(); names = b.get("names"); ids = b.get("ids"); sel = b.get("sel") or None
+                res = exposure_scan(ids=ids if isinstance(ids, list) else None,
+                                    names=names if isinstance(names, list) else None, sel=sel, online=b.get("online", True))
+                audit("exposure_scan", key=f"{len(res)} checked", source="web", detail="hibp-range")
+                return self._json({"results": res})
+            if path == "/api/breach":      # e-posta sizinti sorgusu (HIBP; sadece e-posta gonderilir)
+                b = self._body(); res = hibp_breaches(b.get("email", ""))
+                audit("breach_check", key=b.get("email", ""), source="web")
+                return self._json(res)
+            if path == "/api/gitscan":     # git gecmisi + izlenen dosyalar + log + gitignore (YEREL)
+                b = self._body(); root = b.get("path", "")
+                res = git_scan(root); res["logs"] = log_scan(root)
+                audit("git_scan", source="web", detail=root)
+                return self._json(res)
+            if path == "/api/gitremedy":   # temizleme REHBERI metni (ASLA calistirilmaz)
+                b = self._body()
+                return self._json({"text": git_remediation(b.get("path", ""), b.get("files"), b.get("names"))})
             if path == "/api/settings":    # verify_master zorunlu (hassas)
                 b = self._body()
                 if not verify_master(b.get("pw", "")):
@@ -2476,10 +2945,12 @@ def serve_web(port):
                         cur["agents"] = {k: _clean_limit(v) for k, v in b["limits"]["agents"].items()
                                          if k and isinstance(v, dict) and _clean_limit(v)}
                     CFG["limits"] = cur
+                if "hibp_key" in b:   # HIBP API anahtari (kullaniciya ait); bos string = temizle
+                    CFG["hibp_key"] = str(b["hibp_key"]).strip()
                 _cfg_persist()
                 audit("settings", source="web", detail=f"idle={CFG['idle']}")
                 return self._json({"ok": True, "idle": CFG["idle"], "confirm_ops": CFG["confirm_ops"],
-                                   "limits": CFG.get("limits"), "agents": _agent_labels()})
+                                   "limits": CFG.get("limits"), "agents": _agent_labels(), "hibp_key_set": bool(_hibp_key())})
             if path == "/api/export":      # master parola ile age -p sifreli bundle
                 b = self._body()
                 if not verify_master(b.get("pw", "")):
@@ -2545,7 +3016,7 @@ def serve_web(port):
                 return self._json({"text": deploy_render(scope, target), "targets": DEPLOY_TARGETS})
             if path == "/api/scan/import":
                 b = self._body(); root = b.get("path", ""); names = set(b.get("names") or [])
-                cands = [c for c in scan_folder(root, b.get("history", False)) if c["name"] in names]
+                cands = [c for c in scan_folder(root, b.get("history", False), b.get("env", False)) if c["name"] in names]
                 d = load(); scope = {dim: b.get(dim, "") for dim in DIMS}
                 if not scope["project"] and root:
                     scope["project"] = os.path.basename(os.path.abspath(os.path.expanduser(root)))
@@ -2566,6 +3037,7 @@ def serve_web(port):
                 if not e: return self._json({"error": "not found"}, 404)
                 b = self._body(); ne = _entry_from_body(b)
                 for k in ["name", "type"] + DIMS + ["tags", "url", "notes", "fields", "collection", "rotation"]: e[k] = ne[k]
+                if "field_meta" in ne: e["field_meta"] = ne["field_meta"]   # yalniz gonderildiyse yaz (TUI override'larini korur)
                 e["updated"] = now_iso(); save(d)
                 audit("update", key=e["name"], source="web", detail=label(e))
                 return self._json({"ok": True})
@@ -2574,6 +3046,10 @@ def serve_web(port):
         def do_DELETE(self):
             path = urllib.parse.urlparse(self.path).path
             if not valid(self._tok() or ""): return self._json({"error": "locked"}, 401)
+            if path.startswith("/api/policies/"):
+                pid = path.rsplit("/", 1)[-1]
+                ok = policy_delete(pid); audit("policy_delete", key=pid, source="web")
+                return self._json({"ok": ok})
             if path.startswith("/api/secret/"):
                 sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
                 if not e: return self._json({"error": "not found"}, 404)
@@ -2586,6 +3062,9 @@ def serve_web(port):
 
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), H)
     print(f"concealer web: http://127.0.0.1:{port}  (idle-lock {CFG['idle']}s, Ctrl+C to stop)")
+    if os.environ.get("CONCEALER_NO_OPEN") != "1":  # ponytail: skip in headless/SSH via env
+        try: webbrowser.open(f"http://127.0.0.1:{port}")
+        except Exception: pass
     try: srv.serve_forever()
     except KeyboardInterrupt: pass
 
@@ -2597,6 +3076,7 @@ def _entry_from_body(b):
          "collection": (b.get("collection") or "").strip().strip("/"),
          "rotation": b.get("rotation") if isinstance(b.get("rotation"), dict) else {}}
     for dim in DIMS: e[dim] = b.get(dim, "")
+    if isinstance(b.get("field_meta"), dict): e["field_meta"] = b["field_meta"]   # kayda ozel gizlilik override'lari
     if "id" in b: e["id"] = b["id"]
     return e
 
