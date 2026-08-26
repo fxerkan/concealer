@@ -35,6 +35,24 @@
         "value": "drop-shadow(0 14px 34px rgba(255,176,32,.28))",
         "createdAt": "2026-08-19T06:55:27.127Z",
         "reason": "pre-existing concealer brand glow on logo mark; house accent styling, not introduced by this change"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "docs/index.html"
+        ],
+        "createdAt": "2026-08-26T08:49:11.169Z",
+        "reason": "pre-existing user-requested brand halo on the 'er' redaction box; only recolored amber→red, not newly added"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "assets/hero.html"
+        ],
+        "createdAt": "2026-08-26T08:49:11.248Z",
+        "reason": "pre-existing user-requested brand halo on the 'er' redaction box; only recolored amber→red, not newly added"
       }
     ]
   }

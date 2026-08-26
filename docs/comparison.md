@@ -44,7 +44,7 @@ Legend: ✅ yes · ⚠️ partial / with caveats · ❌ no · — n/a or unknown
 The **Capability** and **concealer** columns stay pinned while you scroll right to see every other tool; scroll down inside the table for the remaining rows. Rows marked ★ are capabilities **no other tool in this table matches**.
 
 <style>
-.cmp-wrap{--cbg:#0d0f13;--chead:#1b1f27;--czA:#0c0e12;--czB:#101319;--ccer:#1a160c;--ccerhd:#2a2410;--cline:#242a33;--ctxt:#e8e8e6;--cstar:#ffb020;--cuniqcap:#1c1810;
+.cmp-wrap{--cbg:#0d0f13;--chead:#1b1f27;--czA:#0c0e12;--czB:#101319;--ccer:#1a0e0e;--ccerhd:#2a1414;--cline:#242a33;--ctxt:#e8e8e6;--cstar:#ff4d4d;--cuniqcap:#1c1010;
   max-height:560px;overflow:auto;border:1px solid var(--cline);border-radius:12px;position:relative;margin:14px 0}
 html[data-cer-theme="light"] .cmp-wrap{--cbg:#fff;--chead:#eef0f3;--czA:#fff;--czB:#f6f7f9;--ccer:#fff6e2;--ccerhd:#ffe7bd;--cline:#e2e6eb;--ctxt:#1a1d23;--cstar:#b06f00;--cuniqcap:#fff7ea}
 .cmp-wrap .table-wrapper{display:contents}
@@ -57,7 +57,7 @@ html[data-cer-theme="light"] .cmp-wrap{--cbg:#fff;--chead:#eef0f3;--czA:#fff;--c
 .cmp thead th.cap{z-index:5}
 .cmp .cer{position:sticky;left:216px;z-index:2;width:190px;min-width:190px;max-width:190px;white-space:normal;background:var(--ccer)!important}
 .cmp thead th.cer{z-index:5;background:var(--ccerhd)!important}
-.cmp tbody tr.u td{background:rgba(255,176,32,.07)}
+.cmp tbody tr.u td{background:rgba(255,77,77,.07)}
 .cmp tbody tr.u .cap{box-shadow:inset 4px 0 0 var(--cstar);background:var(--cuniqcap)}
 .cmp .star{color:var(--cstar);font-weight:800;margin-left:4px}
 .cmp small{opacity:.8}

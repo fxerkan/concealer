@@ -1,14 +1,14 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="concealer">
   <defs>
     <filter id="ink" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="6" stdDev="10" flood-color="#ffb020" flood-opacity="0.30"/>
+      <feDropShadow dx="0" dy="6" stdDev="10" flood-color="#ff4d4d" flood-opacity="0.30"/>
     </filter>
   </defs>
   <!-- app tile -->
   <rect width="512" height="512" rx="116" fill="#0a0b0d"/>
   <rect x="12" y="12" width="488" height="488" rx="104" fill="none" stroke="#20242c" stroke-width="2"/>
-  <!-- concealed text: two dim lines + one amber redaction bar (the act of concealing) -->
+  <!-- concealed text: two dim lines + one red redaction bar (the act of concealing) -->
   <rect x="128" y="176" width="176" height="38" rx="19" fill="#272c35"/>
-  <rect x="128" y="232" width="256" height="52" rx="26" fill="#ffb020" filter="url(#ink)"/>
+  <rect x="128" y="232" width="256" height="52" rx="26" fill="#ff4d4d" filter="url(#ink)"/>
   <rect x="128" y="302" width="136" height="38" rx="19" fill="#272c35"/>
 </svg>
