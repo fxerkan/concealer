@@ -249,14 +249,17 @@ def test_mcp(agent_tok):
 
 
 # ---------- TUI ----------
-def test_tui():
+def test_tui(cli_tok):
     # Launch the curses TUI in a ConPTY and confirm it initializes windows-curses and
-    # RENDERS the UI with the real vault loaded. We then try q/Ctrl-Q, but do NOT require
-    # a programmatic quit: PDCurses (windows-curses) reads keyboard via ReadConsoleInput,
-    # and injected keystrokes over a winpty ConPTY are not reliably delivered in CI. A real
-    # user quits with q/Ctrl-Q on a real keyboard. Rendering is the meaningful CI signal.
+    # RENDERS the UI with the real vault loaded. We pass CONCEALER_TOKEN so the TUI
+    # unlocks without a master-password prompt (a hardened vault would otherwise block
+    # on getpass before drawing). We then try q/Ctrl-Q, but do NOT require a programmatic
+    # quit: PDCurses (windows-curses) reads keyboard via ReadConsoleInput, and injected
+    # keystrokes over a winpty ConPTY are not reliably delivered in CI. A real user quits
+    # with q/Ctrl-Q on a real keyboard. Rendering is the meaningful CI signal.
     from winpty import PtyProcess
-    p = PtyProcess.spawn(["concealer", "tui"], dimensions=(35, 120), env=env())
+    p = PtyProcess.spawn(["concealer", "tui"], dimensions=(35, 120),
+                         env=env({"CONCEALER_TOKEN": cli_tok} if cli_tok else None))
     buf = [""]
 
     def rd():
@@ -328,7 +331,7 @@ def main():
         results.setdefault("web", "SKIP (CLI/init failed)")
         results.setdefault("MCP", "SKIP (CLI/init failed)")
     log("[TUI]")
-    run("TUI", test_tui)
+    run("TUI", test_tui, toks[0] if toks else None)
 
     log("\n== summary ==")
     for k in ("age/pty", "CLI", "web", "MCP", "TUI"):
