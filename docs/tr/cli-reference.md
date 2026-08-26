@@ -221,16 +221,17 @@ Bir purge sonrasında, bellekteki geçmişin geri yazılmaması için açık kab
 ## scan
 
 ```bash
-concealer scan <folder> [--import] [--history] [scope]
+concealer scan [<folder>] [--import] [--history] [--envvars] [scope]
 ```
 
-Bir klasörün `.env`/config dosyalarından (ve isteğe bağlı olarak git geçmişinden) aday secret'ları çıkarır, ardından isteğe bağlı olarak bunları kaynağa göre tag'lenmiş şekilde kasaya aktarır. Varsayılan olarak dry-run.
+Bir klasörün `.env`/config dosyalarından (ve isteğe bağlı olarak shell geçmişi / ortam değişkenlerinden) aday secret'ları çıkarır, ardından isteğe bağlı olarak bunları kaynağa göre tag'lenmiş şekilde kasaya aktarır. Varsayılan olarak dry-run. `--history` veya `--envvars` verildiğinde `<folder>` isteğe bağlıdır.
 
 | Seçenek | Anlamı |
 |---|---|
-| `<folder>` | **zorunlu** — taranacak dizin |
+| `<folder>` | taranacak dizin (`--history`/`--envvars` verilirse isteğe bağlı) |
 | `--import` | adayları gerçekten içe aktar (varsayılan dry-run'dır) |
-| `--history` | klasör için git geçmişini de tara |
+| `--history` | shell geçmişini de tara |
+| `--envvars` | canlı ortamı + shell-profil dosyalarını (`~/.bashrc`, `~/.zshrc`, `/etc/environment`, …) da tara; macOS + Linux |
 | scope bayrakları | içe aktarımda atanacak kapsam; `project` varsayılan olarak klasörün temel adıdır (basename) |
 
 ```bash
@@ -286,10 +287,16 @@ Tüm kasanın **şifre-korumalı bir `.age` paketini** dışa aktarır. Onaylama
 ## import
 
 ```bash
-concealer import <bundle.age|.cer>
+concealer import <bundle.age|.cerbak|.cer> [--mode=overwrite|skip|duplicate]
 ```
 
-Bir paketi içe aktarır veya bir `.cer` yedeğini geri yükler. Paket şifresini ister. Kaç kaydın eklendiğini ve kaç kaydın güncellendiğini raporlar.
+Bir paketi içe aktarır veya bir `.cerbak` yedeğini geri yükler (eski `.cer` dosyaları da geri yüklenir — içe aktarma uzantıdan bağımsızdır). Paket şifresini ister. Kaç kaydın eklendiğini / güncellendiğini / atlandığını raporlar.
+
+| `--mode` | Zaten var olan bir kayıtta… |
+|---|---|
+| `overwrite` *(varsayılan)* | eşleşen kaydı güncelle (önceki davranış) |
+| `skip` | mevcut kaydı olduğu gibi bırak |
+| `duplicate` | gelen kaydı her zaman yeni bir id ile taze kopya olarak ekle |
 
 ## backup
 

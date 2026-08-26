@@ -39,19 +39,16 @@ Binds to `127.0.0.1` **only** — it is a single-user local convenience, not a h
 - Metadata: url, tags, notes.
 - **Auto-lock on idle** (default 300s; set with `CONCEALER_IDLE=…` or the Settings page).
 - **Audit Log viewer** — filter by action / source / key / date, pagination, row detail, **chain verification**, CSV/JSON export.
-- **Risks** view — finds the same value reused across projects and scores the blast radius.
-- **Scan folder** — sweep a directory (or shell history) for stray secrets and import them, tagged by origin, with a server-side folder browser and OS-native picker.
-- **Settings** — idle timeout, which operations require confirmation, and **per-agent MCP rate limits** (see [MCP]({{ site.baseurl }}/mcp)).
+- **[Risks]({{ site.baseurl }}/risks)** — health overview (rotation / expiry / reuse), reused-value blast radius, shell-history scan, and opt-in **Exposure** checks (HIBP Pwned Passwords, email breach, git-history scan).
+- **[Policy]({{ site.baseurl }}/policy)** — user-defined rotation / expiry / reuse / naming / tagging rules with violation lists, bulk-fix, and notifications; also hosts the per-agent MCP access limits.
+- **Scan folder** — sweep a directory, **shell history**, or **live environment / shell-profile variables** (`scan --envvars`) for stray secrets and import them, tagged by origin, with a server-side folder browser and OS-native picker.
+- **Settings** — idle timeout, which operations require confirmation, and your **HIBP API key**. (Per-agent MCP rate limits moved to [Policy]({{ site.baseurl }}/policy).)
 
 ---
 
 ![Audit log viewer with chain verification]({{ site.baseurl }}/assets/app-audit-logs.png)
 
-The **Risks** view finds the same value reused across projects and scores the blast radius:
-
-![Risk view — reused secret values scored by leak risk]({{ site.baseurl }}/assets/app-risks.png)
-
-**Scan folder** sweeps a directory (or shell history) for stray secrets and imports them, tagged by origin:
+The **[Risks]({{ site.baseurl }}/risks)** tab surfaces stale, reused, and exposed secrets; the **[Policy]({{ site.baseurl }}/policy)** tab enforces your own rules. **Scan folder** sweeps a directory, shell history, or environment variables for stray secrets and imports them, tagged by origin:
 
 ![Scan a folder or shell history for leaked secrets]({{ site.baseurl }}/assets/app-scan-folder.png)
 
@@ -82,8 +79,12 @@ The SPA talks to a small JSON API on the same port. Selected endpoints:
 | `GET /api/audit/verify` | chain + tail-anchor integrity check |
 | `GET /api/audit/export?format=csv\|json` | download the audit log |
 | `GET/POST /api/settings` | idle, confirm-ops, MCP limits, registered agents (POST needs master pw) |
+| `GET /api/health` | rotation / expiry / reuse health overview |
 | `GET /api/leaks` | reused-value risk report |
 | `GET /api/history` | shell-history secret scan |
+| `POST /api/exposure` · `POST /api/breach` | online leak check (k-anonymity) · HIBP email breach |
+| `POST /api/gitscan` · `POST /api/gitremedy` | git / log / .gitignore scan · cleanup guide |
+| `GET/POST /api/policies` · `DELETE /api/policies/<id>` | policy rules CRUD |
 | `POST /api/scan` | dry-run folder scan (returns masked candidates) |
 | `GET /api/backup` | auto-backup status (never returns the password) |
 | `GET /api/browse` · `GET /api/pickdir` | server-side folder browser / OS-native picker |

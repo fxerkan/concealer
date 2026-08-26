@@ -221,16 +221,17 @@ After a purge, run `history -c` in open shells so the in-memory history isn't wr
 ## scan
 
 ```bash
-concealer scan <folder> [--import] [--history] [scope]
+concealer scan [<folder>] [--import] [--history] [--envvars] [scope]
 ```
 
-Extract candidate secrets from a folder's `.env`/config files (and optionally git history), then optionally import them into the vault tagged by origin. Dry-run by default.
+Extract candidate secrets from a folder's `.env`/config files (and optionally shell history / environment variables), then optionally import them into the vault tagged by origin. Dry-run by default. `<folder>` is optional when `--history` or `--envvars` is given.
 
 | Option | Meaning |
 |---|---|
-| `<folder>` | **required** — directory to sweep |
+| `<folder>` | directory to sweep (optional if `--history`/`--envvars` set) |
 | `--import` | actually import the candidates (default is dry-run) |
-| `--history` | also scan git history for the folder |
+| `--history` | also scan shell history |
+| `--envvars` | also scan the live environment + shell-profile files (`~/.bashrc`, `~/.zshrc`, `/etc/environment`, …); macOS + Linux |
 | scope flags | scope to assign on import; `project` defaults to the folder's basename |
 
 ```bash
@@ -286,10 +287,16 @@ Export a **password-protected `.age` bundle** of the whole vault. Prompts for th
 ## import
 
 ```bash
-concealer import <bundle.age|.cer>
+concealer import <bundle.age|.cerbak|.cer> [--mode=overwrite|skip|duplicate]
 ```
 
-Import a bundle or restore a `.cer` backup. Prompts for the bundle password. Reports how many records were added vs updated.
+Import a bundle or restore a `.cerbak` backup (older `.cer` files still restore — import is extension-agnostic). Prompts for the bundle password. Reports how many records were added / updated / skipped.
+
+| `--mode` | On a record that already exists… |
+|---|---|
+| `overwrite` *(default)* | update the matching record (prior behavior) |
+| `skip` | leave the existing record untouched |
+| `duplicate` | always add the incoming record as a fresh copy with a new id |
 
 ## backup
 

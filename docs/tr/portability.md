@@ -52,16 +52,16 @@ concealer export mybundle.age        # özel dosya adı
 concealer import mybundle.age        # paket şifresini sorar; +yeni / ~güncellenmiş bildirir
 ```
 
-`import` ayrıca `.cer` yedeklerini de geri yükler.
+`import` ayrıca `.cerbak` yedeklerini de geri yükler (eski `.cer` dosyaları da geri yüklenir — içe aktarma uzantıdan bağımsızdır). Var olan kayıtların nasıl ele alınacağını `--mode=overwrite|skip|duplicate` ile seçin (varsayılan `overwrite`).
 
 ---
 
-## Otomatik `.cer` yedekleri (cron / launchd)
+## Otomatik `.cerbak` yedekleri (cron / launchd)
 
 Web **Ayarlar**'ında bir yedekleme şifresi ve dizini yapılandırın (şifre age ile sarmalanmış saklanır, asla plaintext değil), ardından çalıştırın:
 
 ```bash
-concealer backup                 # yapılandırılan dizine bir .cer yazar
+concealer backup                 # yapılandırılan dizine bir .cerbak yazar
 concealer backup --dir /path     # dizini geçersiz kıl ve kalıcılaştır
 ```
 
@@ -72,7 +72,7 @@ Anahtar erişimi `CONCEALER_TOKEN`'dan (veya bir TTY master-password isteminden)
 ## Geri yükleme
 
 ```bash
-concealer import backup-file.cer     # yedekleme şifresini sorar
+concealer import backup-file.cerbak     # yedekleme şifresini sorar
 ```
 
 ---

@@ -33,6 +33,7 @@ plugins:
   - jekyll-remote-theme
   - jekyll-seo-tag
   - jekyll-sitemap
+  - jekyll-include-cache   # required by the just-the-docs theme
 
 exclude:
   - Gemfile

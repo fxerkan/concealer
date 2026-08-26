@@ -1,0 +1,33 @@
+#!/bin/sh
+# Local preview of the GitHub Pages docs.
+#
+# Host Ruby 4.0 can't run the github-pages gem stack (liquid 4.0.3 calls
+# String#tainted?, removed in Ruby 3.2+), so we build inside a Ruby 3.1
+# container that matches GitHub Pages. Only requirement: Docker running.
+#
+#   ./docs/serve          preview at http://127.0.0.1:4000/concealer/
+#   ./docs/serve build    one-off build into docs/_site (what CI produces)
+#
+# First run pulls ruby:3.1 and installs the gems into a cached volume (slow);
+# later runs are ~10s. Auto-rebuild is intentionally off — this old Jekyll's
+# file-watch is broken on Ruby 3.1 (and Docker-on-mac wouldn't see the fs
+# events anyway). After editing docs, press Ctrl-C and re-run ./docs/serve.
+set -e
+cd "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+
+if ! docker info >/dev/null 2>&1; then
+  echo "Docker isn't running — start Docker Desktop and retry." >&2
+  exit 1
+fi
+
+IMG=ruby:3.1
+VOL=concealer-docs-gems31   # per-ruby gem cache (native exts are ABI-specific)
+RUN="docker run --rm -v $PWD:/site -w /site -v $VOL:/usr/local/bundle"
+
+if [ "$1" = "build" ]; then
+  exec $RUN "$IMG" sh -lc 'bundle install && bundle exec jekyll build'
+fi
+
+echo "→ http://127.0.0.1:4000/concealer/   (Ctrl-C to stop; re-run after edits)"
+exec $RUN -it -p 4000:4000 "$IMG" \
+  sh -lc 'bundle install && bundle exec jekyll serve --host 0.0.0.0 --no-watch'

@@ -1,5 +1,16 @@
 # Local preview only — GitHub Pages builds without this.
-#   cd docs && bundle install && bundle exec jekyll serve
+#   ./docs/serve            (installs gems on first run, then live-reload preview)
 source "https://rubygems.org"
 gem "github-pages", group: :jekyll_plugins
 gem "jekyll-remote-theme"
+gem "jekyll-include-cache", group: :jekyll_plugins   # required by the just-the-docs theme
+
+# Ruby 3.4+/4.0 dropped these from the default gems; Jekyll 3.9 (pinned by
+# github-pages) still requires them, so declare them explicitly.
+gem "webrick"
+gem "base64"
+gem "csv"
+gem "logger"
+gem "bigdecimal"
+gem "ostruct"
+gem "rexml"

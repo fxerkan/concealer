@@ -39,19 +39,16 @@ concealer web 8080       # özel port
 - Meta veri: url, etiketler, notlar.
 - **Boşta kalınca otomatik kilitleme** (varsayılan 300sn; `CONCEALER_IDLE=…` ile veya Ayarlar sayfasından ayarlanır).
 - **Denetim Günlüğü (Audit Log) görüntüleyicisi** — action / source / key / tarihe göre filtreleme, sayfalama, satır ayrıntısı, **zincir doğrulaması**, CSV/JSON dışa aktarma.
-- **Riskler** görünümü — aynı değerin projeler arasında yeniden kullanıldığı yerleri bulur ve etki alanını (blast radius) puanlar.
-- **Klasör tara** — bir dizini (veya shell geçmişini) başıboş secret'lar için tarayıp içe aktarır, kaynağa göre etiketleyerek, sunucu tarafı klasör tarayıcısı ve OS-yerel seçici ile birlikte.
-- **Ayarlar** — boşta kalma zaman aşımı, hangi işlemlerin onay gerektirdiği ve **agent başına MCP hız sınırları** ([MCP]({{ site.baseurl }}/tr/mcp) bölümüne bakın).
+- **[Riskler]({{ site.baseurl }}/tr/risks)** — sağlık genel bakışı (rotation / expiry / yeniden kullanım), yeniden kullanılan-değer etki alanı, shell-history taraması ve isteğe bağlı **Maruz kalma** kontrolleri (HIBP Pwned Passwords, e-posta ihlali, git-geçmişi taraması).
+- **[Politika]({{ site.baseurl }}/tr/policy)** — kullanıcı-tanımlı rotation / expiry / yeniden kullanım / adlandırma / etiketleme kuralları; ihlal listeleri, toplu düzeltme ve bildirimler ile; ayrıca agent başına MCP erişim limitlerini barındırır.
+- **Klasör tara** — bir dizini, **shell geçmişini** veya **canlı ortam / shell-profil değişkenlerini** (`scan --envvars`) başıboş secret'lar için tarayıp içe aktarır, kaynağa göre etiketleyerek, sunucu tarafı klasör tarayıcısı ve OS-yerel seçici ile birlikte.
+- **Ayarlar** — boşta kalma zaman aşımı, hangi işlemlerin onay gerektirdiği ve **HIBP API anahtarınız**. (Agent başına MCP hız sınırları [Politika]({{ site.baseurl }}/tr/policy)'ya taşındı.)
 
 ---
 
 ![Zincir doğrulamalı denetim günlüğü görüntüleyicisi]({{ site.baseurl }}/assets/app-audit-logs.png)
 
-**Riskler** görünümü, aynı değerin projeler arasında yeniden kullanıldığı yerleri bulur ve etki alanını puanlar:
-
-![Risk görünümü — yeniden kullanılan secret değerleri sızıntı riskine göre puanlanır]({{ site.baseurl }}/assets/app-risks.png)
-
-**Klasör tara**, bir dizini (veya shell geçmişini) başıboş secret'lar için tarar ve bunları kaynağa göre etiketleyerek içe aktarır:
+**[Riskler]({{ site.baseurl }}/tr/risks)** sekmesi bayat, yeniden kullanılan ve açığa çıkmış secret'ları öne çıkarır; **[Politika]({{ site.baseurl }}/tr/policy)** sekmesi kendi kurallarınızı uygular. **Klasör tara**, bir dizini, shell geçmişini veya ortam değişkenlerini başıboş secret'lar için tarar ve bunları kaynağa göre etiketleyerek içe aktarır:
 
 ![Bir klasörü veya shell geçmişini sızmış secret'lar için tarayın]({{ site.baseurl }}/assets/app-scan-folder.png)
 
@@ -82,8 +79,12 @@ SPA, aynı port üzerinde küçük bir JSON API ile konuşur. Seçili uç noktal
 | `GET /api/audit/verify` | zincir + tail-anchor bütünlük kontrolü |
 | `GET /api/audit/export?format=csv\|json` | denetim günlüğünü indirir |
 | `GET/POST /api/settings` | idle, confirm-ops, MCP limitleri, kayıtlı agent'lar (POST master parola gerektirir) |
+| `GET /api/health` | rotation / expiry / yeniden kullanım sağlık genel bakışı |
 | `GET /api/leaks` | yeniden kullanılan değer risk raporu |
 | `GET /api/history` | shell geçmişi secret taraması |
+| `POST /api/exposure` · `POST /api/breach` | çevrimiçi sızıntı kontrolü (k-anonimlik) · HIBP e-posta ihlali |
+| `POST /api/gitscan` · `POST /api/gitremedy` | git / log / .gitignore taraması · temizlik kılavuzu |
+| `GET/POST /api/policies` · `DELETE /api/policies/<id>` | politika kuralları CRUD |
 | `POST /api/scan` | kuru çalışma (dry-run) klasör taraması (maskelenmiş adayları döndürür) |
 | `GET /api/backup` | otomatik yedekleme durumu (parolayı asla döndürmez) |
 | `GET /api/browse` · `GET /api/pickdir` | sunucu tarafı klasör tarayıcı / OS-yerel seçici |

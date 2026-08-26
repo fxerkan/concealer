@@ -52,16 +52,16 @@ concealer export mybundle.age        # custom filename
 concealer import mybundle.age        # prompts the bundle password; reports +new / ~updated
 ```
 
-`import` also restores `.cer` backups.
+`import` also restores `.cerbak` backups (older `.cer` files still restore — import is extension-agnostic). Pick how existing records are handled with `--mode=overwrite|skip|duplicate` (default `overwrite`).
 
 ---
 
-## Automated `.cer` backups (cron / launchd)
+## Automated `.cerbak` backups (cron / launchd)
 
 Configure a backup password and directory in the web **Settings** (the password is stored age-wrapped, never in plaintext), then run:
 
 ```bash
-concealer backup                 # writes a .cer to the configured directory
+concealer backup                 # writes a .cerbak to the configured directory
 concealer backup --dir /path     # override and persist the directory
 ```
 
@@ -72,7 +72,7 @@ Key access comes from `CONCEALER_TOKEN` (or a TTY master-password prompt), so it
 ## Restore
 
 ```bash
-concealer import backup-file.cer     # prompts the backup password
+concealer import backup-file.cerbak     # prompts the backup password
 ```
 
 ---

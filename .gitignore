@@ -22,3 +22,9 @@ keys/backup.json
 
 *.code-workspace
 .DS_Store
+
+# docs local preview (Jekyll build output + per-machine gem lock)
+docs/_site/
+docs/.jekyll-cache/
+docs/.jekyll-metadata
+docs/Gemfile.lock

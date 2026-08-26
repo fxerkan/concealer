@@ -17,6 +17,10 @@ Each type renders a type-aware form with exactly the fields that make sense. Fie
 
 ## Field catalog
 
+Pick a type when creating a secret — each one drives a different set of fields:
+
+![The secret type picker — one form per credential shape]({{ site.baseurl }}/assets/secret-types.png)
+
 Secret fields are marked 🔒; plain fields are shown as-is.
 
 | Type | Fields |

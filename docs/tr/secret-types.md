@@ -17,6 +17,10 @@ Her tür, yalnızca anlamlı olan alanları içeren, türe duyarlı bir form sun
 
 ## Alan kataloğu
 
+Bir secret oluştururken bir tür seçin — her biri farklı bir alan kümesi belirler:
+
+![Secret tür seçici — her kimlik bilgisi şekli için ayrı form]({{ site.baseurl }}/assets/secret-types.png)
+
 Secret alanlar 🔒 ile işaretlenir; düz alanlar olduğu gibi gösterilir.
 
 | Tür | Alanlar |
