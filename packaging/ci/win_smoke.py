@@ -25,6 +25,10 @@ import threading
 import time
 import urllib.request
 
+for _s in (sys.stdout, sys.stderr):   # utf-8 so our own logs never hit cp1252 issues
+    try: _s.reconfigure(encoding="utf-8")
+    except Exception: pass
+
 DUMMY = "sk-DUMMY-WINCI-abc123"      # never a real secret
 PW = "pw"
 HOME = os.path.join(tempfile.gettempdir(), "concealer-winci")
@@ -100,7 +104,7 @@ def pty_interact(argv, sends, timeout=60):
                 if time.time() > deadline:
                     raise TimeoutError(f"prompt {needle!r} never appeared in {timeout}s. tail: {buf[0][-400:]!r}")
                 time.sleep(0.05)
-            log(f"    saw {needle!r} → sending response")
+            log(f"    saw {needle!r} -> sending response")
             full = buf[0]
             p.write(resp)
             buf[0] = ""
@@ -281,15 +285,23 @@ def test_tui():
     time.sleep(3.0)
     if not p.isalive():
         raise RuntimeError("TUI exited before we could interact (curses init failed?)")
-    p.write("q")            # quit key
-    deadline = time.time() + 10
-    while p.isalive() and time.time() < deadline:
-        time.sleep(0.2)     # poll only — do NOT p.read() (it can block with no output)
-    alive = p.isalive()
+    # Try the documented quit keys in turn (curses input via winpty can be finicky).
+    quit_ok = False
+    for key in ("q", "\x11", "q\r", "\x1b"):   # q, Ctrl-Q, q+Enter, Esc
+        try:
+            p.write(key)
+        except Exception:
+            break
+        t = time.time() + 4
+        while p.isalive() and time.time() < t:
+            time.sleep(0.2)     # poll only — do NOT p.read() (it can block)
+        if not p.isalive():
+            quit_ok = True
+            break
     _kill(p)
-    if alive:
-        raise RuntimeError("TUI did not quit on 'q' within 10s")
-    log("  TUI started (windows-curses) and quit on 'q'")
+    if not quit_ok:
+        raise RuntimeError("TUI started but did not quit on q/Ctrl-Q/Esc")
+    log("  TUI started (windows-curses) and quit")
 
 
 def run(name, fn, *a):

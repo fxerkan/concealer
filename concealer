@@ -15,6 +15,14 @@ import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse
 import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil, fnmatch, gc
 from datetime import datetime, timezone, timedelta
 
+if sys.platform.startswith("win"):
+    # Windows: a redirected stdout/stderr (pipe, file, CI) defaults to the ANSI code
+    # page (cp1252), so printing "→" or box-drawing glyphs raises UnicodeEncodeError.
+    # Force UTF-8 so CLI/MCP output is byte-safe everywhere. No effect on Unix.
+    for _s in (sys.stdout, sys.stderr):
+        try: _s.reconfigure(encoding="utf-8")
+        except Exception: pass
+
 VERSION = "0.9.12"   # advances through 0.x; 1.0 = reserved for the full live/release version
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
