@@ -51,8 +51,8 @@
 /* ===== theme (mirrors the app's webui palette) ===== */
 :root, html[data-theme="dark"]{
   --bg:#0a0b0d; --panel:#101216; --panel2:#161a20; --line:#1c1f26; --line2:#2a2f38;
-  --txt:#e8e8e6; --mut:#8a909b; --acc:#ffb020; --acc2:#ffc247; --ok:#7ee787; --bad:#ff6b6b;
-  --ink:#0a0b0d; --glow:rgba(255,176,32,.22);
+  --txt:#e8e8e6; --mut:#8a909b; --acc:#ff4d4d; --acc2:#ff7a7a; --ok:#7ee787; --bad:#ff6b6b;
+  --ink:#0a0b0d; --glow:rgba(255,77,77,.22);
 }
 html[data-theme="light"]{
   --bg:#f4f5f7; --panel:#ffffff; --panel2:#eef0f3; --line:#e2e6eb; --line2:#c8ced7;
@@ -69,7 +69,7 @@ a{color:var(--acc);text-decoration:none}
 .wrap{max-width:1080px;margin:0 auto;padding:0 22px}
 /* brand: conceal + amber-boxed "er" (house rule) */
 .brand{font-weight:700;letter-spacing:-.3px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;display:inline-flex;align-items:center}
-.brand .ac{display:inline-block;color:var(--ink);background:var(--acc);border-radius:4px;padding:0 .18em;margin-left:.05em;box-shadow:0 2px 8px var(--glow)}
+.brand .ac{display:inline-block;color:var(--ink);background:var(--acc);border-radius:4px;padding:0 .12em;margin-left:0;box-shadow:0 2px 8px var(--glow)}
 .brand img{height:1.5em;width:1.5em;margin-right:.5em;border-radius:7px}
 
 /* ===== top nav ===== */
@@ -89,6 +89,15 @@ header.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
 .hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
 .hero .wrap{position:relative;z-index:2;padding:76px 22px 66px;text-align:center}
 .hero h1{font-size:clamp(40px,7vw,76px);margin:0 0 6px;letter-spacing:-1.5px;line-height:1}
+/* hero "redact" intro: ONE red highlight sweeps across the whole "concealer", then wipes back
+   from the left, leaving only the last "er" (7/9 of the monospace word) on red. Single animation. */
+.hero h1.reveal{position:relative;z-index:0}
+.hero h1.reveal .ac{background:none;padding:0;margin:0;box-shadow:none;border-radius:0;color:var(--txt);animation:erInk 3.4s ease .3s both}
+.hero h1.reveal::before{content:"";position:absolute;top:.04em;bottom:.04em;left:-.09em;right:-.11em;z-index:-1;
+  background:var(--acc);border-radius:6px;box-shadow:0 2px 14px var(--glow);
+  clip-path:inset(0 100% 0 0);animation:redact 3.4s ease .3s both}
+@keyframes redact{0%,14%{clip-path:inset(0 100% 0 0)}40%,64%{clip-path:inset(0 0 0 0)}90%,100%{clip-path:inset(0 0 0 74.6%)}}
+@keyframes erInk{0%,82%{color:var(--txt)}90%,100%{color:var(--ink)}}
 .hero .tag{font-size:clamp(17px,2.4vw,23px);color:var(--txt);font-weight:600;margin:14px 0 4px}
 .hero .sub{color:var(--mut);max-width:640px;margin:8px auto 26px;font-size:16px}
 .pillrow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:0 0 26px}
@@ -99,7 +108,7 @@ header.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
   background:linear-gradient(180deg,#15181e 0%,#0c0e12 100%);
   border:1px solid var(--acc);border-radius:12px;padding:13px 16px;
   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;
-  box-shadow:0 0 0 4px rgba(255,176,32,.10), 0 18px 50px rgba(0,0,0,.55);
+  box-shadow:0 0 0 4px rgba(255,77,77,.10), 0 18px 50px rgba(0,0,0,.55);
   backdrop-filter:blur(4px);max-width:100%}
 html[data-theme="light"] .install{background:linear-gradient(180deg,#1b1e24 0%,#0f1115 100%)}
 .install code{color:#e8e8e6}
@@ -228,7 +237,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
 <div class="hero">
   <div class="loginbg" id="loginbg" aria-hidden="true"></div>
   <div class="wrap">
-    <h1 class="brand" style="justify-content:center">conceal<span class="ac">er</span></h1>
+    <h1 class="brand reveal" style="justify-content:center"><span class="cv">conceal</span><span class="ac">er</span></h1>
     <p class="tag" data-i18n="hero_tag">The local-only secret manager for the AI-coding era.</p>
     <p class="sub" data-i18n="hero_sub">Encrypted with SOPS + age. No cloud, no telemetry, no account. Your agents <em>use</em> secrets without ever <em>seeing</em> them.</p>
     <div class="pillrow">
