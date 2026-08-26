@@ -71,62 +71,6 @@ def _kill(p):
             pass
 
 
-def pty_interact(argv, sends, timeout=60):
-    """Spawn argv in a ConPTY; for each (needle, response) wait for `needle` in the
-    output then type `response`. Bounded: always terminates the child, never blocks
-    on wait(). Returns (exit_code_or_None, full_output)."""
-    from winpty import PtyProcess
-    log(f"    pty spawn: {' '.join(argv)}")
-    p = PtyProcess.spawn(argv)
-    buf = [""]
-    done = threading.Event()
-
-    def reader():
-        while True:
-            try:
-                c = p.read(1024)
-            except Exception:
-                break
-            if c:
-                buf[0] += c
-            elif not p.isalive():
-                break
-        done.set()
-
-    threading.Thread(target=reader, daemon=True).start()
-    deadline = time.time() + timeout
-    try:
-        for needle, resp in sends:
-            seen = ""
-            while needle.lower() not in buf[0].lower():
-                if done.is_set():
-                    raise RuntimeError(f"exited before prompt {needle!r}. tail: {buf[0][-400:]!r}")
-                if time.time() > deadline:
-                    raise TimeoutError(f"prompt {needle!r} never appeared in {timeout}s. tail: {buf[0][-400:]!r}")
-                time.sleep(0.05)
-            log(f"    saw {needle!r} -> sending response")
-            full = buf[0]
-            p.write(resp)
-            buf[0] = ""
-        # brief drain for trailing output (e.g. the token line), then STOP — never block
-        drain_until = min(deadline, time.time() + 20)
-        while not done.is_set() and time.time() < drain_until:
-            time.sleep(0.05)
-    finally:
-        out = buf[0]
-        rc = None
-        # bounded wait: poll isalive, then force-kill. Do NOT call p.wait() (it blocks).
-        w = time.time() + 8
-        while p.isalive() and time.time() < w:
-            time.sleep(0.1)
-        try:
-            rc = p.exitstatus if not p.isalive() else None
-        except Exception:
-            rc = None
-        _kill(p)
-    return rc, out
-
-
 # ---------- core: pywinpty drives age at all (single-level ConPTY, no vault) ----------
 def test_age_pty():
     """The heart of the port: encrypt+decrypt a temp file with `age -p`/`-d` driven
@@ -147,6 +91,34 @@ def test_age_pty():
     log("  pywinpty drives age -p/-d round-trip OK (single-level ConPTY)")
 
 
+# In-process vault creation: monkeypatch getpass and call cli(["init"]) / agent
+# register in a *plain* subprocess. This keeps age at a SINGLE ConPTY level (exactly
+# what a real user gets in a terminal). Driving `concealer init` through our own
+# ConPTY instead would nest ConPTYs (age's ConPTY inside ours), which deadlocks —
+# a test artifact, not a concealer bug: the single-level path is proven by test_age_pty.
+_MAKE_VAULT = r"""
+import io, getpass, importlib, re, sys
+from contextlib import redirect_stdout
+_r = iter(['pw'] * 12)
+getpass.getpass = lambda *a, **k: next(_r)
+m = importlib.import_module('concealer.__main__')
+m.getpass.getpass = getpass.getpass
+def cap(argv):
+    b = io.StringIO()
+    try:
+        with redirect_stdout(b): m.cli(argv)
+    except SystemExit: pass
+    return b.getvalue()
+o1 = cap(['init'])
+o2 = cap(['agent', 'register', 'ci-agent'])
+ct = re.search(r'CONCEALER_TOKEN=([A-Za-z0-9_-]+)', o1)
+at = re.search(r'CONCEALER_TOKEN"\s*:\s*"([^"]+)"', o2)
+sys.stderr.write('RECOVERY=%s\n' % ('RECOVERY CODES' in o1.upper()))
+print('CLITOKEN=' + (ct.group(1) if ct else 'NONE'))
+print('AGENTTOKEN=' + (at.group(1) if at else 'NONE'))
+"""
+
+
 # ---------- CLI ----------
 def test_cli():
     # fresh vault
@@ -154,15 +126,17 @@ def test_cli():
     shutil.rmtree(HOME, ignore_errors=True)
     os.makedirs(HOME, exist_ok=True)
 
-    # init — ConPTY, feed master pw twice; this also runs age -p via pywinpty internally
-    rc, out = pty_interact(["concealer", "init"], [("password", PW + "\r"), ("Repeat", PW + "\r")])
-    m = re.search(r"CONCEALER_TOKEN=(\S+)", out)
-    if not m:
-        raise RuntimeError(f"init: no CLI token in output. tail: {out[-600:]!r}")
-    cli_tok = m.group(1)
-    if "RECOVERY CODES" not in out.upper():
-        raise RuntimeError("init: recovery codes not printed")
-    log(f"  init OK (rc={rc}, token {cli_tok[:6]}…, recovery codes shown)")
+    r = subprocess.run([sys.executable, "-c", _MAKE_VAULT], env=env(),
+                       capture_output=True, text=True, timeout=120)
+    mct = re.search(r"CLITOKEN=(\S+)", r.stdout)
+    mat = re.search(r"AGENTTOKEN=(\S+)", r.stdout)
+    cli_tok = mct.group(1) if mct else "NONE"
+    agent_tok = mat.group(1) if mat else "NONE"
+    if cli_tok == "NONE" or agent_tok == "NONE":
+        raise RuntimeError(f"init/agent-register failed. stdout={r.stdout[-300:]!r} stderr={r.stderr[-800:]!r}")
+    if "RECOVERY=True" not in r.stderr:
+        raise RuntimeError("init did not print recovery codes")
+    log(f"  init + agent register OK (single-level age via pywinpty; token {cli_tok[:6]}…, recovery codes shown)")
 
     ce = env({"CONCEALER_TOKEN": cli_tok})
     subprocess.run(["concealer", "set", "--name", "winci", "--value", DUMMY,
@@ -178,14 +152,7 @@ def test_cli():
     if DUMMY in lst:
         raise RuntimeError("SECURITY: list leaked the plaintext value (should be masked)")
     log("  set/get/list OK (get returns value to owner; list masks it)")
-
-    # agent register — ConPTY, feed master pw; capture the agent token for MCP
-    rc, out = pty_interact(["concealer", "agent", "register", "ci-agent"], [("password", PW + "\r")])
-    m = re.search(r'CONCEALER_TOKEN"\s*:\s*"([^"]+)"', out)
-    if not m:
-        raise RuntimeError(f"agent register: no agent token. tail: {out[-600:]!r}")
-    log("  agent register OK")
-    return cli_tok, m.group(1)
+    return cli_tok, agent_tok
 
 
 # ---------- web ----------
