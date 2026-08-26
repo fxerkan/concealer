@@ -1,7 +1,8 @@
 ---
 title: Policy
 layout: default
-nav_order: 7.3
+parent: Web UI
+nav_order: 2
 ---
 
 # Policy

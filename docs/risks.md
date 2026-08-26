@@ -1,7 +1,8 @@
 ---
 title: Risks
 layout: default
-nav_order: 7.2
+parent: Web UI
+nav_order: 1
 ---
 
 # Risks
