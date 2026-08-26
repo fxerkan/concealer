@@ -27,7 +27,7 @@
 ## Conventions
 
 - **Style: minimal.** One file where reasonable, stdlib over dependencies, delegate to `sops`/`age`. Match the existing terse, comment‑where‑subtle style.
-- **Turkish comments** in `concealer` are intentional (the author's language); keep them. User‑facing web strings must exist in **both** `tr` and `en` in the `I18N` dict.
+- **Code comments must be English** across the whole codebase. User‑facing web strings must still exist in **both** `tr` and `en` in the `I18N` dict (those stay bilingual — only comments are English‑only).
 - **Branding rule:** product names ending in “er” render the “er” in the accent color. Applied in `webui.html` (`.brand .ac`).
 - Timestamps are UTC ISO‑8601 (`now_iso()`).
 - **Versioning:** single source of truth is `VERSION` in `concealer` (surfaced by `concealer version` and MCP `serverInfo`). Stays in **`0.x.y` until the first full public release — never bump to `1.0`** before then. Any user‑visible change bumps `VERSION` **and** adds a dated entry to `CHANGELOG.md` (Keep a Changelog format).
