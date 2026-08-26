@@ -66,7 +66,10 @@ Audit log, değerleri değil, anahtar **adlarını ve eylemlerini** tutar. Şu y
 
 ## Web UI kapsamı
 
-Web sunucusu **yalnızca** `127.0.0.1`'e bağlanır ve **tek kullanıcılıdır**. Bunu, sağlamlaştırılmış çok kullanıcılı bir sunucu olarak değil, yerel bir kolaylık olarak değerlendirin. Oturum, anahtarı yalnızca belleğe çözer ve onu temizleyen katı bir boşta otomatik kilitlemeye sahiptir.
+Web sunucusu **yalnızca** `127.0.0.1`'e bağlanır ve **tek kullanıcılıdır**. Bunu, sağlamlaştırılmış çok kullanıcılı bir sunucu olarak değil, yerel bir kolaylık olarak değerlendirin. Oturum, anahtarı yalnızca işlem belleğine çözer (asla diske değil) ve `idle` saniye sonra katı bir boşta otomatik kilit onu bırakır.
+
+{: .warning }
+> **Dürüst tavan — bellekteki secret'lar sıfırlanmaz (zeroize edilmez).** concealer saf Python'dur (CPython). Oturum kilitlendiğinde anahtara olan referansları bırakır ve `gc.collect()` çağırır, ama **CPython serbest bırakılan belleğin üzerine yazmaz**. Python `str`/`bytes` immutable'dır ve plaintext birçok kaçınılmaz kopyadan geçer: `sops`'tan çözülen kasa, `json.loads`, `sops` alt-process'ine `SOPS_AGE_KEY` **ortam değişkeni** ile verilen age anahtarı (Linux'ta aynı kullanıcı `/proc/<pid>/environ`'dan okuyabilir), `getpass`'tan gelen master parola. Bu yüzden plaintext anahtar/secret byte'ları, üzerine rastgele bir şey yazılana kadar **işlem heap'inde, swap'te veya bir core dump'ta kalabilir**. "Otomatik kilit temizler" ifadesi erişilebilir-kopya penceresinin daraldığı anlamına gelir — güvenli silme (secure erasure) **değildir**. İşlem belleğini (ve swap/core dump'ı) bir güven sınırı olarak kabul edin: işlemin belleğini, swap'ini veya bir core dump'ını okuyabilen saldırgan secret'ları geri elde edebilir. Bu, stdlib-only bir aracın tasarım sınırıdır; Python'da tamamen kapatılamaz.
 
 ---
 

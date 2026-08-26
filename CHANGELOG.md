@@ -6,6 +6,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.11] — 2026-08-26
+
+### Changed
+- **On lock, drop the in-memory key and run `gc.collect()`** (idle auto-lock and `POST /api/lock`
+  both go through a shared `_lock_clear()`). This reclaims freed key/secret copies sooner.
+- **Documented the in-memory-secrets ceiling honestly** (`docs/security.md`, `docs/web-ui.md`, TR
+  mirrors). CPython does **not** zeroize memory: `str`/`bytes` are immutable and plaintext flows
+  through unavoidable copies (`sops` output, `json.loads`, the age key passed to `sops` via the
+  `SOPS_AGE_KEY` env var, `getpass`), so key/secret bytes may linger in the process heap, swap, or a
+  core dump until overwritten. Lock reduces the reachable-copy window — it is **not** secure erasure.
+
 ## [0.9.10] — 2026-08-26
 
 ### Changed
