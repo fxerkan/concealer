@@ -274,7 +274,7 @@ def test_tui(cli_tok):
                 break
     threading.Thread(target=rd, daemon=True).start()
 
-    marks = ("quit", "search", "reveal", "help")   # footer hint words drawn by the TUI
+    marks = ("filters", "secrets", "details")      # the three panel headers the TUI always draws
     t = time.time() + 6
     while time.time() < t and not any(k in buf[0].lower() for k in marks):
         time.sleep(0.2)
