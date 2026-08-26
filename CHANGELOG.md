@@ -6,6 +6,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.10] — 2026-08-26
+
+### Changed
+- **Backup files now use the `.cerbak` extension** (was `.cer`). Manual downloads, auto-backups,
+  rotation, and the web/CLI wording all emit `.cerbak`. Existing `.cer` backups still restore
+  (import is extension-agnostic) and are still recognized by rotation, so nothing breaks.
+
+### Added
+- **Restore conflict handling.** `import` / restore now takes a conflict mode chosen up front:
+  `overwrite` (default — update the matching record, prior behavior), `skip` (leave existing
+  records untouched), or `duplicate` (always add incoming records as fresh copies with new ids).
+  CLI: `concealer import <file> --mode=overwrite|skip|duplicate`; web: a select next to the
+  Import button; API: `mode` in the `/api/import` body. Result now also reports `skipped`.
+
 ## [0.9.9] — 2026-08-26
 
 ### Changed
@@ -20,7 +34,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   container, but the page-level `#view-leaks thead th` rule pinned headers at
   `top:calc(--hh + --sh)` (the app header/subbar offset), so inside the container the header
   floated mid-list over the rows. A more specific `#view-leaks .exgrid thead th` rule pins it
-  to `top:0` of its own scroll box (with a solid background + hairline shadow).
+  to `top:0` of its own scroll box. It keeps the global opaque `--th-bg` header colour (an
+  earlier attempt overrode it to `--panel`, making the header blend into the rows and letting
+  values show through), and an `inset 0 -2px 0 var(--line2)` bottom line rides with the
+  header so the separator no longer scrolls away.
 
 ## [0.9.8] — 2026-08-26
 

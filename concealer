@@ -15,7 +15,7 @@ import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse
 import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil, fnmatch
 from datetime import datetime, timezone, timedelta
 
-VERSION = "0.9.9"   # 0.x boyunca ilerler; 1.0 = tam canli/yayin surumu icin ayrilmistir
+VERSION = "0.9.10"   # 0.x boyunca ilerler; 1.0 = tam canli/yayin surumu icin ayrilmistir
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Depo checkout'u: vault script'in yaninda yasar → BASE'i koru (mevcut kurulumlar bozulmasin).
@@ -1001,20 +1001,26 @@ def _import_cands(d, cands, scope):
     return n_new, n_skip
 
 # ---------------- tasinabilir export / import (age -p ile sifreli) ----------------
-def merge_secrets(d, incoming):
-    """incoming kayitlarini vault'a birlestir: ayni id (yoksa name+kapsam) → guncelle, degilse ekle."""
-    n_new = n_upd = 0
-    for raw in incoming:
-        e = norm(dict(raw)); cur = by_id(d, e["id"])
-        if not cur:   # farkli makine farkli id uretebilir → name+kapsam ile de dene
-            ident = {dim: e.get(dim, "") for dim in DIMS}; ident["name"] = e["name"]
-            cur = next((x for x in secs(d) if matches(x, ident)), None)
+def merge_secrets(d, incoming, mode="overwrite"):
+    """incoming kayitlarini vault'a birlestir. Cakisma (ayni id, yoksa name+kapsam) cozumu `mode`:
+    overwrite=mevcudu guncelle (varsayilan), skip=mevcuda dokunma, duplicate=her zaman yeni kayit olarak ekle."""
+    n_new = n_upd = n_skip = 0
+    for i, raw in enumerate(incoming):
+        e = norm(dict(raw)); cur = None
+        if mode != "duplicate":   # duplicate: eslesme arama, hep yeni ekle
+            cur = by_id(d, e["id"])
+            if not cur:   # farkli makine farkli id uretebilir → name+kapsam ile de dene
+                ident = {dim: e.get(dim, "") for dim in DIMS}; ident["name"] = e["name"]
+                cur = next((x for x in secs(d) if matches(x, ident)), None)
         if cur:
+            if mode == "skip": n_skip += 1; continue
             for k in ["name", "type"] + DIMS + ["tags", "url", "notes", "fields"]: cur[k] = e[k]
             cur["updated"] = now_iso(); n_upd += 1
         else:
+            if by_id(d, e["id"]):   # duplicate modunda id cakisabilir → taze id uret
+                e["id"] = hashlib.sha1((e["name"] + label(e) + now_iso() + str(i)).encode()).hexdigest()[:12]
             secs(d).append(e); n_new += 1
-    return n_new, n_upd
+    return n_new, n_upd, n_skip
 
 def export_bundle(pw):
     """Vault'u JSON'a cozup master parola ile 'age -p' sifreler; tasinabilir .age bytes dondurur."""
@@ -1032,27 +1038,28 @@ def export_bundle(pw):
             try: os.remove(p)
             except OSError: pass
 
-def import_bundle(pw, blob):
-    """'age -p' ile sifreli bundle'i coz ve vault'a birlestir. pw = bundle'in (kaynak makine) parolasi."""
+def import_bundle(pw, blob, mode="overwrite"):
+    """'age -p' ile sifreli bundle'i coz ve vault'a birlestir. pw = bundle'in (kaynak makine) parolasi.
+    mode: cakisma cozumu (overwrite|skip|duplicate) → merge_secrets'e gecer."""
     tin = tempfile.NamedTemporaryFile(delete=False, suffix=".age"); tout = tin.name + ".json"
     try:
         tin.write(blob); tin.close()
         rc, err = _age_pw(["-d", "-o", tout, tin.name], pw)
         if rc: raise RuntimeError("wrong password or corrupt bundle")
         data = json.loads(open(tout, errors="ignore").read())
-        d = load(); nn, nu = merge_secrets(d, data.get("secrets", [])); save(d)
-        return nn, nu
+        d = load(); nn, nu, ns = merge_secrets(d, data.get("secrets", []), mode); save(d)
+        return nn, nu, ns
     finally:
         for p in (tin.name, tout):
             try: os.remove(p)
             except OSError: pass
 
-# ---------------- yedek (.cer) ----------------
-# .cer = tum vault'un YEDEK PAROLASI (master'dan farkli, zorunlu) ile age -p sifreli hali.
+# ---------------- yedek (.cerbak) ----------------
+# .cerbak = tum vault'un YEDEK PAROLASI (master'dan farkli, zorunlu) ile age -p sifreli hali.
 # Ciktisi opak binary age ciphertext'tir → dosya acilinca ne oldugu gorulemez; import ile geri yuklenir.
 # Oto-yedek: yedek parolasi vault'un age PUBLIC key'ine sarmalanir (keys/backup.json); yalniz age
 # private key (kilit acikken bellekte) cozer. Duz yedek parolasi diske ASLA yazilmaz.
-CER_EXT = ".cer"
+CER_EXT = ".cerbak"    # eski yedekler ".cer" uzantiliydi; import path'i uzantiya bakmaz, rotasyon her ikisini de tanir
 _DEFAULT_BACKUP = {"enabled": False, "interval_h": 24, "dir": "", "keep": 7, "last": None}
 
 def make_backup(pw):
@@ -1060,7 +1067,7 @@ def make_backup(pw):
     return export_bundle(pw)
 
 def _cer_name():
-    return "concealer-" + now_iso()[:19].replace(":", "").replace("-", "") + CER_EXT   # concealer-YYYYMMDDTHHMMSS.cer
+    return "concealer-" + now_iso()[:19].replace(":", "").replace("-", "") + CER_EXT   # concealer-YYYYMMDDTHHMMSS.cerbak
 
 def _recipient():
     return open(PUBKEY).read().strip() if os.path.exists(PUBKEY) else None
@@ -1108,7 +1115,7 @@ def _rotate_backups(d, keep):
     """Klasordeki en eski .cer'leri sil, en yeni `keep` tanesini birak (isim zaman-sirali)."""
     if keep <= 0: return
     p = os.path.expanduser(d)
-    try: files = sorted(os.path.join(p, n) for n in os.listdir(p) if n.endswith(CER_EXT))
+    try: files = sorted(os.path.join(p, n) for n in os.listdir(p) if n.endswith((".cer", ".cerbak")))
     except OSError: return
     for old in files[:-keep]:
         try: os.remove(old)
@@ -2432,8 +2439,8 @@ def _mkhelp():
         "",
         "TRANSFER / AUDIT / INTERFACE",
         R("export [file]", "export a password-protected .age bundle"),
-        R("import <bundle.age|.cer>", "import a bundle / restore a .cer backup"),
-        R("backup [--dir D]", "write a .cer vault backup (uses the Settings backup password; for cron/launchd)"),
+        R("import <bundle.age|.cerbak> [--mode=overwrite|skip|duplicate]", "import a bundle / restore a .cerbak backup (conflict handling)"),
+        R("backup [--dir D]", "write a .cerbak vault backup (uses the Settings backup password; for cron/launchd)"),
         R("audit [verify]", "HMAC-chained audit log (verify: integrity check)"),
         R("audit anchor [--file F][--syslog][--webhook U]", "push head hash to an off-machine sink (tamper-evidence)"),
         R("config [key [val]]", "runtime settings (idle, confirm_ops)"),
@@ -2729,11 +2736,17 @@ def cli(argv):
         blob = export_bundle(pw); open(out, "wb").write(blob)
         audit("export", source="cli", detail=out); print(f"export: {out} ({len(blob)} bytes)")
     elif cmd == "import":
-        if not a: sys.exit("usage: concealer import <bundle.age>")
+        mode = "overwrite"; files = []
+        for x in a:
+            if x.startswith("--mode="): mode = x.split("=", 1)[1]
+            else: files.append(x)
+        if not files: sys.exit("usage: concealer import <bundle.age|.cerbak> [--mode=overwrite|skip|duplicate]")
+        if mode not in ("overwrite", "skip", "duplicate"): sys.exit("mode must be overwrite|skip|duplicate")
         pw = getpass.getpass("Bundle password: ")
-        try: nn, nu = import_bundle(pw, open(a[0], "rb").read())
+        try: nn, nu, ns = import_bundle(pw, open(files[0], "rb").read(), mode)
         except Exception as ex: sys.exit(f"import error: {ex}")
-        audit("import", source="cli", detail=a[0]); print(f"import: +{nn} new, ~{nu} updated")
+        audit("import", source="cli", detail=f"{files[0]} mode={mode}")
+        print(f"import ({mode}): +{nn} new, ~{nu} updated, ={ns} skipped")
     elif cmd == "config":
         if not a:
             for k, v in CFG.items(): print(f"{k} = {v}")
@@ -2964,10 +2977,12 @@ def serve_web(port):
                 b = self._body()
                 try: blob = base64.b64decode(b.get("b64", ""))
                 except Exception: return self._json({"error": "corrupt"}, 400)   # code → localized in webui (imp_corrupt)
-                try: nn, nu = import_bundle(b.get("pw", ""), blob)
+                mode = b.get("mode", "overwrite")
+                if mode not in ("overwrite", "skip", "duplicate"): mode = "overwrite"
+                try: nn, nu, ns = import_bundle(b.get("pw", ""), blob, mode)
                 except Exception as ex: return self._json({"error": str(ex)}, 400)
-                audit("import", source="web", detail=f"+{nn} ~{nu}")
-                return self._json({"ok": True, "imported": nn, "updated": nu})
+                audit("import", source="web", detail=f"mode={mode} +{nn} ~{nu} ={ns}")
+                return self._json({"ok": True, "imported": nn, "updated": nu, "skipped": ns})
             if path == "/api/backup":      # manuel .cer indir — YEDEK parolasi (master'dan farkli, zorunlu)
                 b = self._body(); pw = b.get("pw", "")
                 if len(pw) < 8: return self._json({"error": "backup_pw_short"}, 400)

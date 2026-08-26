@@ -210,9 +210,10 @@ header .brand .logo{background:#1c2029;border-radius:8px;padding:4px;margin-righ
 /* --- exposure: target filter row (narrow before picking) --- */
 .exfilters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:6px}
 .exgrid{max-height:44vh;overflow:auto;border:1px solid var(--line);border-radius:10px}
-/* #view-leaks thead th kurali sayfa-seviyesi sticky icin top:calc(--hh+--sh) veriyor; exgrid KENDI
-   scroll-container'i oldugundan header'i kendi ustune (top:0) sabitle — id+class ile ozgulukte kazan */
-#view-leaks .exgrid thead th{position:sticky;top:0;z-index:5;background:var(--panel);box-shadow:0 1px 0 var(--line)}
+/* #view-leaks thead th sayfa-seviyesi sticky icin top:calc(--hh+--sh) veriyor; exgrid KENDI scroll
+   container'i oldugundan top:0 ile kendi ustune sabitle (id+class ozguluk kazanir). background'i EZME —
+   global th{background:var(--th-bg)} opak ve satirlardan farkli; inset alt-cizgi header'la birlikte kayar */
+#view-leaks .exgrid thead th{position:sticky;top:0;z-index:5;box-shadow:inset 0 -2px 0 var(--line2)}
 .exgrid tbody tr{cursor:pointer}
 .exgrid tbody tr.sel{background:color-mix(in srgb,var(--acc) 12%,transparent)}
 .exgrid tbody tr:hover{background:var(--panel)}
@@ -621,16 +622,21 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
       <label class="fld" data-i18n="set_portability">Portability (move between machines)</label>
       <div class="toolbar" style="margin-top:8px">
         <button data-i18n="export_btn" onclick="doExport()">⬇ Export (.age)</button>
-        <input type="file" id="imp_file" accept=".age,.cer" style="width:auto">
+        <input type="file" id="imp_file" accept=".age,.cer,.cerbak" style="width:auto">
+        <select id="imp_mode" title="conflict handling" style="width:auto">
+          <option value="overwrite" data-i18n="imp_mode_overwrite">On conflict: overwrite</option>
+          <option value="skip" data-i18n="imp_mode_skip">On conflict: skip</option>
+          <option value="duplicate" data-i18n="imp_mode_duplicate">On conflict: duplicate</option>
+        </select>
         <button data-i18n="import_btn" onclick="doImport()">⬆ Import</button>
       </div>
-      <p class="mut" style="max-width:680px" data-i18n="set_export_hint">Export encrypts the whole vault with your master password (age). Import merges records into this vault (also restores a .cer backup).</p>
+      <p class="mut" style="max-width:680px" data-i18n="set_export_hint">Export encrypts the whole vault with your master password (age). Import merges records into this vault (also restores a .cerbak backup).</p>
 
       <hr style="border-color:var(--line);margin:22px 0;max-width:680px">
-      <label class="fld" data-i18n="set_backup">Backup (.cer)</label>
-      <p class="mut" style="max-width:680px;margin:4px 0 10px" data-i18n="set_backup_hint">A .cer backup is the whole vault encrypted with a dedicated backup password (separate from your master password) — an opaque binary you can't open to read. Restore it via Import above. Automatic backups write a .cer to a local folder on unlock once the interval has elapsed.</p>
+      <label class="fld" data-i18n="set_backup">Backup (.cerbak)</label>
+      <p class="mut" style="max-width:680px;margin:4px 0 10px" data-i18n="set_backup_hint">A .cerbak backup is the whole vault encrypted with a dedicated backup password (separate from your master password) — an opaque binary you can't open to read. Restore it via Import above. Automatic backups write a .cerbak to a local folder on unlock once the interval has elapsed.</p>
       <div class="toolbar" style="margin-top:4px">
-        <button data-i18n="backup_now" onclick="doBackup()">⬇ Backup now (.cer)</button>
+        <button data-i18n="backup_now" onclick="doBackup()">⬇ Backup now (.cerbak)</button>
       </div>
       <div class="grid" style="max-width:680px;margin-top:14px">
         <div class="field"><label class="fld" style="display:flex;gap:8px;align-items:center">
@@ -748,9 +754,10 @@ const I18N={
   lim_not_hardened:"Vault HARDENED değil: diskte düz-metin age anahtarı (keys/age-key.txt) var. Bu yüzden MCP/CLI, secret'ları token/kayıt OLMADAN okuyabiliyor (bu sayfadaki limitler ve kayıt zorunluluğu bu haldeyken uygulanamaz). Zorunlu kılmak için: (1) <code>concealer harden</code> — düz-metin anahtarı kaldırır; (2) <code>concealer agent register claude-code</code> — CONCEALER_TOKEN üretir; (3) token'ı Claude Code MCP env'ine ekle; (4) MCP sunucusunu yeniden başlat.",
   set_portability:"Taşınabilirlik (makineler arası)",export_btn:"⬇ Dışa Aktar (.age)",import_btn:"⬆ İçe Aktar",
   set_export_hint:"Dışa aktarma tüm vault'u master parolayla (age) şifreler; başka makineye taşınabilir. İçe aktarma kayıtları bu vault'a birleştirir.",
-  exported:"dışa aktarma indirildi",imp_pick:"önce .age dosyası seç",imp_fail:"içe aktarma başarısız",imp_corrupt:"bozuk / okunamayan dosya",imported_n:(n,u)=>`+${n} yeni, ~${u} güncellendi`,
-  set_backup:"Yedek (.cer)",set_backup_hint:"Bir .cer yedeği, tüm vault'un master parolandan AYRI özel bir yedek parolasıyla şifrelenmiş halidir — içi açılıp okunamayan opak binary. Yukarıdaki İçe Aktar ile geri yüklenir. Otomatik yedekler, süre dolunca kilit açılışında bir .cer'i yerel klasöre yazar.",
-  backup_now:"⬇ Şimdi yedekle (.cer)",bk_auto:"Otomatik yedek",bk_interval:"Her (saat)",bk_keep:"Son (dosya) tut",bk_dir:"Hedef klasör",
+  exported:"dışa aktarma indirildi",imp_pick:"önce .age dosyası seç",imp_fail:"içe aktarma başarısız",imp_corrupt:"bozuk / okunamayan dosya",imported_n:(n,u,s)=>`+${n} yeni, ~${u} güncellendi, =${s||0} atlandı`,
+  imp_mode_overwrite:"Çakışmada: üzerine yaz",imp_mode_skip:"Çakışmada: atla",imp_mode_duplicate:"Çakışmada: kopyala",
+  set_backup:"Yedek (.cerbak)",set_backup_hint:"Bir .cerbak yedeği, tüm vault'un master parolandan AYRI özel bir yedek parolasıyla şifrelenmiş halidir — içi açılıp okunamayan opak binary. Yukarıdaki İçe Aktar ile geri yüklenir. Otomatik yedekler, süre dolunca kilit açılışında bir .cerbak'ı yerel klasöre yazar.",
+  backup_now:"⬇ Şimdi yedekle (.cerbak)",bk_auto:"Otomatik yedek",bk_interval:"Her (saat)",bk_keep:"Son (dosya) tut",bk_dir:"Hedef klasör",
   bk_pw:"Yedek parolası",bk_pw_ph:"belirle / değiştir (boş = değişmesin)",bk_pw_isset:"(ayarlı)",bk_pw_unset:"(ayarlı değil)",bk_run:"▶ Otomatik yedeği şimdi al",
   bk_saved:"yedek ayarı kaydedildi",bk_downloaded:"yedek indirildi",bk_ran:s=>`yedek yazıldı: ${s}`,
   bk_pw_short:"yedek parolası en az 8 karakter olmalı",bk_pw_mismatch:"yedek parolaları eşleşmiyor",bk_pw_same:"yedek parolası master paroladan farklı olmalı",
@@ -845,9 +852,10 @@ const I18N={
   lim_not_hardened:"Vault is NOT hardened: a plaintext age key (keys/age-key.txt) is on disk, so MCP/CLI can read secrets WITHOUT a token or registration (the limits and registration requirement on this page can't be enforced in this state). To enforce them: (1) <code>concealer harden</code> — removes the plaintext key; (2) <code>concealer agent register claude-code</code> — prints a CONCEALER_TOKEN; (3) put that token in the Claude Code MCP env; (4) restart the MCP server.",
   set_portability:"Portability (move between machines)",export_btn:"⬇ Export (.age)",import_btn:"⬆ Import",
   set_export_hint:"Export encrypts the whole vault with your master password (age); portable to another machine. Import merges records into this vault.",
-  exported:"export downloaded",imp_pick:"pick a .age file first",imp_fail:"import failed",imp_corrupt:"corrupt / unreadable file",imported_n:(n,u)=>`+${n} new, ~${u} updated`,
-  set_backup:"Backup (.cer)",set_backup_hint:"A .cer backup is the whole vault encrypted with a dedicated backup password (separate from your master password) — an opaque binary you can't open to read. Restore it via Import above. Automatic backups write a .cer to a local folder on unlock once the interval has elapsed.",
-  backup_now:"⬇ Backup now (.cer)",bk_auto:"Automatic backups",bk_interval:"Every (hours)",bk_keep:"Keep last (files)",bk_dir:"Destination folder",
+  exported:"export downloaded",imp_pick:"pick a .age file first",imp_fail:"import failed",imp_corrupt:"corrupt / unreadable file",imported_n:(n,u,s)=>`+${n} new, ~${u} updated, =${s||0} skipped`,
+  imp_mode_overwrite:"On conflict: overwrite",imp_mode_skip:"On conflict: skip",imp_mode_duplicate:"On conflict: duplicate",
+  set_backup:"Backup (.cerbak)",set_backup_hint:"A .cerbak backup is the whole vault encrypted with a dedicated backup password (separate from your master password) — an opaque binary you can't open to read. Restore it via Import above. Automatic backups write a .cerbak to a local folder on unlock once the interval has elapsed.",
+  backup_now:"⬇ Backup now (.cerbak)",bk_auto:"Automatic backups",bk_interval:"Every (hours)",bk_keep:"Keep last (files)",bk_dir:"Destination folder",
   bk_pw:"Backup password",bk_pw_ph:"set / change (leave blank to keep)",bk_pw_isset:"(set)",bk_pw_unset:"(not set)",bk_run:"▶ Run auto-backup now",
   bk_saved:"backup settings saved",bk_downloaded:"backup downloaded",bk_ran:s=>`backup written: ${s}`,
   bk_pw_short:"backup password must be at least 8 characters",bk_pw_mismatch:"backup passwords don't match",bk_pw_same:"backup password must differ from the master password",
@@ -1069,7 +1077,7 @@ async function loadBackup(){
   $('#bk_pw_set').textContent=b.has_pw?t('bk_pw_isset'):t('bk_pw_unset');
   $('#bk_last').textContent=b.last?t('bk_last',b.last.replace('T',' ').slice(0,19)):t('bk_last_never');
 }
-// Manuel .cer indir: yedek parolasını 2 kez sor (master'dan farklı, min 8).
+// Manuel .cerbak indir: yedek parolasını 2 kez sor (master'dan farklı, min 8).
 function doBackup(){
   const body=`<div class="field"><label class="fld">${t('bk_pw')}</label>
       <input id="bk1" type="password" ${NOPM} data-i18n-ph="bk_pw_ph"></div>
@@ -1319,12 +1327,13 @@ function doExport(){
 function doImport(){
   const f=$('#imp_file').files[0]; if(!f){toast(t('imp_pick'));return;}
   const rd=new FileReader();
+  const mode=$('#imp_mode').value;
   rd.onload=()=>{ const b64=btoa(String.fromCharCode(...new Uint8Array(rd.result)));
     askPw(t('import_btn'),async pw=>{
-      const r=await api('/api/import',{method:'POST',body:JSON.stringify({pw,b64})});
+      const r=await api('/api/import',{method:'POST',body:JSON.stringify({pw,b64,mode})});
       const d=await r.json();
       if(!r.ok){const k='imp_'+(d.error||''); toast(I18N[LANG][k]?t(k):(d.error||t('imp_fail')));return;}
-      toast(t('imported_n',d.imported,d.updated)); refreshFilterOptions(); loadSecrets();
+      toast(t('imported_n',d.imported,d.updated,d.skipped)); refreshFilterOptions(); loadSecrets();
     });
   };
   rd.readAsArrayBuffer(f);
