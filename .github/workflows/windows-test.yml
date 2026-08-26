@@ -1,0 +1,54 @@
+name: windows-test
+
+# Real Windows test of the native port: CLI + web + MCP + TUI, all of which drive
+# `age` through pywinpty's ConPTY. windows-latest is a full Windows Server VM (real
+# console, real ConPTY) — not just a browser. See docs/WINDOWS.md.
+
+on:
+  push:
+    branches: [windows-support]
+    paths:
+      - "concealer"
+      - "concealer_win.py"
+      - "webui.html"
+      - "pyproject.toml"
+      - "packaging/ci/**"
+      - ".github/workflows/windows-test.yml"
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install sops + age (the binaries concealer wraps)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          # age (ships age.exe + age-keygen.exe)
+          Invoke-WebRequest "https://github.com/FiloSottile/age/releases/download/v1.2.1/age-v1.2.1-windows-amd64.zip" -OutFile age.zip
+          Expand-Archive age.zip -DestinationPath ageroot
+          "$PWD\ageroot\age" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          # sops (single exe)
+          New-Item -ItemType Directory sopsbin | Out-Null
+          Invoke-WebRequest "https://github.com/getsops/sops/releases/download/v3.9.4/sops-v3.9.4.exe" -OutFile sopsbin\sops.exe
+          "$PWD\sopsbin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Install concealer (pip — pulls pywinpty + windows-curses)
+        run: pip install .
+
+      - name: Verify toolchain on PATH
+        shell: pwsh
+        run: |
+          sops --version
+          age --version
+          concealer version
+
+      - name: Windows smoke — CLI + web + MCP + TUI
+        shell: pwsh
+        run: python packaging/ci/win_smoke.py
