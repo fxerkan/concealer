@@ -52,3 +52,21 @@ jobs:
       - name: Windows smoke — CLI + web + MCP + TUI
         shell: pwsh
         run: python packaging/ci/win_smoke.py
+
+      - name: Capture deps (screenshots)
+        shell: pwsh
+        run: |
+          pip install pillow pyte playwright
+          python -m playwright install chromium
+
+      - name: Capture Windows interface screenshots
+        continue-on-error: true          # a screenshot hiccup must not fail the gate
+        shell: pwsh
+        run: python packaging/ci/win_capture.py "$env:RUNNER_TEMP\win-artifacts"
+
+      - name: Upload screenshots artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-screenshots
+          path: ${{ runner.temp }}\win-artifacts\*.png
+          if-no-files-found: warn
