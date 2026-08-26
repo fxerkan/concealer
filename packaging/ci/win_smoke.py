@@ -274,11 +274,20 @@ def test_tui(cli_tok):
                 break
     threading.Thread(target=rd, daemon=True).start()
 
-    marks = ("filters", "secrets", "details")      # the three panel headers the TUI always draws
+    # curses draws cell-by-cell with cursor-move escapes BETWEEN letters, so words
+    # aren't contiguous in the raw stream. Strip CSI (…and ESC 7/8 save/restore) first,
+    # then the visible glyphs of a word become adjacent and searchable.
+    def visible(s):
+        s = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", s)   # CSI sequences (incl. cursor moves)
+        s = re.sub(r"\x1b[78=>]", "", s)               # save/restore cursor, keypad modes
+        return s.lower()
+
+    marks = ("filter", "secret", "project", "api_key")   # panel headers + a field the vault row shows
     t = time.time() + 6
-    while time.time() < t and not any(k in buf[0].lower() for k in marks):
+    while time.time() < t and not any(k in visible(buf[0]) for k in marks):
         time.sleep(0.2)
-    rendered = any(k in buf[0].lower() for k in marks)
+    vis = visible(buf[0])
+    rendered = buf[0].count("\x1b[") > 20 and any(k in vis for k in marks)
     alive = p.isalive()
 
     quit_clean = False
@@ -298,7 +307,7 @@ def test_tui(cli_tok):
     if not alive:
         raise RuntimeError(f"TUI exited before rendering (curses init failed?). tail: {buf[0][-300:]!r}")
     if not rendered:
-        raise RuntimeError(f"TUI ran but no UI text detected. tail: {buf[0][-300:]!r}")
+        raise RuntimeError(f"TUI ran but no UI text detected. visible tail: {vis[-300:]!r}")
     log(f"  TUI started + rendered on windows-curses "
         f"(interactive quit {'confirmed' if quit_clean else 'not assertable via winpty; real keyboard quits with q'})")
 
