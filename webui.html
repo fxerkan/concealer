@@ -141,7 +141,12 @@ tr:last-child td{border-bottom:0}
 label.fld{display:block;margin-bottom:4px;color:var(--mut);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
 .field{margin-bottom:14px}
 .secretrow{display:flex;gap:6px}.secretrow input{flex:1}
-.kv{display:flex;gap:8px;margin-bottom:8px}.kv input:first-child{max-width:200px}
+.kv{display:flex;gap:8px;margin-bottom:8px;align-items:flex-start}.kv input:first-child{max-width:200px}
+.kv .kv-v{flex:1;min-width:0}
+.kv .ghost{flex:none;white-space:nowrap;align-self:flex-start}
+.kv .jbtn{width:34px;text-align:center}.kv .jbtn.off{visibility:hidden}
+textarea.jsonv{flex:1;min-width:0;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.4;white-space:pre-wrap;word-break:break-all;resize:vertical;min-height:34px}
+textarea.jsonv.masked{-webkit-text-security:disc}
 
 #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line2);padding:11px 18px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.4);z-index:80;opacity:0;transition:opacity .2s;pointer-events:none}
 #toast.show{opacity:1}
@@ -558,6 +563,7 @@ const I18N={
   idle_lock:"⏱ oto-kilit",idle_locked:"Boşta kalma — kilitlendi",
   name_req:"ad gerekli",save:"Kaydet",cancel:"İptal",close:"Kapat",fields:"alanlar",notes:"notlar",
   add_field:"+ alan ekle",field:"alan",value:"değer",type:"tip",scope:"kapsam",tags:"etiketler",url:"url",
+  json_split:"JSON'u alanlara böl",json_bad:"Geçerli JSON nesnesi değil",
   collection:"Koleksiyon",th_collection:"Koleksiyon",rotation:"Rotasyon",rot_days:"Her (gün)",rot_mode:"Mod",
   rot_generate:"otomatik üret",rot_manual:"elle",rot_none:"politika yok",overdue:"gecikmiş",rot_overdue_d:d=>`${d} gün gecikmiş`,
   move_to:"Koleksiyona taşı",copy_to:"Çoğalt (Duplicate)",coll_root:"(kök)",copied:"çoğaltıldı",moved:"taşındı",
@@ -618,6 +624,7 @@ const I18N={
   idle_lock:"⏱ auto-lock",idle_locked:"Idle — locked",
   name_req:"name required",save:"Save",cancel:"Cancel",close:"Close",fields:"fields",notes:"notes",
   add_field:"+ add field",field:"field",value:"value",type:"type",scope:"scope",tags:"tags",url:"url",
+  json_split:"Split JSON into fields",json_bad:"Not a valid JSON object",
   collection:"Collection",th_collection:"Collection",rotation:"Rotation",rot_days:"Every (days)",rot_mode:"Mode",
   rot_generate:"auto-generate",rot_manual:"manual",rot_none:"no policy",overdue:"overdue",rot_overdue_d:d=>`${d} days overdue`,
   move_to:"Move to collection",copy_to:"Duplicate",coll_root:"(root)",copied:"duplicated",moved:"moved",
@@ -710,7 +717,10 @@ const $ = s => document.querySelector(s);
 async function api(path,opts){ const r=await fetch(path,opts); if(r.status===401){showLogin();throw 'locked';} return r; }
 function toast(m){ const el=$('#toast'); el.textContent=m; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2600); }
 function esc(s){ return (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function togglePw(id,btn){ const el=typeof id==='string'?$('#'+id):id; el.type=el.type==='password'?'text':'password'; if(btn)btn.textContent=el.type==='password'?'👁':'🙈'; }
+function togglePw(id,btn){ const el=typeof id==='string'?$('#'+id):id; let masked;
+  if(el.tagName==='TEXTAREA'){ el.classList.toggle('masked'); masked=el.classList.contains('masked'); }
+  else { el.type=el.type==='password'?'text':'password'; masked=el.type==='password'; }
+  if(btn)btn.textContent=masked?'👁':'🙈'; }
 function fmtTs(ts){ return ts?ts.replace('T',' ').replace('+00:00',''):''; }
 
 // parola-yoneticisi overlay'ini (LastPass/1Password/Bitwarden) secret input'larindan bastir
@@ -1403,7 +1413,16 @@ function renderFields(){
     cont.innerHTML=html;
   }
 }
-function kvRow(k,v){ return `<div class="kv"><input class="kv-k" placeholder="${t('field')}" value="${esc(k)}"><input class="kv-v" placeholder="${t('value')}" value="${esc(v)}"><button class="ghost danger" onclick="this.parentElement.remove()">✕</button></div>`; }
+function kvRow(k,v){
+  let obj=null; try{ const p=JSON.parse(v); if(p&&typeof p==='object') obj=p; }catch(e){}
+  const val=obj?`<textarea class="kv-v jsonv masked" rows="${Math.min((JSON.stringify(obj,null,2).match(/\n/g)||[]).length+1,14)}" placeholder="${t('value')}" ${NOPM}>${esc(JSON.stringify(obj,null,2))}</textarea>`
+                :`<input class="kv-v" type="password" placeholder="${t('value')}" value="${esc(v)}" ${NOPM}>`;
+  const split=`<button class="ghost jbtn ${obj?'':'off'}" type="button" title="${t('json_split')}" onclick="explodeJson(this)">{}</button>`;
+  return `<div class="kv"><input class="kv-k" placeholder="${t('field')}" value="${esc(k)}">${val}${split}<button class="ghost" type="button" onclick="togglePw(this.parentElement.querySelector('.kv-v'),this)">👁</button><button class="ghost danger" onclick="this.parentElement.remove()">✕</button></div>`;
+}
+// JSON blob -> nested keys flattened to dotted key/value rows (installed.client_id, …)
+function flattenJson(obj,prefix,out){ out=out||{}; Object.entries(obj).forEach(([k,v])=>{ const key=prefix?prefix+'.'+k:k; if(v&&typeof v==='object'&&!Array.isArray(v)) flattenJson(v,key,out); else out[key]=typeof v==='object'?JSON.stringify(v):String(v); }); return out; }
+function explodeJson(btn){ const row=btn.closest('.kv'); let obj; try{ obj=JSON.parse(row.querySelector('.kv-v').value); }catch(e){ toast(t('json_bad')); return; } if(!obj||typeof obj!=='object'||Array.isArray(obj)){ toast(t('json_bad')); return; } const flat=flattenJson(obj); row.insertAdjacentHTML('beforebegin',Object.entries(flat).map(([k,v])=>kvRow(k,v)).join('')); row.remove(); }
 function addKv(){ const d=document.createElement('div'); d.innerHTML=kvRow('',''); $('#e_fields').insertBefore(d.firstChild,$('#e_fields').lastElementChild); }
 async function saveSecret(id){
   const type=$('#e_type').value; let fields={};
