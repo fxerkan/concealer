@@ -29,18 +29,28 @@ git clone https://github.com/fxerkan/homebrew-tap && cd homebrew-tap
 mkdir -p Formula
 ```
 
-### Per release: fully automated
+### Per release: fully automated (ALL channels)
 
-`.github/workflows/release.yml` does all of the below automatically. When a push
-to `main` changes the `VERSION` line in `concealer`, it cuts the `vX.Y.Z` tag +
-GitHub release (notes pulled from that version's `CHANGELOG.md` section) and bumps
-`Formula/concealer.rb` in `fxerkan/homebrew-tap` (url + sha256). It's idempotent —
-re-runs skip if the tag already exists — and can be triggered manually via
-**Actions → release → Run workflow** to catch up the current `VERSION`.
+`.github/workflows/release.yml` fans one `VERSION` bump out to every channel so they
+never drift. When a push to `main` changes the `VERSION` line in `concealer`, it:
 
-**One-time setup:** add a repo secret `HOMEBREW_TAP_TOKEN` — a PAT (classic `repo`,
-or fine-grained with **contents:write** on `fxerkan/homebrew-tap`). Without it the
-release still cuts but the tap bump step fails.
+1. cuts the `vX.Y.Z` tag + GitHub release (notes from that version's `CHANGELOG.md`),
+2. builds the sdist+wheel and **publishes to PyPI** via Trusted Publishing (OIDC),
+3. **bumps the Scoop bucket** (`fxerkan/scoop-bucket`) to the freshly-published wheel's
+   real content-addressed url + sha256 (read back from the PyPI JSON API), and
+4. **bumps the Homebrew tap** (`fxerkan/homebrew-tap`) url + sha256 from the GH tag tarball.
+
+It's idempotent — the release/tag/PyPI steps skip (or `skip-existing`) if the version
+already shipped; the Scoop + Homebrew steps run every time so a stale channel self-heals.
+Trigger manually via **Actions → release → Run workflow** to catch up the current `VERSION`.
+
+**One-time setup:**
+- **PyPI** — on pypi.org add a *Trusted Publisher*: project `concealer`, owner `fxerkan`,
+  repo `concealer`, workflow `release.yml`, environment *(blank)*. No token stored in GitHub.
+- **Repo secret `HOMEBREW_TAP_TOKEN`** — a PAT with **contents:write on BOTH
+  `fxerkan/homebrew-tap` and `fxerkan/scoop-bucket`** (classic `repo` scope covers both;
+  fine-grained must list both repos). Without it the release still cuts + publishes to
+  PyPI, but the tap/bucket bump steps fail.
 
 <details><summary>Manual fallback (if you ever need it)</summary>
 
@@ -111,12 +121,11 @@ sops/age/expect are absent, so this path fails loudly, not silently.
 
 ## 3. Other channels (scope notes)
 
-These are **more work than Homebrew** and optional — add on demand:
-
-- **pipx / PyPI (all platforms)** — `pyproject.toml` (hatchling) packages the flat
-  script as the `concealer` package with `webui.html` bundled; `pywinpty` +
-  `windows-curses` are Windows-only deps. `sops`/`age` stay external (not pip
-  packages). Build + publish:
+- **pipx / PyPI (all platforms)** — **automated** by `release.yml` (Trusted Publishing).
+  `pyproject.toml` (hatchling) packages the flat script as the `concealer` package with
+  `webui.html` bundled; `pywinpty` + `windows-curses` are Windows-only deps. `sops`/`age`
+  stay external (not pip packages). Version is read dynamically from the `VERSION` line in
+  `concealer`, so it never drifts from the tag/CHANGELOG. Manual fallback:
 
   ```bash
   python3 -m build            # → dist/concealer-<ver>-py3-none-any.whl + .tar.gz
@@ -124,15 +133,16 @@ These are **more work than Homebrew** and optional — add on demand:
   # users:  pipx install concealer
   ```
 
-  Version is read dynamically from the `VERSION` line in `concealer`, so it never
-  drifts from the tag/CHANGELOG.
+The remaining channels are **more work** and optional — add on demand:
 - **Linux (apt/dnf)** — no native package yet. Simplest today: the git-clone method
   above, or `pipx install concealer`. A `.deb`/`.rpm` would just drop `concealer` +
   `webui.html` into `/usr/lib/concealer` and symlink `/usr/bin` — same shape as the
   brew formula, plus `Depends: age, sops, expect, python3`.
 - **Scoop / winget (Windows)** — **now supported.** Native Windows drops the `expect`
   dependency and drives age through a ConPTY via `pywinpty` (see `docs/WINDOWS.md`).
-  Draft **Scoop** manifest: `packaging/scoop/concealer.json` (works via pip). **winget**
+  **Scoop is automated** by `release.yml`: the source manifest is
+  `packaging/scoop/concealer.json` and each release mirrors it (bumped to the new PyPI
+  wheel's url+hash) into the `fxerkan/scoop-bucket` repo users install from. **winget**
   needs a bundled `.exe` (PyInstaller on a Windows CI runner) — see
   `packaging/winget/README.md`; until then, `pipx install concealer` or Scoop are the
   Windows paths.

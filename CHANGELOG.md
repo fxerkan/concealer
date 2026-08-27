@@ -6,6 +6,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.15] — 2026-08-27
+
+### Added
+- **Least-privilege injection** — `run_with_secrets` (MCP) and `concealer run` (CLI) accept a
+  name filter so a command gets **only the secrets it names**, not every secret in the scope.
+  MCP: `names: ["A", "B"]`. CLI: `concealer run --project p --name A <cmd>`. Default is unchanged
+  (whole scope) for backward compatibility, but agents should name what they need — this shrinks
+  the injected env and the audit `inject` line to just the required keys.
+
 ## [0.9.14] — 2026-08-27
 
 ### Changed

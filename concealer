@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "0.9.14"   # advances through 0.x; 1.0 = reserved for the full live/release version
+VERSION = "0.9.15"   # advances through 0.x; 1.0 = reserved for the full live/release version
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -1555,10 +1555,14 @@ def harden():
     print(f"  export CONCEALER_TOKEN={tok}   (~{TOKEN_TTL // 3600}h; agent: concealer agent register <name>)")
 
 # ---------------- injection ----------------
-def collect_secrets(target, d=None):
-    """Collect secrets matching the target scopes as {ENV_KEY: value} (most specific wins)."""
+def collect_secrets(target, d=None, names=None):
+    """Collect secrets matching the target scopes as {ENV_KEY: value} (most specific wins).
+    names: if given (set/list of secret names), inject ONLY those — least-privilege, so a
+    command pulls just the secret it needs instead of the whole scope."""
     d = d or load(); chosen = {}
+    names = set(names) if names else None
     for e in secs(d):
+        if names is not None and e["name"] not in names: continue
         spec = 0; ok = True
         for dim in DIMS:
             ev = e[dim]
@@ -1575,11 +1579,11 @@ def collect_secrets(target, d=None):
             for fn, fv in e["fields"].items(): kv[f"{name}_{fn.upper()}"] = str(fv)
     return kv, d, [e for sp, e in chosen.values()]
 
-def inject_env(target, source="cli", actor=None, command=None, gate=None):
+def inject_env(target, source="cli", actor=None, command=None, gate=None, names=None):
     """If gate=<agent label> is given, injection passes through rate_gate(atomic) — if the quota is exceeded
     it returns (None, d, note) and NO secret is injected. If command is given, the executed command
-    (redacted) is added to the audit detail."""
-    kv, d, recs = collect_secrets(target)
+    (redacted) is added to the audit detail. names: restrict injection to these secret names."""
+    kv, d, recs = collect_secrets(target, names=names)
     if gate is not None:
         allowed, note = rate_gate(gate, recs, atomic=True)
         if recs and not allowed:
@@ -2688,9 +2692,9 @@ def cli(argv):
             audit("create", key=ne["name"], source="cli", detail=f"cp collection={to or '-'}")
             print(f"cp: {e['name']} -> {ne['name']} @ 📁{to or '(root)'} (id {ne['id']})")
     elif cmd == "run":
-        sel = _sel(a)
+        sel = _sel(a); names = [sel.pop("name")] if "name" in sel else None   # --name X → inject only X
         for dim in ("repo", "project"): sel.setdefault(dim, detect(dim))
-        env, _, _ = inject_env(sel, source="cli", actor=_cli_actor(), command=" ".join(a))
+        env, _, _ = inject_env(sel, source="cli", actor=_cli_actor(), command=" ".join(a), names=names)
         sys.stderr.write(f"[concealer] {label(sel)}\n")
         os.execvpe(a[0], a, env)
     elif cmd == "leaks":
@@ -3158,6 +3162,17 @@ def _entry_from_body(b):
     return e
 
 # ---------------- MCP ----------------
+# Delivered to EVERY MCP client on `initialize` (not just Claude Code). This is the managed,
+# server-side secrets policy — it travels with the connection, unlike a per-agent local file.
+# Advisory by protocol; the non-bypassable guards are code: registered-agent gate, rate_gate, redaction.
+MCP_INSTRUCTIONS = (
+    "concealer is a local-only secret manager. Never print, echo, cat, or write secret VALUES — "
+    "they are injected into a child env and redacted from output. "
+    "LEAST-PRIVILEGE (required): when calling run_with_secrets, pass `names` with ONLY the secrets the "
+    "command needs; do NOT inject a whole scope. Discover names with list_secrets/search_secrets first. "
+    "Scope every call as narrowly as you can (tenant/project/environment/repo). "
+    "Bulk enumeration is rate-limited and audited; injecting more than you use will be flagged."
+)
 _DIMPROPS = {d: {"type": "string"} for d in DIMS}
 MCP_TOOLS = [
     {"name": "list_secrets", "description": "List secrets by type+scope+tag+collection (no values returned).",
@@ -3165,8 +3180,10 @@ MCP_TOOLS = [
         "collection": {"type": "string", "description": "narrow by collection path (sub-paths included)"}}}},
     {"name": "search_secrets", "description": "Search across name/scope/tag/url/notes (no values returned).",
      "inputSchema": {"type": "object", "properties": {"term": {"type": "string"}}, "required": ["term"]}},
-    {"name": "run_with_secrets", "description": "Run a command with scope-matching secrets injected into env. No values leak; output is masked.",
-     "inputSchema": {"type": "object", "properties": {"command": {"type": "string"}, **_DIMPROPS}, "required": ["command"]}},
+    {"name": "run_with_secrets", "description": "Run a command with scope-matching secrets injected into env. No values leak; output is masked. Pass 'names' to inject ONLY the secrets you need (least-privilege) instead of the whole scope.",
+     "inputSchema": {"type": "object", "properties": {"command": {"type": "string"},
+        "names": {"type": "array", "items": {"type": "string"}, "description": "restrict injection to these secret names (default: all matching the scope)"},
+        **_DIMPROPS}, "required": ["command"]}},
     {"name": "set_secret", "description": "Create/update a secret (WRITES the value, never returns it). Updates if the same name+scope exists. Identify yourself with 'actor'; audit source=mcp.",
      "inputSchema": {"type": "object", "properties": {
         "name": {"type": "string"}, "type": {"type": "string", "description": "api_key|database|website|custom"},
@@ -3198,7 +3215,7 @@ def _mcp_call(name, args):
     if name == "run_with_secrets":
         target = {d: args[d] for d in DIMS if args.get(d)}
         for dim in ("repo", "project"): target.setdefault(dim, detect(dim))
-        env, d, note = inject_env(target, source="mcp", actor=agent, command=args["command"], gate=agent)
+        env, d, note = inject_env(target, source="mcp", actor=agent, command=args["command"], gate=agent, names=args.get("names"))
         if env is None: return "error: injection blocked — rate limit reached." + (note or "")
         r = subprocess.run(["/bin/sh", "-c", args["command"]], env=env, capture_output=True, text=True)
         return redact(f"[{label(target)}]\n" + r.stdout + r.stderr, d) or "(no output)"
@@ -3234,7 +3251,8 @@ def mcp_stdio():
         req = json.loads(line); mid = req.get("id"); m = req.get("method")
         if m == "initialize":
             send({"jsonrpc": "2.0", "id": mid, "result": {"protocolVersion": "2024-11-05",
-                  "capabilities": {"tools": {}}, "serverInfo": {"name": "concealer", "version": VERSION}}})
+                  "capabilities": {"tools": {}}, "serverInfo": {"name": "concealer", "version": VERSION},
+                  "instructions": MCP_INSTRUCTIONS}})
         elif m == "notifications/initialized": pass
         elif m == "tools/list": send({"jsonrpc": "2.0", "id": mid, "result": {"tools": MCP_TOOLS}})
         elif m == "tools/call":

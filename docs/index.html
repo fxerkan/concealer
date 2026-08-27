@@ -113,9 +113,11 @@ header.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
 html[data-theme="light"] .install{background:linear-gradient(180deg,#1b1e24 0%,#0f1115 100%)}
 .install code{color:#e8e8e6}
 .install .p{color:var(--acc);font-weight:700}
-.install code{color:#e8e8e6;white-space:nowrap;overflow:auto}
+.install code{color:#e8e8e6;white-space:pre;overflow:auto;text-align:left}
 .install button{border:0;background:var(--acc);color:var(--ink);border-radius:7px;padding:6px 11px;font-weight:700;cursor:pointer;font-size:12.5px;flex:0 0 auto}
 .install button:active{transform:translateY(1px)}
+/* tabs stacked above the one-liner */
+.installwrap{display:flex;flex-direction:column;align-items:center;gap:10px}
 .ctarow{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:26px}
 .btn{border-radius:10px;padding:12px 22px;font-weight:700;font-size:15px;cursor:pointer;border:1px solid var(--line2);display:inline-flex;align-items:center;gap:8px;font-family:inherit;line-height:1}
 .btn.primary{background:var(--acc);color:var(--ink);border-color:var(--acc);box-shadow:0 10px 30px var(--glow)}
@@ -197,7 +199,17 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
   opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:3000;max-width:90vw}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+/* os tabs above the hero install one-liner */
+.ostabs{display:inline-flex;gap:4px;background:rgba(255,255,255,.05);border-radius:9px;padding:3px}
+.qstabs{display:flex;width:fit-content;margin:0 auto 16px}
+.sub em.u{text-decoration:underline;text-underline-offset:3px}
+.ostabs button{border:0;background:none;color:var(--mut);font:inherit;font-size:12.5px;font-weight:600;padding:5px 12px;border-radius:7px;cursor:pointer}
+.ostabs button.on{background:var(--acc);color:var(--ink)}
+
 /* install popup modal */
+.modal .cmdlabel{margin:16px 0 5px;font-size:12.5px;font-weight:700;color:var(--txt)}
+.modal .cmdlabel:first-of-type{margin-top:0}
+.modal .cmdlabel span{color:var(--mut);font-weight:500}
 .modal{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
   background:rgba(0,0,0,.6);backdrop-filter:blur(3px)}
 .modal .box{background:var(--panel);border:1px solid var(--line2);border-radius:16px;padding:28px;
@@ -239,17 +251,23 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
   <div class="wrap">
     <h1 class="brand reveal" style="justify-content:center"><span class="cv">conceal</span><span class="ac">er</span></h1>
     <p class="tag" data-i18n="hero_tag">The local-only secret manager for the AI-coding era.</p>
-    <p class="sub" data-i18n="hero_sub">Encrypted with SOPS + age. No cloud, no telemetry, no account. Your agents <em>use</em> secrets without ever <em>seeing</em> them.</p>
+    <p class="sub" data-i18n="hero_sub">No cloud, no telemetry, no account.<br>Your agents use secrets without ever <em class="u">seeing</em> them.</p>
     <div class="pillrow">
       <span class="pill" data-i18n="pill_local">🔒 Local-only</span>
       <span class="pill" data-i18n="pill_ai">🤖 AI-safe by design</span>
       <span class="pill" data-i18n="pill_oss">⭐ Open source (MIT)</span>
       <span class="pill">🧩 CLI · Web · TUI · MCP</span>
     </div>
-    <div id="install" class="install">
-      <span class="p">$</span>
-      <code id="installcmd">brew install fxerkan/tap/concealer</code>
-      <button id="copybtn" data-i18n="copy">Copy</button>
+    <div class="installwrap">
+      <div class="ostabs" id="ostabs">
+        <button data-os="unix">macOS / Linux</button>
+        <button data-os="win">Windows</button>
+      </div>
+      <div id="install" class="install">
+        <span class="p" id="installp">$</span>
+        <code id="installcmd">brew install fxerkan/tap/concealer</code>
+        <button id="copybtn" data-copy data-i18n="copy">Copy</button>
+      </div>
     </div>
     <div class="ctarow">
       <a class="btn primary" href="/concealer/getting-started" data-i18n="cta_start">Get started →</a>
@@ -323,7 +341,12 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <div class="eyebrow" data-i18n="qs_eyebrow">Quick start</div>
       <h2 data-i18n="qs_h">Up and running in a minute</h2>
     </div>
-    <div class="codeblk mono"><span class="c"># install (pulls in sops, age, expect)</span>
+    <div class="ostabs qstabs" id="qstabs">
+      <button data-qs="mac" class="on">🍎 macOS</button>
+      <button data-qs="linux">🐧 Linux</button>
+      <button data-qs="win">🪟 Windows</button>
+    </div>
+    <div class="codeblk mono" data-qspanel="mac"><span class="c"># install (pulls in sops, age, expect)</span>
 brew install fxerkan/tap/concealer
 
 <span class="c"># create the vault — prints recovery codes + a CLI token, once</span>
@@ -335,6 +358,32 @@ eval "$(cer unlock)"
 <span class="c"># store &amp; use a secret — the value never hits your terminal</span>
 cer set --name OPENAI_API_KEY --project web --env prod <span class="a">'sk-DUMMY-123'</span>
 cer run --project web --env prod npm run deploy</div>
+    <div class="codeblk mono" data-qspanel="linux" hidden><span class="c"># install concealer, then the sops/age binaries it wraps</span>
+pipx install concealer
+sudo apt install sops age        <span class="c"># or dnf / pacman</span>
+
+<span class="c"># create the vault — prints recovery codes + a CLI token, once</span>
+concealer init
+
+<span class="c"># unlock your shell session (~8h token) — `cer` is the short alias for `concealer`</span>
+eval "$(cer unlock)"
+
+<span class="c"># store &amp; use a secret — the value never hits your terminal</span>
+cer set --name OPENAI_API_KEY --project web --env prod <span class="a">'sk-DUMMY-123'</span>
+cer run --project web --env prod npm run deploy</div>
+    <div class="codeblk mono" data-qspanel="win" hidden><span class="c"># install (pulls in python, sops, age) — PowerShell</span>
+scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket
+scoop install concealer
+
+<span class="c"># create the vault — prints recovery codes + a CLI token, once</span>
+concealer init
+
+<span class="c"># unlock this session — paste the token that init printed</span>
+$env:CONCEALER_TOKEN = <span class="a">"…paste from init…"</span>
+
+<span class="c"># store &amp; use a secret — the value never hits your terminal</span>
+concealer set --name OPENAI_API_KEY --project web --env prod <span class="a">'sk-DUMMY-123'</span>
+concealer run --project web --env prod npm run deploy</div>
     <p style="text-align:center;margin-top:20px"><a class="btn ghost" href="/concealer/getting-started" data-i18n="qs_more">Read the full guide →</a></p>
   </div>
 </section>
@@ -386,11 +435,24 @@ cer run --project web --env prod npm run deploy</div>
   <div class="box">
     <button class="x" id="modalclose" aria-label="Close">×</button>
     <h3 data-i18n="modal_h">Install concealer</h3>
-    <p data-i18n="modal_p">Homebrew pulls in sops, age and expect automatically.</p>
+    <p data-i18n="modal_p">Pick your platform's package manager — each pulls in the sops/age binaries.</p>
+    <div class="cmdlabel">Homebrew <span data-i18n="modal_l_brew">· macOS / Linux</span></div>
     <div class="cmd">
       <span class="p">$</span>
-      <code id="modalcmd">brew install fxerkan/tap/concealer</code>
-      <button id="modalcopy" data-i18n="copy">Copy</button>
+      <code>brew install fxerkan/tap/concealer</code>
+      <button data-copy data-i18n="copy">Copy</button>
+    </div>
+    <div class="cmdlabel">Scoop <span>· Windows</span></div>
+    <div class="cmd">
+      <span class="p">&gt;</span>
+      <code>scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket; scoop install concealer</code>
+      <button data-copy data-i18n="copy">Copy</button>
+    </div>
+    <div class="cmdlabel">pipx <span data-i18n="modal_l_pipx">· all platforms</span></div>
+    <div class="cmd">
+      <span class="p">$</span>
+      <code>pipx install concealer</code>
+      <button data-copy data-i18n="copy">Copy</button>
     </div>
     <p class="alt" data-i18n="modal_alt">Prefer the manual route? See the <a href="/concealer/installation">Installation guide</a>.</p>
   </div>
@@ -444,7 +506,7 @@ const I18N={
  en:{nav_docs:"Docs",nav_install:"Install",nav_comparison:"Comparison",nav_support:"Support",copy:"Copy",copied:"Copied ✓",
   sup_eyebrow:"Support",sup_h:"Questions, bugs or feedback?",sup_p:"Reach out directly — we read every message and usually reply within a day.",sup_btn:"✉️ Email support",sup_issue:"Open a GitHub issue",
   hero_tag:"The local-only secret manager for the AI-coding era.",
-  hero_sub:"Encrypted with SOPS + age. No cloud, no telemetry, no account. Your agents <em>use</em> secrets without ever <em>seeing</em> them.",
+  hero_sub:"No cloud, no telemetry, no account.<br>Your agents use secrets without ever <em class=\"u\">seeing</em> them.",
   pill_local:"🔒 Local-only",pill_ai:"🤖 AI-safe by design",pill_oss:"⭐ Open source (MIT)",
   cta_start:"Get started →",cta_star:"Star on GitHub",
   feat_eyebrow:"Why concealer",feat_h:"Built for how we code now",
@@ -461,12 +523,13 @@ const I18N={
   s_mcp_h:"Agents use secrets, never see them",s_mcp_p:"Register an agent, hand it a revocable token, and it can inject a DB password to run a query — while the value stays redacted from its context. Every call is audited with source=mcp.",
   qs_eyebrow:"Quick start",qs_h:"Up and running in a minute",qs_more:"Read the full guide →",
   cta_h:"Stop pasting keys into chat windows.",cta_p:"Local-only. Portable. Open source. Built for the AI-coding era.",cta_install:"Install now",
-  modal_h:"Install concealer",modal_p:"Homebrew pulls in sops, age and expect automatically.",
+  modal_h:"Install concealer",modal_p:"Pick your platform's package manager — each pulls in the sops/age binaries.",
+  modal_l_brew:"· macOS / Linux",modal_l_pipx:"· all platforms",
   modal_alt:"Prefer the manual route? See the <a href=\"/concealer/installation\">Installation guide</a>."},
  tr:{nav_docs:"Dokümanlar",nav_install:"Kurulum",nav_comparison:"Karşılaştırma",nav_support:"Destek",copy:"Kopyala",copied:"Kopyalandı ✓",
   sup_eyebrow:"Destek",sup_h:"Soru, hata ya da geri bildirim?",sup_p:"Doğrudan yaz — her mesajı okuyoruz ve genelde bir gün içinde yanıtlıyoruz.",sup_btn:"✉️ E-posta ile destek",sup_issue:"GitHub'da konu aç",
   hero_tag:"Yapay zekâ ile kodlama çağı için yerel, tek dosyalı gizli bilgi yöneticisi.",
-  hero_sub:"SOPS + age ile şifreli. Bulut yok, telemetri yok, hesap yok. Ajanların gizli bilgileri <em>görmeden</em> <em>kullanır</em>.",
+  hero_sub:"Bulut yok, telemetri yok, hesap yok.<br>Ajanların gizli bilgileri <em class=\"u\">görmeden</em> kullanır.",
   pill_local:"🔒 Yalnızca yerel",pill_ai:"🤖 Tasarımca YZ-güvenli",pill_oss:"⭐ Açık kaynak (MIT)",
   cta_start:"Başla →",cta_star:"GitHub'da yıldızla",
   feat_eyebrow:"Neden concealer",feat_h:"Bugün nasıl kodluyorsak ona göre",
@@ -483,7 +546,8 @@ const I18N={
   s_mcp_h:"Ajanlar kullanır, asla görmez",s_mcp_p:"Bir ajan kaydet, iptal edilebilir bir token ver; DB parolasını enjekte edip sorgu çalıştırabilir — değer bağlamından maskeli kalır. Her çağrı source=mcp ile denetlenir.",
   qs_eyebrow:"Hızlı başlangıç",qs_h:"Bir dakikada çalışır durumda",qs_more:"Tüm rehberi oku →",
   cta_h:"Anahtarları sohbet penceresine yapıştırmayı bırak.",cta_p:"Yalnızca yerel. Taşınabilir. Açık kaynak. YZ çağı için.",cta_install:"Şimdi kur",
-  modal_h:"concealer kurulumu",modal_p:"Homebrew; sops, age ve expect'i otomatik kurar.",
+  modal_h:"concealer kurulumu",modal_p:"Platformunun paket yöneticisini seç — her biri sops/age ikililerini de kurar.",
+  modal_l_brew:"· macOS / Linux",modal_l_pipx:"· tüm platformlar",
   modal_alt:"Elle kurmak mı? <a href=\"/concealer/installation\">Kurulum rehberine</a> bak."}
 };
 function setLang(l){
@@ -501,8 +565,26 @@ async function copyCmd(cmd,btn){
     const l=(localStorage.getItem('concealer_lang')||'en');btn.textContent=I18N[l].copied;
     setTimeout(()=>{btn.textContent=I18N[l].copy;},1600);}catch(_){}
 }
-document.getElementById('copybtn').onclick=e=>copyCmd(document.getElementById('installcmd').textContent,e.target);
-document.getElementById('modalcopy').onclick=e=>copyCmd(document.getElementById('modalcmd').textContent,e.target);
+document.querySelectorAll('[data-copy]').forEach(btn=>{
+  btn.onclick=()=>copyCmd(btn.parentElement.querySelector('code').textContent,btn);
+});
+
+/* ===== hero OS one-liner tabs ===== */
+const CMDS={unix:['$','brew install fxerkan/tap/concealer'],
+            win:['>','scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket\nscoop install concealer']};
+function setOS(os){
+  document.getElementById('installp').textContent=CMDS[os][0];
+  document.getElementById('installcmd').textContent=CMDS[os][1];
+  document.querySelectorAll('#ostabs button').forEach(b=>b.classList.toggle('on',b.dataset.os===os));
+}
+document.querySelectorAll('#ostabs button').forEach(b=>b.onclick=()=>setOS(b.dataset.os));
+setOS(/win/i.test(navigator.platform||navigator.userAgent||'')?'win':'unix');
+
+/* ===== quick-start platform tabs ===== */
+document.querySelectorAll('#qstabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#qstabs button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('[data-qspanel]').forEach(p=>p.hidden=p.dataset.qspanel!==b.dataset.qs);
+});
 
 /* ===== mailto fallback ===== */
 /* mailto opens the native mail app only where the OS has a default handler registered.

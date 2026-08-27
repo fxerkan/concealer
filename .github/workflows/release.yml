@@ -1,6 +1,10 @@
 # Auto-release: when VERSION (in ./concealer) changes on main, cut a matching
-# tag + GitHub release (notes = that version's CHANGELOG section) and bump the
-# Homebrew tap formula (url + sha256). Idempotent: skips if the tag already exists.
+# tag + GitHub release (notes = that version's CHANGELOG section) and fan the
+# same version out to EVERY channel so they never drift:
+#   GitHub Release → PyPI (Trusted Publishing) → Scoop bucket (points at the PyPI
+#   wheel) ; Homebrew tap (independent, from the GH tag tarball).
+# Idempotent: the release/tag steps skip if the tag already exists; the tap and
+# Scoop reconcile steps run every time so a stale channel self-heals.
 # ponytail: single workflow; VERSION is the trigger, no separate version bump step.
 name: release
 
@@ -13,7 +17,8 @@ on:
 concurrency: release           # never run two releases at once
 
 permissions:
-  contents: write              # create tags + releases
+  contents: write              # create tags + releases; push the in-repo scoop manifest
+  id-token: write              # OIDC for PyPI Trusted Publishing (no stored token)
 
 jobs:
   release:
@@ -59,6 +64,73 @@ jobs:
             --title "concealer ${{ steps.v.outputs.version }}" \
             --notes-file RELEASE_NOTES.md \
             --target "${{ github.sha }}"
+
+      # ---- PyPI (all platforms) — version is read from ./concealer, so it can't drift.
+      - name: Set up Python
+        if: steps.check.outputs.exists == 'false'
+        uses: actions/setup-python@v5
+        with: { python-version: '3.x' }
+
+      - name: Build sdist + wheel
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          python -m pip install --upgrade build
+          python -m build            # → dist/*.whl + dist/*.tar.gz
+
+      - name: Publish to PyPI (Trusted Publishing)
+        if: steps.check.outputs.exists == 'false'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true        # idempotent: a re-run won't fail on an already-uploaded version
+
+      # ---- Scoop (Windows) — the manifest points at the content-addressed PyPI wheel,
+      # so it MUST run after publish. Runs every time (like the tap) so a stale bucket
+      # self-heals; commits only when something changed.
+      - name: Wait for PyPI to serve this version
+        env: { VER: "${{ steps.v.outputs.version }}" }
+        run: |
+          for i in $(seq 1 30); do
+            curl -fsSL "https://pypi.org/pypi/concealer/${VER}/json" -o pypi.json && break
+            echo "waiting for pypi ${VER}… ($i)"; sleep 10
+          done
+          [ -s pypi.json ] || { echo "::error::pypi did not serve ${VER} in time"; exit 1; }
+
+      - name: Bump Scoop bucket
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}   # PAT also needs contents:write on fxerkan/scoop-bucket
+          VER: ${{ steps.v.outputs.version }}
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "::error::HOMEBREW_TAP_TOKEN secret is not set"; exit 1; }
+          # pull the real content-addressed wheel url + sha256 from the PyPI release JSON
+          INFO=$(python3 - <<'PY'
+          import json
+          d=json.load(open("pypi.json"))
+          w=next(u for u in d["urls"] if u["packagetype"]=="bdist_wheel")
+          print(w["url"], w["digests"]["sha256"])
+          PY
+          )
+          URL=${INFO% *}; SHA=${INFO#* }
+          echo "wheel: $URL  $SHA"
+          # rewrite the in-repo manifest (version + url#fragment + hash), preserving key order + ## comments
+          python3 - "$VER" "$URL" "$SHA" <<'PY'
+          import json,sys
+          ver,url,sha=sys.argv[1:4]
+          p="packaging/scoop/concealer.json"
+          d=json.load(open(p))
+          d["version"]=ver; d["url"]=url+"#/concealer.whl"; d["hash"]=sha
+          json.dump(d,open(p,"w"),indent=2); open(p,"a").write("\n")
+          PY
+          BOT_NAME="github-actions[bot]"; BOT_EMAIL="41898282+github-actions[bot]@users.noreply.github.com"
+          # mirror to the bucket repo (the authoritative channel users `scoop install` from)
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/fxerkan/scoop-bucket.git" bucketrepo
+          DEST=bucketrepo/concealer.json; [ -d bucketrepo/bucket ] && DEST=bucketrepo/bucket/concealer.json
+          cp packaging/scoop/concealer.json "$DEST"
+          ( cd bucketrepo
+            git config user.name "$BOT_NAME"; git config user.email "$BOT_EMAIL"
+            git add -A && git commit -m "concealer ${VER}" && git push || echo "scoop bucket already up to date" )
+          # best-effort: commit the refreshed in-repo manifest back to main (never fail the release on branch protection)
+          git config user.name "$BOT_NAME"; git config user.email "$BOT_EMAIL"
+          git commit -am "scoop: concealer ${VER}" && git push || echo "in-repo scoop manifest unchanged or push blocked"
 
       # Reconcile the tap formula to the current VERSION. Runs every time (not gated on
       # the release-exists check) so a stale tap self-heals; commits only if it changed.
