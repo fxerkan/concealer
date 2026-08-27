@@ -15,6 +15,15 @@
 
 <div id="status" class="status"></div>
 
+<section id="setup" hidden>
+  <div class="setupcard">
+    <b>One-time setup</b>
+    <p>Run this in your terminal, then reopen the extension:</p>
+    <div class="cmd"><code id="setupcmd">cer chrome-extension</code><button class="ghost ico" id="setupcopy" title="copy">📋</button></div>
+    <p class="dim">Registers the native helper so concealer opens on demand — no <code>cer web</code> needed. Requires concealer installed (<code>brew install fxerkan/tap/concealer</code>).</p>
+  </div>
+</section>
+
 <section id="unlock" hidden>
   <input id="pw" type="password" placeholder="Master password" autocomplete="off">
   <button id="unlockbtn" class="primary">Unlock</button>
@@ -60,6 +69,9 @@
     <label class="setrow">Extension auto-lock (seconds)<input id="s_idle" type="number" min="10"></label>
     <label class="setrow">Reveal auto-hide (seconds)<input id="s_reveal" type="number" min="5" max="30"></label>
     <div class="setinfo" id="s_info"></div>
+    <div class="setrow">Developer — authorize this build's ID for the native host
+      <div class="cmd"><code id="s_devcmd" class="mono"></code><button class="ghost ico" id="s_devcopy" title="copy">📋</button></div>
+    </div>
     <button class="ghost full" id="s_web">Open full settings in web UI →</button>
     <div class="setver" id="s_ver"></div>
   </div>

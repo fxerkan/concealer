@@ -10,18 +10,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 
 ### Added
 - **Chrome extension** (`extension/`) — open the vault and copy secret values from the toolbar,
-  without typing `cer web`. The popup starts `concealer web` **on demand** via a cross-platform
-  native-messaging host (macOS/Linux/Windows) and the server **self-exits after 15 min idle**, so
-  nothing lingers. One-time setup: `python3 extension/install.py` then load `extension/` unpacked.
-  Deterministic extension ID; `--uninstall` reverts. Features:
+  without typing `cer web`. The popup starts `concealer web` **on demand** via a native-messaging
+  host **built into concealer** (macOS/Linux/Windows) and the server **self-exits after 15 min
+  idle**, so nothing lingers. One-time OS setup is a single command — **`cer chrome-extension`**
+  (registers the host; `--add-id <id>` authorizes dev builds, `--list`, `--uninstall`); the popup
+  shows a setup card with that command until it's registered. `extension/build.py` packages a
+  Chrome Web Store zip (self-signed `key` stripped); `.github/workflows/publish-extension.yml`
+  automates the upload. Features:
   - **Per-field copy** — multi-field secrets expand into child rows (secret + non-secret), each
     with its own copy button and a reveal (eye) for secret fields; single-field secrets one-click copy.
   - **Auto-lock countdown** in the header that locks the popup when the server's idle-lock expires.
   - **Generate** (🎲) — client-side password/hex/base64url/UUID generator, copy to clipboard.
   - **Settings** (⚙) — clipboard auto-clear seconds, server/vault info, link to full web settings.
   - Globe button and the brand name both open the full web UI.
-  - The installer auto-detects the **global `~/.concealer` vault** and runs the newer repo server
-    against it (so the extension shows your real secrets, not a repo-local vault).
+  - **Settings → Developer** shows this build's extension ID + the `--add-id` command to authorize it.
 
 ### Changed
 - **Web server: header-token auth for the extension.** `/api/*` now accepts `X-Concealer-Token`

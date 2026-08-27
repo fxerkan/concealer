@@ -23,11 +23,9 @@ keys/backup.json
 *.code-workspace
 .DS_Store
 
-# Chrome extension native-host: machine-specific generated files (abs paths, launcher, manifest copy)
-extension/nativehost/config.json
-extension/nativehost/run_host.sh
-extension/nativehost/run_host.bat
-extension/nativehost/com.concealer.host.json
+# concealer chrome-extension: local native-host state (written into the vault HOME; abs paths)
+/chrome/
+/chrome_ext.json
 
 # docs local preview (Jekyll build output + per-machine gem lock)
 docs/_site/

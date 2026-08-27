@@ -20,7 +20,7 @@ function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; cle
 // page it gets clipped. Grow <body> to the modal's height while it's open, reset on close.
 function fitModal(id){ const s=$("#"+id).querySelector(".sheet"); if(s) document.body.style.minHeight=(s.offsetHeight+28)+"px"; }  // offsetHeight forces sync layout
 function closeModal(id){ $("#"+id).hidden=true; document.body.style.minHeight=""; }
-function show(id){ for(const s of ["unlock","list"]) $("#"+s).hidden = (s!==id); }
+function show(id){ for(const s of ["setup","unlock","list"]) $("#"+s).hidden = (s!==id); }
 function setStatus(msg,err){ const s=$("#status"); s.textContent=msg||""; s.className="status"+(err?" err":""); }
 
 async function getToken(){ return (await chrome.storage.session.get("tok")).tok || null; }
@@ -86,13 +86,15 @@ async function boot(){
   await loadPrefs();
   TOKEN = await getToken();
   const ens = await ensureServer();
-  let s=null;
-  for(let i=0;i<20;i++){ s=await sessionUp(); if(s) break; await new Promise(r=>setTimeout(r,250)); }
+  const hostMissing = ens.ok===false && /not found|forbidden|access/i.test(ens.err||"");
+  let s = await sessionUp();
+  if(!s && !hostMissing){   // host is (probably) starting the server → poll briefly while it binds
+    for(let i=0;i<20 && !s;i++){ await new Promise(r=>setTimeout(r,250)); s=await sessionUp(); }
+  }
   if(!s){
-    if(ens.ok===false && /not found|forbidden|access/i.test(ens.err||""))
-      setStatus("Native host not installed. Run `python3 extension/install.py`, then restart Chrome.", true);
-    else
-      setStatus("Couldn't reach the concealer server ("+(ens.err||"no connection")+").", true);
+    setStatus("");
+    if(hostMissing) show("setup");   // native host not registered → show the `cer chrome-extension` card
+    else setStatus("Couldn't reach the concealer server ("+(ens.err||"no connection")+").", true);
     return;
   }
   setStatus(""); IDLE = s.idle||0;
@@ -255,6 +257,7 @@ async function openSettings(){
   $("#s_ver").innerHTML=`conceal<span class="ac">er</span> · v${chrome.runtime.getManifest().version}`;
   const info=$("#s_info");
   info.innerHTML=`<div><span>Port</span><span>${PORT}</span></div><div><span>Server auto-lock</span><span>${IDLE?Math.round(IDLE/60)+" min":"—"}</span></div>`;
+  $("#s_devcmd").textContent = "cer chrome-extension --add-id " + (chrome.runtime.id||"");
   $("#setModal").hidden=false; fitModal("setModal");
   try{ const s=await (await api("/api/settings")).json(); if(s&&"hardened"in s){ info.innerHTML+=`<div><span>Vault hardened</span><span>${s.hardened?"yes":"no"}</span></div>`; fitModal("setModal"); } }catch(e){}
 }
@@ -289,6 +292,8 @@ $("#g_copy").onclick=async()=>{
   toast(CLIP_CLEAR>0?`copied — clears in ${CLIP_CLEAR}s`:"copied");
   if(CLIP_CLEAR>0) setTimeout(()=>navigator.clipboard.writeText("").catch(()=>{}),CLIP_CLEAR*1000);
 };
+$("#setupcopy").onclick=async()=>{ await navigator.clipboard.writeText($("#setupcmd").textContent); toast("copied command"); };
+$("#s_devcopy").onclick=async()=>{ await navigator.clipboard.writeText($("#s_devcmd").textContent); toast("copied command"); };
 for(const n of ["dark","light","matrix"]) $("#th_"+n).onclick=()=>setTheme(n);
 $("#settings").onclick=openSettings;
 $("#setClose").onclick=()=>{ saveSettings(); closeModal("setModal"); };

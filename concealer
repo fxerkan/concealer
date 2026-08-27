@@ -2494,6 +2494,7 @@ def _mkhelp():
         R("tui", "interactive terminal UI (arrow keys, search, add/del/reveal)"),
         R("web [port]", "serve the web UI + JSON API (default 8787)"),
         R("mcp", "MCP stdio server (for agents; needs CONCEALER_TOKEN)"),
+        R("chrome-extension", "register the Chrome extension's native host (one-time OS setup)"),
         R("version | help", "version / this help"),
         "",
         "TYPES",
@@ -2541,10 +2542,150 @@ def _preflight():
     sys.exit(f"missing dependency: {', '.join(missing)}\ninstall: {hint}\n"
              "(with homebrew, 'brew install fxerkan/tap/concealer' installs everything together)")
 
+# ---------------- Chrome extension: built-in native-messaging host + one-time setup ----------------
+# The host lives INSIDE concealer (no separate script), so a brew/scoop install needs no extra files.
+# `concealer chrome-extension` registers a launcher that runs `concealer native-host`; the extension
+# popup calls it to start `concealer web` on demand.
+_HOST_NAME = "com.concealer.host"
+_EXT_DEV_ID = "bkogcelhpcfdfceaoickckmikhglgpae"   # deterministic ID from the repo manifest "key" (unpacked dev build)
+_EXT_STORE_ID = ""    # filled in after the first Chrome Web Store upload (the store assigns its own ID)
+
+def native_host():
+    """Chrome native-messaging host (stdio). One request per launch:
+    {"cmd":"ensure","port":8787} → start `concealer web <port>` if nothing is listening, then reply."""
+    import struct, socket, time as _t
+    def port_open(p):
+        with socket.socket() as s:
+            s.settimeout(0.3)
+            try: s.connect(("127.0.0.1", p)); return True
+            except OSError: return False
+    def reply(o):
+        b = json.dumps(o).encode()
+        sys.stdout.buffer.write(struct.pack("@I", len(b))); sys.stdout.buffer.write(b); sys.stdout.buffer.flush()
+    raw = sys.stdin.buffer.read(4)
+    if len(raw) < 4: return
+    n = struct.unpack("@I", raw)[0]
+    try: msg = json.loads(sys.stdin.buffer.read(n).decode())
+    except Exception: msg = {}
+    if msg.get("cmd") != "ensure": return reply({"ok": False, "err": "unknown cmd"})
+    port = int(msg.get("port") or 8787)
+    if port_open(port): return reply({"ok": True, "running": True, "port": port})
+    env = dict(os.environ); env["CONCEALER_NO_OPEN"] = "1"; env.setdefault("CONCEALER_WEB_IDLE_EXIT", "900")
+    kw = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL, "stdin": subprocess.DEVNULL, "env": env}
+    if os.name == "nt": kw["creationflags"] = 0x00000008 | 0x00000200  # DETACHED_PROCESS|CREATE_NEW_PROCESS_GROUP
+    else: kw["start_new_session"] = True
+    try: subprocess.Popen([sys.executable, os.path.realpath(__file__), "web", str(port)], **kw)
+    except Exception as e: return reply({"ok": False, "err": f"launch failed: {e}"})
+    for _ in range(40):   # wait up to ~6s for it to bind
+        if port_open(port): return reply({"ok": True, "running": True, "port": port, "started": True})
+        _t.sleep(0.15)
+    reply({"ok": False, "err": "server did not come up in time"})
+
+def _chrome_state():   # persisted extra allowed-origin IDs (so re-runs keep dev IDs you've added)
+    return os.path.join(HOME, "chrome_ext.json")
+def _chrome_dir():     # where the launcher (and, on Windows, the manifest) live
+    d = os.path.join(HOME, "chrome"); os.makedirs(d, exist_ok=True); return d
+
+def _chrome_browser_targets():
+    home = os.path.expanduser("~")
+    if sys.platform == "darwin":
+        base = os.path.join(home, "Library", "Application Support")
+        subs = ["Google/Chrome", "Google/Chrome Beta", "Google/Chrome Canary", "Chromium",
+                "BraveSoftware/Brave-Browser", "Microsoft Edge"]
+    else:
+        base = os.path.join(home, ".config")
+        subs = ["google-chrome", "google-chrome-beta", "chromium", "BraveSoftware/Brave-Browser", "microsoft-edge"]
+    return base, subs
+
+def install_chrome_extension(args):
+    """One-time OS setup so the Chrome extension can start `concealer web` on demand."""
+    import stat, json as _json
+    if "--uninstall" in args: return _chrome_uninstall()
+    add = [args[i+1] for i, x in enumerate(args) if x == "--add-id" and i+1 < len(args)]
+    # merge allowed IDs: built-in dev + store (once known) + previously-added + newly-added
+    ids = {_EXT_DEV_ID}
+    if _EXT_STORE_ID: ids.add(_EXT_STORE_ID)
+    os.makedirs(HOME, exist_ok=True)
+    if os.path.exists(_chrome_state()):
+        try: ids |= set(_json.load(open(_chrome_state())).get("ids", []))
+        except Exception: pass
+    ids |= set(add)
+    if "--list" in args:
+        print("allowed extension IDs:"); [print("  " + i) for i in sorted(ids)]; return
+    _json.dump({"ids": sorted(ids)}, open(_chrome_state(), "w"), indent=2)
+
+    python = sys.executable or shutil.which("python3") or "python3"
+    concealer = os.path.realpath(__file__)
+    origins = [f"chrome-extension://{i}/" for i in sorted(ids)]
+    man = {"name": _HOST_NAME, "description": "concealer native messaging host", "type": "stdio",
+           "allowed_origins": origins}
+    # Chrome launches native hosts with a minimal env → pin PATH (find sops/age) and CONCEALER_HOME.
+    d = _chrome_dir()
+    if os.name == "nt":
+        launcher = os.path.join(d, "run_host.bat")
+        lines = ['@echo off', f'set "PATH={os.environ.get("PATH","")}"']
+        if os.environ.get("CONCEALER_HOME"): lines.append(f'set "CONCEALER_HOME={os.environ["CONCEALER_HOME"]}"')
+        lines.append(f'"{python}" "{concealer}" native-host')
+        open(launcher, "w", newline="\r\n").write("\r\n".join(lines) + "\r\n")
+    else:
+        launcher = os.path.join(d, "run_host.sh")
+        lines = ["#!/bin/sh", f'export PATH="{os.environ.get("PATH","")}"']
+        if os.environ.get("CONCEALER_HOME"): lines.append(f'export CONCEALER_HOME="{os.environ["CONCEALER_HOME"]}"')
+        lines.append(f'exec "{python}" "{concealer}" native-host')
+        open(launcher, "w").write("\n".join(lines) + "\n")
+        os.chmod(launcher, os.stat(launcher).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+    man["path"] = launcher
+
+    written = []
+    if os.name == "nt":
+        import winreg
+        mpath = os.path.join(d, _HOST_NAME + ".json"); _json.dump(man, open(mpath, "w"), indent=2)
+        for root in [r"Software\Google\Chrome\NativeMessagingHosts",
+                     r"Software\Microsoft\Edge\NativeMessagingHosts",
+                     r"Software\Chromium\NativeMessagingHosts"]:
+            try:
+                k = winreg.CreateKey(winreg.HKEY_CURRENT_USER, root + "\\" + _HOST_NAME)
+                winreg.SetValueEx(k, "", 0, winreg.REG_SZ, mpath); winreg.CloseKey(k); written.append(root)
+            except OSError as e: print(f"  skip {root}: {e}")
+    else:
+        base, subs = _chrome_browser_targets()
+        targets = [os.path.join(base, s) for s in subs if os.path.isdir(os.path.join(base, s))] or [os.path.join(base, subs[0])]
+        for t in targets:
+            nh = os.path.join(t, "NativeMessagingHosts"); os.makedirs(nh, exist_ok=True)
+            _json.dump(man, open(os.path.join(nh, _HOST_NAME + ".json"), "w"), indent=2); written.append(nh)
+
+    print("✓ concealer Chrome extension native host registered.")
+    print(f"  vault   : {os.environ.get('CONCEALER_HOME') or HOME}")
+    print(f"  IDs     : {', '.join(sorted(ids))}")
+    for w in written: print("  host    : " + w)
+    print("\nNow open the concealer extension in Chrome — no need to type `cer web`.")
+    print("Add a dev/unpacked build's ID:  concealer chrome-extension --add-id <extension-id>")
+
+def _chrome_uninstall():
+    removed = []
+    for p in [os.path.join(_chrome_dir(), "run_host.sh"), os.path.join(_chrome_dir(), "run_host.bat"),
+              os.path.join(_chrome_dir(), _HOST_NAME + ".json"), _chrome_state()]:
+        if os.path.exists(p): os.remove(p); removed.append(p)
+    if os.name == "nt":
+        import winreg
+        for root in [r"Software\Google\Chrome\NativeMessagingHosts",
+                     r"Software\Microsoft\Edge\NativeMessagingHosts",
+                     r"Software\Chromium\NativeMessagingHosts"]:
+            try: winreg.DeleteKey(winreg.HKEY_CURRENT_USER, root + "\\" + _HOST_NAME); removed.append(root)
+            except OSError: pass
+    else:
+        base, subs = _chrome_browser_targets()
+        for s in subs:
+            p = os.path.join(base, s, "NativeMessagingHosts", _HOST_NAME + ".json")
+            if os.path.exists(p): os.remove(p); removed.append(p)
+    print("removed:" if removed else "nothing to remove")
+    for r in removed: print("  " + r)
+
 def cli(argv):
     cmd = argv[0] if argv else "help"; a = argv[1:]
     if cmd in ("version", "--version", "-v"): return print("concealer " + VERSION)
     if cmd in ("help", "--help", "-h", ""): return print(HELP)
+    if cmd == "native-host": return native_host()   # Chrome-invoked stdio host: no preflight (keeps stdout clean)
     _preflight()
     if cmd == "init": return init("--force" in a)
     if cmd == "passwd": return passwd()
@@ -2818,6 +2959,7 @@ def cli(argv):
         print(out or "(no match)")
     elif cmd == "web": serve_web(int(a[0]) if a else 8787)
     elif cmd == "mcp": mcp_stdio()
+    elif cmd in ("chrome-extension", "chrome-ext"): install_chrome_extension(a)
     else:
         print(HELP)
 

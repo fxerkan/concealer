@@ -1,0 +1,45 @@
+# Build the Chrome extension zip and publish it to the Chrome Web Store.
+#
+# Manual trigger only (publishing is a deliberate act). Do the FIRST upload by hand in the
+# dashboard to create the item, get its ID, and set the listing + privacy policy — CI handles
+# version bumps after that.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   CWS_EXTENSION_ID   the store-assigned item ID (from the dashboard)
+#   CWS_CLIENT_ID      Google OAuth client id  (Cloud console, Chrome Web Store API enabled)
+#   CWS_CLIENT_SECRET  Google OAuth client secret
+#   CWS_REFRESH_TOKEN  OAuth refresh token for the account that owns the item
+# See: https://developer.chrome.com/docs/webstore/using-api
+name: publish-extension
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish live after upload (false = upload as draft only)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build zip (strips the self-signed key)
+        run: python3 extension/build.py
+      - name: Find zip
+        id: zip
+        run: echo "path=$(ls dist/concealer-extension-*.zip)" >> "$GITHUB_OUTPUT"
+      # Pin to a commit SHA in production for supply-chain safety (this is a 3rd-party action).
+      - name: Upload to Chrome Web Store
+        uses: mnao305/chrome-extension-upload@v5.0.0
+        with:
+          file-path: ${{ steps.zip.outputs.path }}
+          extension-id: ${{ secrets.CWS_EXTENSION_ID }}
+          client-id: ${{ secrets.CWS_CLIENT_ID }}
+          client-secret: ${{ secrets.CWS_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CWS_REFRESH_TOKEN }}
+          publish: ${{ inputs.publish }}

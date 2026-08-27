@@ -85,6 +85,15 @@ button.ok{color:var(--ok);border-color:var(--ok)}
 .status{padding:0 12px;color:var(--mut);font-size:12px}
 .status:empty{display:none}
 .status.err{color:var(--bad);padding:12px}
+.setupcard{background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:14px}
+.setupcard b{font-size:14px}
+.setupcard p{margin:8px 0;color:var(--mut);font-size:12px}
+.setupcard p.dim{font-size:11px;opacity:.85}
+.setupcard code{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:11px}
+.cmd{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line2);
+  border-radius:8px;padding:6px 8px;margin:8px 0}
+.cmd code{flex:1;background:none;border:none;font-family:ui-monospace,Menlo,monospace;font-size:12px;
+  color:var(--acc2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0}
 .empty{color:var(--mut);text-align:center;padding:16px}
 
 /* modals */
