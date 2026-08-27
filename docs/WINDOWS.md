@@ -44,12 +44,21 @@ concealer version
 `sops` and `age` must be on `PATH`. concealer's preflight check fails loudly with
 an install hint if either is missing.
 
-### Option B — Scoop / winget
+### Option B — Scoop
 
-Draft manifests live under [`packaging/scoop/`](../packaging/scoop/) and
-[`packaging/winget/`](../packaging/winget/). They still install `sops`, `age`, and
-concealer (via pip/pipx under the hood). See those files for status — they're
-finalized once a versioned release is published to PyPI.
+concealer has its own Scoop bucket:
+
+```powershell
+scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket
+scoop install concealer      # pulls in python + sops + age; pip fetches pywinpty/windows-curses
+```
+
+(The bucket's manifest installs the published PyPI wheel. `scoop.sh`'s global search
+lists the bucket once its crawler re-indexes; the `scoop bucket add` line above works
+immediately regardless.)
+
+**winget** needs a bundled `.exe` and is still deferred — see
+[`packaging/winget/`](../packaging/winget/). Until then use Scoop or `pipx`.
 
 ### Option C — run the flat script
 

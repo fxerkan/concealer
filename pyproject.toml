@@ -18,12 +18,12 @@ build-backend = "hatchling.build"
 [project]
 name = "concealer"
 dynamic = ["version"]
-description = "Local-only secret manager: a typed, scoped, audited wrapper over SOPS + age with a web UI and MCP server."
+description = "Local‑only, single‑file secret manager for the AI‑coding era. CLI, TUI, Web UI, MCP server."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
 authors = [{ name = "fxerkan", email = "fxerkan@gmail.com" }]
-keywords = ["secrets", "sops", "age", "vault", "mcp", "secret-manager"]
+keywords = ["secrets", "ai", "credentials", "vault", "mcp", "secret-manager"]
 classifiers = [
   "Environment :: Console",
   "Intended Audience :: Developers",
@@ -41,8 +41,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/fxerkan/concealer"
-Documentation = "https://fxerkan.github.io/concealer/"
+Homepage = "https://fxerkan.github.io/concealer/"
+Documentation = "https://fxerkan.github.io/concealer/getting-started"
 Source = "https://github.com/fxerkan/concealer"
 
 [project.scripts]

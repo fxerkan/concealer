@@ -45,9 +45,19 @@ scoop install sops age            # the binaries it wraps (Windows); brew/apt el
 ```
 
 `sops`/`age` are external binaries and are **not** pip packages — install them with
-your OS package manager. On Windows this is the recommended path; see the
-[Windows guide]({{ site.baseurl }}/WINDOWS) for Scoop, environment variables, and
-the security caveats.
+your OS package manager.
+
+## Scoop (Windows)
+
+concealer has its own Scoop bucket:
+
+```powershell
+scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket
+scoop install concealer          # pulls in python + sops + age
+```
+
+See the [Windows guide]({{ site.baseurl }}/WINDOWS) for environment variables and the
+security caveats.
 
 ---
 

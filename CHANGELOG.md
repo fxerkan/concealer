@@ -6,6 +6,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.14] — 2026-08-27
+
+### Changed
+- **PyPI page: dropped the redundant top logo** — the hero banner already shows the logo, so the
+  extra logo above it is gone.
+- **Scoop bucket published** (`fxerkan/scoop-bucket`): `scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket && scoop install concealer`. The in-repo `packaging/scoop/concealer.json` tracks the live PyPI wheel url/hash.
+
+## [0.9.13] — 2026-08-27
+
+### Changed
+- **PyPI page polish** (metadata is fixed at upload time, so this needed a new release): the
+  package `description` is now the tagline *"The local-only secret manager for the AI-coding era"*
+  (with the docs link); **Project links** point Homepage → the docs site and Documentation →
+  `/getting-started`. README images now use **absolute `raw.githubusercontent.com` URLs** so they
+  render on PyPI (they were relative and showed as broken images).
+
 ## [0.9.12] — 2026-08-26
 
 ### Added
