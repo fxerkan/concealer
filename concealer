@@ -15,7 +15,15 @@ import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse
 import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil, fnmatch, gc
 from datetime import datetime, timezone, timedelta
 
-VERSION = "0.9.11"   # advances through 0.x; 1.0 = reserved for the full live/release version
+if sys.platform.startswith("win"):
+    # Windows: a redirected stdout/stderr (pipe, file, CI) defaults to the ANSI code
+    # page (cp1252), so printing "→" or box-drawing glyphs raises UnicodeEncodeError.
+    # Force UTF-8 so CLI/MCP output is byte-safe everywhere. No effect on Unix.
+    for _s in (sys.stdout, sys.stderr):
+        try: _s.reconfigure(encoding="utf-8")
+        except Exception: pass
+
+VERSION = "0.9.12"   # advances through 0.x; 1.0 = reserved for the full live/release version
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -195,9 +203,24 @@ def load():
 
 def save(d):
     cmd = ["sops", "--encrypt", "--input-type", "json", "--output-type", "yaml",
-           "--filename-override", FILE, "/dev/stdin"]
+           "--filename-override", FILE]
     if os.path.exists(SOPSCFG): cmd[1:1] = ["--config", SOPSCFG]
-    r = subprocess.run(cmd, input=json.dumps(d), env=_env(), capture_output=True, text=True)
+    payload = json.dumps(d)
+    if sys.platform.startswith("win"):
+        # Windows has no /dev/stdin, so sops must read a real file. Write it inside the
+        # ACL-locked keys/ dir (inherits user-only access), then delete right after.
+        # Documented caveat (docs/WINDOWS.md): the vault plaintext briefly touches an
+        # ACL-restricted temp file here, unlike the /dev/stdin (no-disk) path on Unix.
+        import concealer_win
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(KEY), suffix=".json")
+        try:
+            os.write(fd, payload.encode()); os.close(fd); concealer_win.secure_file(tmp)
+            r = subprocess.run(cmd + [tmp], env=_env(), capture_output=True, text=True)
+        finally:
+            try: os.remove(tmp)
+            except OSError: pass
+    else:
+        r = subprocess.run(cmd + ["/dev/stdin"], input=payload, env=_env(), capture_output=True, text=True)
     if r.returncode: sys.exit(f"encrypt error: {r.stderr.strip()}")
     with open(FILE, "w") as f: f.write(r.stdout)
 
@@ -1152,6 +1175,11 @@ def _auto_backup_maybe():
 
 # ---------------- age (expect) / master password ----------------
 def _age_pw(args, passphrase, confirm=False):
+    if sys.platform.startswith("win"):
+        # Windows has no `expect`/`/dev/tty`; drive age through a ConPTY (pywinpty).
+        # This branch is never taken on Unix — the expect path below is unchanged.
+        import concealer_win
+        return concealer_win.age_pw(args, passphrase, confirm)
     # NOTE: age's encrypt prompt is "Enter passphrase (leave empty ...): " → its end is NOT "passphrase:".
     # So match on the "passphrase" substring (present in both the encrypt and decrypt prompts),
     # otherwise every call times out and waits 30s.
@@ -1393,6 +1421,8 @@ def init(force=False):
     print(_c("Setting up vault…", "1") + f"  ({HOME})\n")
     print(_c("Step 1/2", "38;5;203;1") + " — set a master password (this opens the vault; if lost you need a recovery code).")
     os.makedirs(os.path.dirname(KEY), exist_ok=True)
+    if sys.platform.startswith("win"):
+        import concealer_win; concealer_win.secure_dir(os.path.dirname(KEY))  # user-only ACL (chmod 0600 is a no-op on Windows)
     for f in (KEY, PUBKEY, BACKUP, MASTER):
         if os.path.exists(f): os.remove(f)
     r = subprocess.run(["age-keygen", "-o", KEY], capture_output=True, text=True)
@@ -1830,6 +1860,19 @@ def _tui_main(scr, data):
 
     # ---- clipboard ----
     def clip(val, what):
+        if sys.platform.startswith("win"):
+            try:
+                subprocess.run(["clip"], input=str(val), text=True, check=True)  # clip.exe reads stdin
+                # auto-clear after CLIP_CLEAR seconds via a detached, hidden PowerShell
+                subprocess.Popen(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command",
+                                  f"Start-Sleep {CLIP_CLEAR}; Set-Clipboard -Value ' '"],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                e = cur()
+                if e: audit("copy", key=e["name"], source="tui", detail=what)
+                st["msg"] = L("copied %s → clipboard (clears in %ds)", what, CLIP_CLEAR)
+            except Exception:
+                st["msg"] = L("no clipboard tool found (pbcopy / xclip / wl-copy)")
+            return
         for tool in (["pbcopy"], ["xclip", "-selection", "clipboard"], ["wl-copy"]):
             if shutil.which(tool[0]):
                 try:
@@ -2479,10 +2522,18 @@ HELP = _mkhelp()
 # external dependencies; the brew formula installs these automatically, but give a clear error on manual install.
 _DEPS = {"sops": "sops", "age": "age", "age-keygen": "age", "expect": "expect"}
 def _preflight():
-    missing = sorted({_DEPS[b] for b in _DEPS if not shutil.which(b)})
+    _win = sys.platform.startswith("win")
+    deps = {b: p for b, p in _DEPS.items() if not (_win and b == "expect")}  # Windows: pywinpty replaces expect
+    missing = sorted({deps[b] for b in deps if not shutil.which(b)})
+    if _win:
+        try: import winpty  # noqa: F401 — the ConPTY driver for age (see concealer_win.py)
+        except ImportError: missing.append("pywinpty (pip install pywinpty)")
     if not missing: return
-    hint = ("brew install " + " ".join(missing)) if shutil.which("brew") else \
-           ("install with apt/dnf: " + ", ".join(missing))
+    if _win:
+        hint = "scoop install sops age  (and: pip install pywinpty)"
+    else:
+        hint = ("brew install " + " ".join(missing)) if shutil.which("brew") else \
+               ("install with apt/dnf: " + ", ".join(missing))
     sys.exit(f"missing dependency: {', '.join(missing)}\ninstall: {hint}\n"
              "(with homebrew, 'brew install fxerkan/tap/concealer' installs everything together)")
 
@@ -3193,6 +3244,9 @@ def mcp_stdio():
             send({"jsonrpc": "2.0", "id": mid, "result": {"content": [{"type": "text", "text": text}]}})
         elif mid is not None:
             send({"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": f"method not found: {m}"}})
+
+def _run():   # console_scripts entry point (pipx/PyPI); flat `./concealer` still uses the guard below
+    cli(sys.argv[1:])
 
 if __name__ == "__main__":
     cli(sys.argv[1:])

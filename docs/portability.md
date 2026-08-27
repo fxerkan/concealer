@@ -39,6 +39,8 @@ concealer list                 # works — machine-independent
 
 A copied folder is **inert** until someone types the master password (or a recovery code). That's the security property: portability without machine-binding, and no plaintext key travels with the files.
 
+The vault is also **cross-platform**: a vault created on macOS/Linux opens on **Windows** and vice-versa (same SOPS+age format). On Windows use `$env:CONCEALER_TOKEN`/`setx` and see the [Windows guide]({{ site.baseurl }}/WINDOWS) for the (minor) at-rest caveats.
+
 ---
 
 ## Encrypted export / import bundles

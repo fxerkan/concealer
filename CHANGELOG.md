@@ -6,6 +6,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.12] — 2026-08-26
+
+### Added
+- **Native Windows support** (no WSL required). `age` reads the console rather than stdin, which the
+  Unix build drives with `expect`; Windows has neither `expect` nor `/dev/tty`, so a new Windows-only
+  helper (`concealer_win.py`) gives `age` a real ConPTY via **pywinpty** and types the passphrase into
+  it — the same interaction, through the Windows console API. The Unix `expect` path is **unchanged**;
+  `_age_pw` just takes an early Windows branch. The TUI works on Windows via **windows-curses**, and
+  clipboard copy uses `clip` + PowerShell auto-clear. See `docs/WINDOWS.md` for setup and the security
+  caveats (Windows `chmod` only flips the read-only bit — the vault relies on `icacls`/NTFS ACLs, and
+  concealer best-effort-locks its `keys/` files to the current user).
+- **Published to PyPI — `pipx install concealer`** now works on all platforms
+  ([pypi.org/project/concealer](https://pypi.org/project/concealer/)). PyPI packaging
+  (`pyproject.toml`, hatchling) ships the flat script as the `concealer` package with `webui.html`
+  bundled and `pywinpty`/`windows-curses` as Windows-only deps. `sops`/`age` remain external binaries
+  (install via scoop/winget/brew/apt). A **Scoop** manifest (real PyPI wheel url/hash) and **winget**
+  notes live under `packaging/`.
+- **Windows portability fixes found by the CI smoke test** (`packaging/ci/win_smoke.py`,
+  run on `windows-latest`): (a) force UTF-8 on `stdout`/`stderr` — a redirected Windows
+  stream defaults to cp1252, so printing `→`/box-drawing raised `UnicodeEncodeError` in
+  pipes/CI; (b) `save()` can't use `/dev/stdin` on Windows, so it now writes the plaintext
+  to an ACL-locked temp file in `keys/` and deletes it immediately (documented at-rest
+  caveat in `docs/WINDOWS.md`). Both are Windows-only branches; Unix is byte-for-byte unchanged.
+- **Verified green on a real `windows-latest` runner:** all five interfaces pass end-to-end —
+  `age/pty` (pywinpty round-trip), `CLI` (init + agent register + set/get/list, masking),
+  `web` (`/api/unlock` → age decrypt in-process, masked `/api/secrets`), `MCP`
+  (`tools/list` + `list_secrets`, value never leaked), and `TUI` (windows-curses render + quit).
+
 ## [0.9.11] — 2026-08-26
 
 ### Changed

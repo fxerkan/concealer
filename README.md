@@ -8,6 +8,7 @@
   <a href="https://github.com/fxerkan/concealer/stargazers"><img src="https://img.shields.io/github/stars/fxerkan/concealer?style=for-the-badge&logo=github&color=ff4d4d&labelColor=0a0b0d" alt="GitHub stars"></a>
   <a href="https://github.com/fxerkan/concealer/blob/main/LICENSE"><img src="https://img.shields.io/github/license/fxerkan/concealer?style=for-the-badge&color=ff4d4d&labelColor=0a0b0d" alt="MIT License"></a>
   <a href="https://github.com/fxerkan/homebrew-tap"><img src="https://img.shields.io/badge/brew-fxerkan%2Ftap%2Fconcealer-ff4d4d?style=for-the-badge&logo=homebrew&labelColor=0a0b0d" alt="Homebrew"></a>
+  <a href="https://pypi.org/project/concealer/"><img src="https://img.shields.io/pypi/v/concealer?style=for-the-badge&logo=pypi&logoColor=white&color=ff4d4d&labelColor=0a0b0d" alt="PyPI"></a>
   <a href="https://fxerkan.github.io/concealer/"><img src="https://img.shields.io/badge/docs-fxerkan.github.io-ff4d4d?style=for-the-badge&labelColor=0a0b0d" alt="Docs"></a>
 </p>
 
@@ -97,10 +98,18 @@ Why this stack: SOPS is a CNCF project used by thousands of teams; age is a mode
 
 ## Install
 
+**Runs natively on macOS, Linux, and Windows** — all four interfaces (CLI · Web · MCP · TUI) are verified on each in CI.
+
 ```bash
-# Homebrew (recommended) — pulls in sops, age and expect automatically:
+# Homebrew (recommended, macOS/Linux) — pulls in sops, age and expect automatically:
 brew install fxerkan/tap/concealer
+
+# or pipx (all platforms, incl. Windows):
+pipx install concealer            # + pywinpty/windows-curses on Windows
+scoop install sops age            # the binaries it wraps (Windows); brew/apt elsewhere
 ```
+
+On **Windows** see the [Windows guide](https://fxerkan.github.io/concealer/WINDOWS) (Scoop/pip install, environment variables, security caveats, screenshots).
 
 Or run the single script directly (needs `python3`, `sops`, `age`, `expect` on PATH):
 
@@ -123,7 +132,7 @@ concealer init      # or: cer init
 eval "$(concealer unlock)"     # asks master password, exports CONCEALER_TOKEN (~8h)
 ```
 
-Requires Python 3 (stdlib only — no `pip install`), plus `sops`, `age`, and `expect` (ships with macOS/most Linux).
+Requires Python 3 (stdlib only — no `pip install`), plus `sops`, `age`, and `expect` (macOS/Linux; on Windows `pywinpty` replaces `expect`, installed automatically by `pipx`).
 
 ---
 

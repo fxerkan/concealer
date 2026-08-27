@@ -113,13 +113,29 @@ sops/age/expect are absent, so this path fails loudly, not silently.
 
 These are **more work than Homebrew** and optional — add on demand:
 
+- **pipx / PyPI (all platforms)** — `pyproject.toml` (hatchling) packages the flat
+  script as the `concealer` package with `webui.html` bundled; `pywinpty` +
+  `windows-curses` are Windows-only deps. `sops`/`age` stay external (not pip
+  packages). Build + publish:
+
+  ```bash
+  python3 -m build            # → dist/concealer-<ver>-py3-none-any.whl + .tar.gz
+  python3 -m twine upload dist/*
+  # users:  pipx install concealer
+  ```
+
+  Version is read dynamically from the `VERSION` line in `concealer`, so it never
+  drifts from the tag/CHANGELOG.
 - **Linux (apt/dnf)** — no native package yet. Simplest today: the git-clone method
-  above, or `pipx`-style install is N/A (no pip deps). A `.deb`/`.rpm` would just drop
-  `concealer` + `webui.html` into `/usr/lib/concealer` and symlink `/usr/bin` — same
-  shape as the brew formula, plus `Depends: age, sops, expect, python3`.
-- **Scoop / winget (Windows)** — blocked until the `expect` dependency is handled;
-  age reads `/dev/tty` and the current flow drives it via `expect`, which is a Unix
-  assumption. Windows support is a separate task, not a packaging tweak.
+  above, or `pipx install concealer`. A `.deb`/`.rpm` would just drop `concealer` +
+  `webui.html` into `/usr/lib/concealer` and symlink `/usr/bin` — same shape as the
+  brew formula, plus `Depends: age, sops, expect, python3`.
+- **Scoop / winget (Windows)** — **now supported.** Native Windows drops the `expect`
+  dependency and drives age through a ConPTY via `pywinpty` (see `docs/WINDOWS.md`).
+  Draft **Scoop** manifest: `packaging/scoop/concealer.json` (works via pip). **winget**
+  needs a bundled `.exe` (PyInstaller on a Windows CI runner) — see
+  `packaging/winget/README.md`; until then, `pipx install concealer` or Scoop are the
+  Windows paths.
 - **Nix** — a flake would be a thin derivation over the same three deps.
 
-Recommendation: ship Homebrew now; add the others only when users ask.
+Recommendation: ship Homebrew + pipx now; add Scoop/winget as users ask.

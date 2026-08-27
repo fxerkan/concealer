@@ -1,0 +1,69 @@
+# PyPI / pipx packaging for concealer.
+#
+# The repo is a flat, stdlib-only script (`concealer`) + `webui.html` + a
+# Windows-only helper (`concealer_win.py`). We DON'T move those files — hatchling
+# force-includes them into a `concealer/` package inside the wheel so that:
+#   * the console entry point `concealer` runs `concealer.__main__:_run`
+#   * `webui.html` sits next to __main__.py, so the web server finds it (BASE)
+#   * `concealer_win` is a top-level module (imported lazily on Windows)
+#
+# External binaries `sops` and `age` are NOT pip-installable and are NOT listed
+# here — users install them via scoop/winget/brew/apt. `concealer`'s preflight
+# check fails loudly if they're missing. On Windows, `pywinpty` (ships here)
+# replaces the Unix `expect` dependency; `windows-curses` enables the TUI.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "concealer"
+dynamic = ["version"]
+description = "Local-only secret manager: a typed, scoped, audited wrapper over SOPS + age with a web UI and MCP server."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "fxerkan", email = "fxerkan@gmail.com" }]
+keywords = ["secrets", "sops", "age", "vault", "mcp", "secret-manager"]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Topic :: Security :: Cryptography",
+]
+dependencies = [
+  # Windows only: age reads the console (not stdin); pywinpty gives it a ConPTY
+  # so we can type the passphrase — the Windows stand-in for Unix `expect`.
+  'pywinpty>=2.0; sys_platform == "win32"',
+  # Windows only: provides the stdlib-absent `curses` module for the TUI.
+  'windows-curses; sys_platform == "win32"',
+]
+
+[project.urls]
+Homepage = "https://github.com/fxerkan/concealer"
+Documentation = "https://fxerkan.github.io/concealer/"
+Source = "https://github.com/fxerkan/concealer"
+
+[project.scripts]
+concealer = "concealer.__main__:_run"
+
+# Single source of truth for the version stays the `VERSION = "…"` line in the
+# flat `concealer` script — read it dynamically so packaging never drifts.
+[tool.hatch.version]
+path = "concealer"
+pattern = 'VERSION = "(?P<version>[^"]+)"'
+
+# Map the flat files into a `concealer/` package layout inside the wheel WITHOUT
+# moving them in the repo. LHS = path in repo, RHS = path in the built wheel.
+[tool.hatch.build.targets.wheel.force-include]
+"concealer" = "concealer/__main__.py"
+"webui.html" = "concealer/webui.html"
+"packaging/pypi/pkg_init.py" = "concealer/__init__.py"
+"concealer_win.py" = "concealer_win.py"
+
+[tool.hatch.build.targets.sdist]
+# Keep the sdist small: the runnable script + its data + metadata. Docs/screenshots
+# and CI packaging live in the git repo, not the PyPI tarball.
+include = ["concealer", "concealer_win.py", "webui.html", "README.md", "LICENSE", "CHANGELOG.md",
+           "packaging/pypi/pkg_init.py"]   # force-include source, needed to build the wheel from the sdist
