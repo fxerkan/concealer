@@ -38,3 +38,6 @@ win-artifacts/
 dist/
 build/
 *.egg-info/
+
+# extension test harness (throwaway)
+extension/_test.html

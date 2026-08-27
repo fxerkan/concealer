@@ -2548,7 +2548,7 @@ def _preflight():
 # popup calls it to start `concealer web` on demand.
 _HOST_NAME = "com.concealer.host"
 _EXT_DEV_ID = "bkogcelhpcfdfceaoickckmikhglgpae"   # deterministic ID from the repo manifest "key" (unpacked dev build)
-_EXT_STORE_ID = ""    # filled in after the first Chrome Web Store upload (the store assigns its own ID)
+_EXT_STORE_ID = "hecffnhjbhldmdpcnpkpcffmodnemdcj"    # Chrome Web Store item ID (published build)
 
 def native_host():
     """Chrome native-messaging host (stdio). One request per launch:
