@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "0.9.15"   # advances through 0.x; 1.0 = reserved for the full live/release version
+VERSION = "0.9.16"   # advances through 0.x; 1.0 = reserved for the full live/release version
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -2838,7 +2838,8 @@ def _lock_clear(tok=None):
     gc.collect()
 
 def serve_web(port):
-    import time
+    import time, threading
+    _last = [time.time()]   # wall-clock of the last handled request (idle self-exit watchdog)
     def valid(tok):
         global _KEY_CACHE
         t = _SESSIONS.get(tok)
@@ -2855,9 +2856,15 @@ def serve_web(port):
         server_version = "concealer"
         def log_message(self, *a): pass
         def handle(self):
+            _last[0] = time.time()
             try: super().handle()
             except (BrokenPipeError, ConnectionResetError): pass
         def _tok(self):
+            # Header first: the Chrome extension is a cross-origin client, so the SPA's
+            # HttpOnly SameSite=Strict cookie never rides along on its fetches. It holds
+            # the token itself and sends it back here. The web SPA keeps using the cookie.
+            h = self.headers.get("X-Concealer-Token")
+            if h: return h
             c = self.headers.get("Cookie", "")
             for part in c.split(";"):
                 if part.strip().startswith("tok="): return part.strip()[4:]
@@ -2965,7 +2972,12 @@ def serve_web(port):
                     if keytext: _SESS_KEY[tok] = keytext; _KEY_CACHE = keytext   # hardened: bind the key to the session in memory
                     audit("unlock", source="web")
                     _auto_backup_maybe()                   # if the interval elapsed, write a .cer at unlock (key in memory)
-                    return self._json({"ok": True}, cookie=f"tok={tok}; HttpOnly; Path=/; SameSite=Strict")
+                    body = {"ok": True}
+                    # Extension client can't read the HttpOnly cookie cross-origin; hand it the
+                    # token in the body so it can send X-Concealer-Token. The SPA never sets this
+                    # header, so its response body stays {ok:true} and the token stays HttpOnly for it.
+                    if self.headers.get("X-Concealer-Client") == "ext": body["tok"] = tok
+                    return self._json(body, cookie=f"tok={tok}; HttpOnly; Path=/; SameSite=Strict")
                 audit("unlock_fail", source="web"); return self._json({"ok": False}, 403)
             tok = self._tok()
             if path == "/api/lock":
@@ -3141,7 +3153,26 @@ def serve_web(port):
                 return self._json({"ok": True})
             self._json({"error": "not found"}, 404)
 
-    srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), H)
+    try:
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), H)
+    except OSError as e:
+        if e.errno in (48, 98, 10048):   # EADDRINUSE (mac / linux / win): a server is already up
+            print(f"concealer web already running on http://127.0.0.1:{port} — opening it")
+            if os.environ.get("CONCEALER_NO_OPEN") != "1":
+                try: webbrowser.open(f"http://127.0.0.1:{port}")
+                except Exception: pass
+            return
+        raise
+    # Opt-in idle self-exit: when started on-demand (e.g. by the Chrome extension's native
+    # host) the process shuts itself down after N idle seconds so nothing lingers in the
+    # background. Off for a normal `cer web` (env unset). Keys are already dropped by idle-lock.
+    _idle_exit = int(os.environ.get("CONCEALER_WEB_IDLE_EXIT") or 0)
+    if _idle_exit > 0:
+        def _watchdog():
+            while True:
+                time.sleep(30)
+                if time.time() - _last[0] > _idle_exit: os._exit(0)
+        threading.Thread(target=_watchdog, daemon=True).start()
     print(f"concealer web: http://127.0.0.1:{port}  (idle-lock {CFG['idle']}s, Ctrl+C to stop)")
     if os.environ.get("CONCEALER_NO_OPEN") != "1":  # ponytail: skip in headless/SSH via env
         try: webbrowser.open(f"http://127.0.0.1:{port}")

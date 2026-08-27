@@ -1,0 +1,70 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="popup.css">
+</head><body>
+<header>
+  <span class="brand" id="brand" title="Open web UI">conceal<span class="ac">er</span></span>
+  <span class="spacer"></span>
+  <button id="lock" class="ghost ico" title="Lock" hidden>🔒</button>
+  <span id="timer" class="timer" hidden></span>
+  <span class="sep"></span>
+  <button id="gen" class="ghost ico" title="Generate password">🎲</button>
+  <button id="openweb" class="ghost ico" title="Open web UI">🌐</button>
+  <button id="settings" class="ghost ico" title="Settings">⚙️</button>
+</header>
+
+<div id="status" class="status"></div>
+
+<section id="unlock" hidden>
+  <input id="pw" type="password" placeholder="Master password" autocomplete="off">
+  <button id="unlockbtn" class="primary">Unlock</button>
+</section>
+
+<section id="list" hidden>
+  <input id="search" type="search" placeholder="Search… (name / tag / project)" autocomplete="off">
+  <div id="rows"></div>
+</section>
+
+<!-- Generate password modal -->
+<div id="genModal" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheethead"><b>🎲 Generate</b><button class="ghost ico" id="genClose">✕</button></div>
+    <div class="row2">
+      <label>format
+        <select id="g_fmt"><option value="password">password</option><option value="hex">hex token</option><option value="base64url">base64url</option><option value="uuid">UUID</option></select>
+      </label>
+      <label id="g_lenwrap">length<input id="g_len" type="number" value="24" min="1" max="512"></label>
+    </div>
+    <div id="g_classes" class="classes">
+      <label><input type="checkbox" id="g_lower" checked> a-z</label>
+      <label><input type="checkbox" id="g_upper" checked> A-Z</label>
+      <label><input type="checkbox" id="g_digit" checked> 0-9</label>
+      <label><input type="checkbox" id="g_sym" checked> !@#</label>
+    </div>
+    <div class="genout"><input id="g_out" class="mono" readonly><button class="ghost ico" id="g_regen" title="regenerate">🎲</button><button class="ghost ico" id="g_copy" title="copy">📋</button></div>
+  </div>
+</div>
+
+<!-- Settings modal -->
+<div id="setModal" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheethead"><b>⚙️ Settings</b><button class="ghost ico" id="setClose">✕</button></div>
+    <div class="setrow">Theme
+      <div class="theme">
+        <button id="th_dark" title="Dark">🌙</button>
+        <button id="th_light" title="White">☀️</button>
+        <button id="th_matrix" title="Matrix">🟩</button>
+      </div>
+    </div>
+    <label class="setrow">Clipboard auto-clear (seconds)<input id="s_clip" type="number" min="0" max="600"></label>
+    <label class="setrow">Extension auto-lock (seconds)<input id="s_idle" type="number" min="10"></label>
+    <label class="setrow">Reveal auto-hide (seconds)<input id="s_reveal" type="number" min="5" max="30"></label>
+    <div class="setinfo" id="s_info"></div>
+    <button class="ghost full" id="s_web">Open full settings in web UI →</button>
+    <div class="setver" id="s_ver"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script src="popup.js"></script>
+</body></html>

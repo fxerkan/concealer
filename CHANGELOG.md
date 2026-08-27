@@ -6,6 +6,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.16] — 2026-08-27
+
+### Added
+- **Chrome extension** (`extension/`) — open the vault and copy secret values from the toolbar,
+  without typing `cer web`. The popup starts `concealer web` **on demand** via a cross-platform
+  native-messaging host (macOS/Linux/Windows) and the server **self-exits after 15 min idle**, so
+  nothing lingers. One-time setup: `python3 extension/install.py` then load `extension/` unpacked.
+  Deterministic extension ID; `--uninstall` reverts. Features:
+  - **Per-field copy** — multi-field secrets expand into child rows (secret + non-secret), each
+    with its own copy button and a reveal (eye) for secret fields; single-field secrets one-click copy.
+  - **Auto-lock countdown** in the header that locks the popup when the server's idle-lock expires.
+  - **Generate** (🎲) — client-side password/hex/base64url/UUID generator, copy to clipboard.
+  - **Settings** (⚙) — clipboard auto-clear seconds, server/vault info, link to full web settings.
+  - Globe button and the brand name both open the full web UI.
+  - The installer auto-detects the **global `~/.concealer` vault** and runs the newer repo server
+    against it (so the extension shows your real secrets, not a repo-local vault).
+
+### Changed
+- **Web server: header-token auth for the extension.** `/api/*` now accepts `X-Concealer-Token`
+  in addition to the SPA's HttpOnly cookie (which can't ride cross-origin fetches from an
+  extension page). `/api/unlock` returns the token in the body **only** when the caller sends
+  `X-Concealer-Client: ext` — the browser SPA never sets it, so its token stays HttpOnly.
+- **Web server: opt-in idle self-exit.** `CONCEALER_WEB_IDLE_EXIT=<sec>` makes `cer web` shut its
+  process down after N idle seconds. Unset for a normal `cer web` (unchanged behavior); the
+  extension's native host sets it to 900.
+- **`cer web` no longer crashes when a server is already running.** On `EADDRINUSE` it opens the
+  existing `http://127.0.0.1:<port>` in the browser instead of dumping a traceback.
+
 ## [0.9.15] — 2026-08-27
 
 ### Added

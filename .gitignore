@@ -23,6 +23,12 @@ keys/backup.json
 *.code-workspace
 .DS_Store
 
+# Chrome extension native-host: machine-specific generated files (abs paths, launcher, manifest copy)
+extension/nativehost/config.json
+extension/nativehost/run_host.sh
+extension/nativehost/run_host.bat
+extension/nativehost/com.concealer.host.json
+
 # docs local preview (Jekyll build output + per-machine gem lock)
 docs/_site/
 docs/.jekyll-cache/
