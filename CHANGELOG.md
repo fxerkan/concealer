@@ -14,6 +14,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   MCP: `names: ["A", "B"]`. CLI: `concealer run --project p --name A <cmd>`. Default is unchanged
   (whole scope) for backward compatibility, but agents should name what they need — this shrinks
   the injected env and the audit `inject` line to just the required keys.
+- **Managed MCP policy** — the secrets policy (redaction + least-privilege + narrow scoping) is now
+  returned in the MCP `initialize` `instructions`, so it reaches **every** connecting agent, not just
+  a Claude Code that reads a local `CONCEALER.md`. Advisory by protocol; the code guards
+  (registered-agent gate, `rate_gate`, redaction) remain the non-bypassable enforcement.
 
 ## [0.9.14] — 2026-08-27
 
