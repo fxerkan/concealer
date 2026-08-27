@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "0.9.12"   # advances through 0.x; 1.0 = reserved for the full live/release version
+VERSION = "0.9.13"   # advances through 0.x; 1.0 = reserved for the full live/release version
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
