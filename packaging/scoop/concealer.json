@@ -1,6 +1,6 @@
 {
   "##": "Scoop manifest for concealer. Installs the published PyPI wheel (pip pulls pywinpty/windows-curses). Not yet exercised on a real Scoop host, but url/hash are the live PyPI artifacts. See docs/WINDOWS.md.",
-  "version": "0.9.15",
+  "version": "0.9.16",
   "description": "Local-only, single-file secret manager for the AI-coding era. CLI, TUI, Web UI, MCP server.",
   "homepage": "https://fxerkan.github.io/concealer/",
   "license": "MIT",
@@ -10,8 +10,8 @@
     "age"
   ],
   "##depends": "python provides pip; sops+age are the binaries concealer wraps. All three live in the Scoop 'main' bucket.",
-  "url": "https://files.pythonhosted.org/packages/8b/99/3c754275b1e7e7e012c9ba54ccc98b50e240cb04385fc33e3255e9383022/concealer-0.9.15-py3-none-any.whl#/concealer.whl",
-  "hash": "e4ac9eccc9f6b6a316230b3dd14aa9eefe67d633ae2f9abb91a0950a5d73e38a",
+  "url": "https://files.pythonhosted.org/packages/db/da/1c08e8562a8bbe7be8058a4368acc27f8813cad15e3a38fe4f5ec9287e17/concealer-0.9.16-py3-none-any.whl#/concealer.whl",
+  "hash": "fb1bb7a2e3e905a148e34d4de546eadced807f406baaacbdfd6c7c7acd582f90",
   "installer": {
     "script": [
       "python -m pip install --disable-pip-version-check --no-warn-script-location --target=\"$dir\\lib\" \"$dir\\concealer.whl\"",
