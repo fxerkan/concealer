@@ -6,6 +6,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.17] — 2026-08-30
+
+### Added
+- **Login brute-force throttle** — after 5 consecutive wrong master passwords the web login locks
+  for 5 minutes (per client IP, in-memory); the UI shows a live countdown and disables the field.
+  Audited as `unlock_blocked`.
+- **Backup schedule units** — the auto-backup interval now takes a number **+ unit** (hours / days /
+  weeks / months) instead of raw hours; **Destination folder** gets a native **Browse** picker.
+
+### Changed
+- **Filters panels start collapsed** on every page (Secrets / Audit / Stats) — open them explicitly.
+- **Stats charts** — Platform/Tags and Interface (source) bars now use the same accent color as the
+  other charts (no rainbow palette).
+- **Login slogan** → "The local-only secret manager for the AI-coding era." (web login + hero image).
+- **`.cerbak` backups are masked at rest** — the file no longer shows `age-encryption.org` / `scrypt`
+  markers on a raw `cat`; the bytes are XOR-masked with a fixed public seed. Cosmetic only — the real
+  encryption is unchanged (age + backup password). Old raw-age `.cer`/`.age` bundles still import.
+
 ## [0.9.16] — 2026-08-27
 
 ### Added

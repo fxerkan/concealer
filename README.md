@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/fxerkan/concealer/main/docs/assets/hero.png" alt="concealer — Local‑only, single‑file secret manager for the AI‑coding era" width="820">
+  <img src="https://raw.githubusercontent.com/fxerkan/concealer/main/docs/assets/hero.png" alt="concealer — The local-only secret manager for the AI-coding era" width="820">
 </p>
 
 # conceal**er**
@@ -12,7 +12,7 @@
   <a href="https://fxerkan.github.io/concealer/"><img src="https://img.shields.io/badge/docs-fxerkan.github.io-ff4d4d?style=for-the-badge&labelColor=0a0b0d" alt="Docs"></a>
 </p>
 
-> **Local‑only, single‑file secret manager for the AI‑coding era.**
+> **The local-only secret manager for the AI-coding era.**
 > Encrypted with [SOPS](https://github.com/getsops/sops) + [age](https://github.com/FiloSottile/age).
 > No cloud, no telemetry, no account. CLI · Web UI · MCP · TUI.
 

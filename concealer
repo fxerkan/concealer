@@ -12,7 +12,7 @@ Audit: keys/audit.log (JSONL, HMAC-chained, tamper-evident). Keeps only key
 NAMES and actions, never secret VALUES.
 """
 import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse, urllib.request, html, getpass, time, webbrowser
-import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil, fnmatch, gc
+import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil, fnmatch, gc, zlib
 from datetime import datetime, timezone, timedelta
 
 if sys.platform.startswith("win"):
@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "0.9.16"   # advances through 0.x; 1.0 = reserved for the full live/release version
+VERSION = "0.9.17"   # advances through 0.x; 1.0 = reserved for the full live/release version
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -1064,6 +1064,7 @@ def export_bundle(pw):
 def import_bundle(pw, blob, mode="overwrite"):
     """Decrypt an 'age -p'-encrypted bundle and merge into the vault. pw = the bundle's (source machine) password.
     mode: conflict resolution (overwrite|skip|duplicate) → passed to merge_secrets."""
+    blob = _cer_unwrap(blob)                # de-obfuscate .cerbak; raw age bundles pass through
     tin = tempfile.NamedTemporaryFile(delete=False, suffix=".age"); tout = tin.name + ".json"
     try:
         tin.write(blob); tin.close()
@@ -1085,9 +1086,29 @@ def import_bundle(pw, blob, mode="overwrite"):
 CER_EXT = ".cerbak"    # old backups had a ".cer" extension; the import path ignores extension, rotation recognizes both
 _DEFAULT_BACKUP = {"enabled": False, "interval_h": 24, "dir": "", "keep": 7, "last": None}
 
+# .cerbak obfuscation: XOR the age ciphertext with a keystream derived from a FIXED, PUBLIC seed so the
+# raw file shows no 'age-encryption.org'/'scrypt'/'sops' markers — just opaque bytes.
+# ponytail: COSMETIC only. The seed is in this source, so this provides ZERO confidentiality — it only
+# hides the format from a casual `cat`/text-editor look. The REAL encryption is age with the backup
+# password (unchanged). Not a "cipher" replacing age; a reversible masking layer on top. (zlib was tried
+# first but stores incompressible age ciphertext verbatim, leaking the header — hence XOR.)
+_CER_OBF_SEED = b"concealer-cerbak-obfuscation-v1"
+def _cer_keystream(n):
+    out = bytearray(); ctr = 0
+    while len(out) < n:
+        out += hashlib.sha256(_CER_OBF_SEED + ctr.to_bytes(8, "big")).digest(); ctr += 1
+    return bytes(out[:n])
+def _cer_wrap(blob):
+    ks = _cer_keystream(len(blob)); return bytes(b ^ k for b, k in zip(blob, ks))
+def _cer_unwrap(blob):
+    """Raw age bundles (old .cer / any .age export) start with the ASCII header → pass through untouched;
+    masked .cerbak files are XOR'd back to age ciphertext (XOR is its own inverse)."""
+    if blob[:18] == b"age-encryption.org": return blob
+    return _cer_wrap(blob)
+
 def make_backup(pw):
-    """Encrypt the whole vault with the backup password → opaque .cer bytes (same format as export_bundle → import restores it)."""
-    return export_bundle(pw)
+    """Encrypt the whole vault with the backup password, then obfuscate → opaque .cerbak bytes (import restores it)."""
+    return _cer_wrap(export_bundle(pw))
 
 def _cer_name():
     return "concealer-" + now_iso()[:19].replace(":", "").replace("-", "") + CER_EXT   # concealer-YYYYMMDDTHHMMSS.cerbak
@@ -2967,6 +2988,24 @@ def cli(argv):
 _SESSIONS = {}   # token -> last_activity_epoch
 _SESS_KEY = {}   # token -> decrypted age key text (on a hardened vault; in memory, not written to disk)
 
+# Brute-force throttle on /api/unlock: after UNLOCK_MAX consecutive wrong master passwords,
+# lock the login for UNLOCK_COOLDOWN seconds. Keyed by client IP; in-memory only (resets on restart).
+# ponytail: flat cooldown, single IP key — enough for a local single-user app. Upgrade path:
+# exponential backoff or per-account escalation if this ever faces a real network attacker.
+UNLOCK_MAX, UNLOCK_COOLDOWN = 5, 300
+_UNLOCK_FAIL = {}   # ip -> [fail_count, locked_until_epoch]
+
+def _unlock_locked_for(ip):
+    """Seconds the given IP must wait before another unlock attempt (0 = not locked)."""
+    st = _UNLOCK_FAIL.get(ip)
+    if not st: return 0
+    return max(0, int(st[1] - time.time()))
+def _unlock_note(ip, ok):
+    """Record an unlock outcome; on the UNLOCK_MAX-th consecutive failure, arm the cooldown."""
+    if ok: _UNLOCK_FAIL.pop(ip, None); return
+    st = _UNLOCK_FAIL.setdefault(ip, [0, 0.0]); st[0] += 1
+    if st[0] >= UNLOCK_MAX: st[1] = time.time() + UNLOCK_COOLDOWN; st[0] = 0
+
 def _lock_clear(tok=None):
     """Drop the in-memory key/session, then gc.collect() to reclaim freed copies.
     ponytail: BEST-EFFORT ONLY — CPython does not zeroize memory. Plaintext key/secret
@@ -3107,9 +3146,15 @@ def serve_web(port):
             global _KEY_CACHE
             path = urllib.parse.urlparse(self.path).path
             if path == "/api/unlock":
+                ip = self.client_address[0] if self.client_address else "?"
+                wait = _unlock_locked_for(ip)
+                if wait:                               # brute-force cooldown active → refuse without checking pw
+                    audit("unlock_blocked", source="web")
+                    return self._json({"ok": False, "locked": True, "retry_after": wait}, 429)
                 pw = self._body().get("pw", "")
                 keytext = key_from_master(pw)          # decrypt both verifies and yields the key
                 if keytext or verify_master(pw):       # 2nd condition: legacy (plaintext-key) vault
+                    _unlock_note(ip, True)
                     tok = _secrets.token_urlsafe(18); _SESSIONS[tok] = time.time()
                     if keytext: _SESS_KEY[tok] = keytext; _KEY_CACHE = keytext   # hardened: bind the key to the session in memory
                     audit("unlock", source="web")
@@ -3120,7 +3165,10 @@ def serve_web(port):
                     # header, so its response body stays {ok:true} and the token stays HttpOnly for it.
                     if self.headers.get("X-Concealer-Client") == "ext": body["tok"] = tok
                     return self._json(body, cookie=f"tok={tok}; HttpOnly; Path=/; SameSite=Strict")
-                audit("unlock_fail", source="web"); return self._json({"ok": False}, 403)
+                _unlock_note(ip, False); audit("unlock_fail", source="web")
+                wait = _unlock_locked_for(ip)
+                if wait: return self._json({"ok": False, "locked": True, "retry_after": wait}, 429)
+                return self._json({"ok": False}, 403)
             tok = self._tok()
             if path == "/api/lock":
                 if tok:
