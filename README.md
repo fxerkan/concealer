@@ -232,6 +232,30 @@ Opens **http://127.0.0.1:8787** (localhost only). Features:
   <br><sub><b>Scan folder</b> — sweep a directory (or shell history) for stray secrets and import them, tagged by origin.</sub>
 </p>
 
+### Chrome Extension — copy secrets from your toolbar
+
+A companion Chrome extension opens your vault and copies secret values straight from the toolbar —
+**without typing `cer web`**. It talks only to your local server on `127.0.0.1`; no cloud, no accounts.
+
+```bash
+cer chrome-extension     # one-time: register the native helper (macOS/Linux/Windows)
+```
+
+Then click the toolbar icon → unlock → copy. Highlights:
+- **Per‑field copy** — multi‑field secrets expand into child rows; copy or reveal exactly the field you need.
+- **On‑demand** — starts `concealer web` when you open the popup and **self‑exits after 15 min idle** (nothing lingers).
+- **Auto‑lock** countdown, **🎲 password generator**, **search**, and three **themes** (Dark · White · Matrix).
+- Clipboard **auto‑clears**; values are never logged.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/fxerkan/concealer/main/docs/assets/ext-fields.png" alt="concealer Chrome extension — per-field copy for multi-field secrets" width="720">
+  <br><sub><b>Chrome extension</b> — pick the exact field to copy, right from the toolbar.</sub>
+</p>
+
+Install & full guide → **[Chrome Extension docs](https://fxerkan.github.io/concealer/chrome-extension)**.
+The native host is **built into concealer** (`concealer native-host`) — no separate program to install.
+_Chrome Web Store listing: coming soon (pending review)._
+
 ### MCP (AI agents) — `concealer mcp` - `cer mcp`
 Register once, available in every session. On a hardened (key‑at‑rest) vault the
 MCP server unlocks with a token, so **give it an agent token instead of your

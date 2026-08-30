@@ -236,6 +236,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
     <span class="brand"><img src="/concealer/assets/logo.svg" alt="">conceal<span class="ac">er</span></span>
     <nav>
       <a class="lnk" data-collapse href="/concealer/getting-started" data-i18n="nav_docs">Docs</a>
+      <a class="lnk" data-collapse href="/concealer/chrome-extension" data-i18n="nav_ext">Extension</a>
       <a class="lnk" data-collapse href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener">GitHub</a>
       <a class="lnk" data-collapse href="mailto:concealer@fxerkan.com?subject=concealer%20support" data-i18n="nav_support">Support</a>
       <button class="lnk" id="installbtn" data-collapse data-i18n="nav_install" style="border:0;background:none;font-family:inherit;cursor:pointer">Install</button>
@@ -503,7 +504,7 @@ document.getElementById('theme').onclick=()=>setTheme(html.getAttribute('data-th
 
 /* ===== language toggle (EN/TR, persists like the app: concealer_lang) ===== */
 const I18N={
- en:{nav_docs:"Docs",nav_install:"Install",nav_comparison:"Comparison",nav_support:"Support",copy:"Copy",copied:"Copied ✓",
+ en:{nav_docs:"Docs",nav_ext:"Extension",nav_install:"Install",nav_comparison:"Comparison",nav_support:"Support",copy:"Copy",copied:"Copied ✓",
   sup_eyebrow:"Support",sup_h:"Questions, bugs or feedback?",sup_p:"Reach out directly — we read every message and usually reply within a day.",sup_btn:"✉️ Email support",sup_issue:"Open a GitHub issue",
   hero_tag:"The local-only secret manager for the AI-coding era.",
   hero_sub:"No cloud, no telemetry, no account.<br>Your agents use secrets without ever <em class=\"u\">seeing</em> them.",
@@ -526,7 +527,7 @@ const I18N={
   modal_h:"Install concealer",modal_p:"Pick your platform's package manager — each pulls in the sops/age binaries.",
   modal_l_brew:"· macOS / Linux",modal_l_pipx:"· all platforms",
   modal_alt:"Prefer the manual route? See the <a href=\"/concealer/installation\">Installation guide</a>."},
- tr:{nav_docs:"Dokümanlar",nav_install:"Kurulum",nav_comparison:"Karşılaştırma",nav_support:"Destek",copy:"Kopyala",copied:"Kopyalandı ✓",
+ tr:{nav_docs:"Dokümanlar",nav_ext:"Eklenti",nav_install:"Kurulum",nav_comparison:"Karşılaştırma",nav_support:"Destek",copy:"Kopyala",copied:"Kopyalandı ✓",
   sup_eyebrow:"Destek",sup_h:"Soru, hata ya da geri bildirim?",sup_p:"Doğrudan yaz — her mesajı okuyoruz ve genelde bir gün içinde yanıtlıyoruz.",sup_btn:"✉️ E-posta ile destek",sup_issue:"GitHub'da konu aç",
   hero_tag:"Yapay zekâ ile kodlama çağı için yerel, tek dosyalı gizli bilgi yöneticisi.",
   hero_sub:"Bulut yok, telemetri yok, hesap yok.<br>Ajanların gizli bilgileri <em class=\"u\">görmeden</em> kullanır.",

@@ -12,6 +12,47 @@ nav_order: 3
 
 ---
 
+## Quick install
+
+<div class="cer-tabs">
+<div class="cer-tabbar">
+<button class="cer-tab is-active" data-tab="mac">🍎 macOS / Linux</button>
+<button class="cer-tab" data-tab="win">🪟 Windows</button>
+<button class="cer-tab" data-tab="ext">🧩 Chrome Extension</button>
+</div>
+<div class="cer-panel is-active" data-panel="mac" markdown="1">
+Homebrew pulls in `sops`, `age`, and `expect` automatically:
+
+```bash
+brew install fxerkan/tap/concealer
+concealer init
+```
+</div>
+<div class="cer-panel" data-panel="win" markdown="1">
+Scoop pulls in Python + `sops` + `age`:
+
+```powershell
+scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket
+scoop install concealer
+concealer init
+```
+
+See the [Windows guide]({{ site.baseurl }}/WINDOWS) for details.
+</div>
+<div class="cer-panel" data-panel="ext" markdown="1">
+Browse your vault and copy secrets from the Chrome toolbar. Install concealer (macOS/Linux or
+Windows tab), then run the one-time setup:
+
+```bash
+cer chrome-extension
+```
+
+Full guide → [Chrome Extension]({{ site.baseurl }}/chrome-extension).
+</div>
+</div>
+
+---
+
 ## Requirements
 
 | Dependency | Why | Notes |

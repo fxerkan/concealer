@@ -21,6 +21,20 @@
   #cer-theme{right:14px}#cer-lang{right:96px}
   #cer-theme:hover,#cer-lang:hover{border-color:#ff4d4d}
   @media(max-width:800px){#cer-theme{top:auto;bottom:12px}#cer-lang{top:auto;bottom:12px}}
+  /* platform tabs (macOS/Linux · Windows · Chrome Extension) — used across install docs */
+  .cer-tabs{border:1px solid #2a2f38;border-radius:10px;overflow:hidden;margin:18px 0;background:#101216}
+  .cer-tabbar{display:flex;flex-wrap:wrap;background:#161a20;border-bottom:1px solid #2a2f38}
+  .cer-tab{flex:1;min-width:150px;border:0;background:transparent;color:#8a909b;padding:11px 14px;
+    font:inherit;font-weight:700;cursor:pointer;border-bottom:2px solid transparent}
+  .cer-tab:hover{color:#e8e8e6}
+  .cer-tab.is-active{color:#ff4d4d;border-bottom-color:#ff4d4d;background:#101216}
+  .cer-panel{display:none;padding:6px 18px 10px}
+  .cer-panel.is-active{display:block}
+  html[data-cer-theme="light"] .cer-tabs{border-color:#e2e6eb;background:#fff}
+  html[data-cer-theme="light"] .cer-tabbar{background:#eef0f3;border-bottom-color:#e2e6eb}
+  html[data-cer-theme="light"] .cer-tab{color:#5b6472}
+  html[data-cer-theme="light"] .cer-tab:hover{color:#1a1d23}
+  html[data-cer-theme="light"] .cer-tab.is-active{color:#c47a00;border-bottom-color:#c47a00;background:#fff}
 </style>
 <script>
 /* Docs enhancements: wordmark, dark/light toggle, and an EN/TR language toggle.
@@ -33,6 +47,7 @@
   var NAV={
     "Getting Started":"Başlarken","Installation":"Kurulum","Concepts":"Kavramlar",
     "CLI Reference":"CLI Referansı","Secret Types":"Secret Türleri","Web UI":"Web Arayüzü",
+    "Chrome Extension":"Chrome Eklentisi",
     "Risks":"Riskler","Policy":"Politika",
     "TUI":"TUI","MCP for AI Agents":"AI Ajanları için MCP","Tokens & Recovery":"Token'lar & Kurtarma",
     "Security Model":"Güvenlik Modeli","Portability & Backup":"Taşınabilirlik & Yedekleme",
@@ -75,10 +90,32 @@
       return orig(t);
     };
   }
+  /* platform tabs: clicking a tab switches every tab group that has that key, and remembers it. */
+  function tabs(){
+    function activate(group,key){
+      group.querySelectorAll('.cer-tab').forEach(function(b){b.classList.toggle('is-active',b.dataset.tab===key);});
+      group.querySelectorAll('.cer-panel').forEach(function(p){p.classList.toggle('is-active',p.dataset.panel===key);});
+    }
+    var groups=document.querySelectorAll('.cer-tabs');if(!groups.length)return;
+    var saved=localStorage.getItem('cer_platform');
+    if(saved!=='mac'&&saved!=='win'&&saved!=='ext')saved=/win/i.test((navigator.platform||navigator.userAgent))?'win':'mac';
+    groups.forEach(function(group){
+      var keys=[].map.call(group.querySelectorAll('.cer-tab'),function(b){return b.dataset.tab;});
+      if(keys.indexOf(saved)>=0)activate(group,saved);
+      group.querySelectorAll('.cer-tab').forEach(function(b){
+        b.addEventListener('click',function(){
+          var key=b.dataset.tab;localStorage.setItem('cer_platform',key);
+          document.querySelectorAll('.cer-tabs').forEach(function(g){
+            if([].some.call(g.querySelectorAll('.cer-tab'),function(x){return x.dataset.tab===key;}))activate(g,key);
+          });
+        });
+      });
+    });
+  }
   function init(){
     if(document.getElementById('cer-theme'))return;
     if(!document.body){setTimeout(init,50);return;}
-    wordmark();trSidebar();cleanCopy();
+    wordmark();trSidebar();cleanCopy();tabs();
     /* theme */
     var tb=document.createElement('button');tb.id='cer-theme';document.body.appendChild(tb);
     var cur=localStorage.getItem('cer_docs_theme');if(cur!=='light'&&cur!=='default')cur='default';

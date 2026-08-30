@@ -12,6 +12,47 @@ nav_exclude: true
 
 ---
 
+## Hızlı kurulum
+
+<div class="cer-tabs">
+<div class="cer-tabbar">
+<button class="cer-tab is-active" data-tab="mac">🍎 macOS / Linux</button>
+<button class="cer-tab" data-tab="win">🪟 Windows</button>
+<button class="cer-tab" data-tab="ext">🧩 Chrome Eklentisi</button>
+</div>
+<div class="cer-panel is-active" data-panel="mac" markdown="1">
+Homebrew `sops`, `age` ve `expect`'i otomatik getirir:
+
+```bash
+brew install fxerkan/tap/concealer
+concealer init
+```
+</div>
+<div class="cer-panel" data-panel="win" markdown="1">
+Scoop Python + `sops` + `age` getirir:
+
+```powershell
+scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket
+scoop install concealer
+concealer init
+```
+
+Ayrıntılar için [Windows rehberi]({{ site.baseurl }}/tr/WINDOWS).
+</div>
+<div class="cer-panel" data-panel="ext" markdown="1">
+Kasanı gözat ve secret'ları Chrome araç çubuğundan kopyala. concealer'ı kur (macOS/Linux veya
+Windows sekmesi), sonra tek seferlik ayarı çalıştır:
+
+```bash
+cer chrome-extension
+```
+
+Tam rehber → [Chrome Eklentisi]({{ site.baseurl }}/tr/chrome-extension).
+</div>
+</div>
+
+---
+
 ## Gereksinimler
 
 | Bağımlılık | Neden | Notlar |
