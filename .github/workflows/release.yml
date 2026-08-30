@@ -19,6 +19,7 @@ concurrency: release           # never run two releases at once
 permissions:
   contents: write              # create tags + releases; push the in-repo scoop manifest
   id-token: write              # OIDC for PyPI Trusted Publishing (no stored token)
+  actions: write               # dispatch publish-extension after a fresh release
 
 jobs:
   release:
@@ -131,6 +132,14 @@ jobs:
           # best-effort: commit the refreshed in-repo manifest back to main (never fail the release on branch protection)
           git config user.name "$BOT_NAME"; git config user.email "$BOT_EMAIL"
           git commit -am "scoop: concealer ${VER}" && git push || echo "in-repo scoop manifest unchanged or push blocked"
+
+      # Fire-and-forget: kick the Chrome Web Store publish for the freshly-cut release.
+      # Only on a new release; fails soft — a missing CWS_* secret fails that run, not this one.
+      # ponytail: dispatch the existing workflow_dispatch job, don't duplicate its upload steps.
+      - name: Publish Chrome extension
+        if: steps.check.outputs.exists == 'false'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh workflow run publish-extension.yml -f publish=true || echo "extension publish not dispatched (CWS not configured yet)"
 
       # Reconcile the tap formula to the current VERSION. Runs every time (not gated on
       # the release-exists check) so a stale tap self-heals; commits only if it changed.

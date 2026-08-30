@@ -1,0 +1,57 @@
+Chrome Web Store — automated publishing
+========================================
+
+STATUS (set up 2026-08-30, reuse this doc to re-configure or rotate creds):
+  Store item ...... concealer, ID `hecffnhjbhldmdpcnpkpcffmodnemdcj`
+  OAuth client .... GCP project `concealer`, DESKTOP-app client (not "Web application")
+  Creds vault ..... concealer secret `concealer-desktop-app-oauth`
+                    (fields: client_id, client_secret, refresh_token)
+  GitHub secrets .. CWS_EXTENSION_ID, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN — all set
+  Host trust ...... `_EXT_STORE_ID` in ./concealer = the store ID above
+  Auto-publish .... release.yml dispatches publish-extension (publish=true) on every fresh release
+
+How it runs
+-----------
+- On release: push a VERSION bump to `concealer` on main → release.yml cuts the tag/release,
+  then dispatches publish-extension.yml (publish=true). Fails soft — a missing CWS_* secret
+  fails that dispatch, not the release.
+- Manually: Actions → publish-extension → Run. Use publish=false first (uploads a draft only)
+  to sanity-check before pushing live.
+- build.py zips the runtime files and strips the self-signed manifest `key` (the store assigns
+  the ID); mnao305/chrome-extension-upload uploads + optionally publishes.
+
+One-time setup / re-configuration (only a store owner can do these)
+-------------------------------------------------------------------
+1. First upload BY HAND at https://chrome.google.com/webstore/devconsole — CI can only update an
+   existing item, not create one. This gives you the store ID and is where you set the listing +
+   privacy policy. Then set `_EXT_STORE_ID` in ./concealer to that ID (and re-run
+   `cer chrome-extension`) so the native host trusts the published build (its ID differs from the
+   unpacked dev ID).
+
+2. GCP: project → enable "Chrome Web Store API" → create OAuth client of type **Desktop app**
+   (NOT "Web application" — the refresh-token/OOB flow below needs a Desktop client).
+   Store its client_id + client_secret in concealer:
+     secret name `concealer-desktop-app-oauth`, scope */concealer/*/concealer.
+
+3. Mint a refresh token (once; the token is long-lived):
+   a. Open in a browser, approve, copy the shown code:
+      https://accounts.google.com/o/oauth2/auth?response_type=code&access_type=offline&redirect_uri=urn:ietf:wg:oauth:2.0:oob&scope=https://www.googleapis.com/auth/chromewebstore&client_id=<DESKTOP_CLIENT_ID>
+   b. Exchange the code for a refresh_token (the code is single-use — get this right first try):
+      curl -s https://oauth2.googleapis.com/token \
+        -d client_id=<ID> -d client_secret=<SECRET> -d code=<CODE> \
+        -d grant_type=authorization_code -d redirect_uri=urn:ietf:wg:oauth:2.0:oob
+   c. Save the returned refresh_token into the same concealer secret as field `refresh_token`.
+
+4. Set the 4 GitHub Actions secrets (Settings → Secrets and variables → Actions).
+   Pull the vault values without exposing them — run these inside `cer run` / MCP
+   run_with_secrets so client_id/secret/refresh_token arrive as env vars and are never printed:
+     gh secret set CWS_CLIENT_ID     --body "$(printenv concealer-desktop-app-oauth_CLIENT_ID)"
+     gh secret set CWS_CLIENT_SECRET --body "$(printenv concealer-desktop-app-oauth_CLIENT_SECRET)"
+     gh secret set CWS_REFRESH_TOKEN --body "$(printenv concealer-desktop-app-oauth_REFRESH_TOKEN)"
+     gh secret set CWS_EXTENSION_ID  --body "hecffnhjbhldmdpcnpkpcffmodnemdcj"
+   CWS_CLIENT_ID/SECRET must match the DESKTOP client the refresh token was minted with.
+
+Rotating creds
+--------------
+Re-run step 3 (new refresh token) and step 4 (re-set CWS_REFRESH_TOKEN, and CWS_CLIENT_ID/SECRET
+if the client changed). The refresh token is bound to its client — rotate them together.

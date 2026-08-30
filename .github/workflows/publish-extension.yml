@@ -1,14 +1,15 @@
 # Build the Chrome extension zip and publish it to the Chrome Web Store.
 #
-# Manual trigger only (publishing is a deliberate act). Do the FIRST upload by hand in the
-# dashboard to create the item, get its ID, and set the listing + privacy policy — CI handles
-# version bumps after that.
+# Manual trigger, plus release.yml dispatches it (publish=true) on every fresh release.
+# Do the FIRST upload by hand in the dashboard to create the item, get its ID, and set the
+# listing + privacy policy — CI handles version bumps after that.
 #
 # Required repo secrets (Settings → Secrets and variables → Actions):
 #   CWS_EXTENSION_ID   the store-assigned item ID (from the dashboard)
-#   CWS_CLIENT_ID      Google OAuth client id  (Cloud console, Chrome Web Store API enabled)
-#   CWS_CLIENT_SECRET  Google OAuth client secret
-#   CWS_REFRESH_TOKEN  OAuth refresh token for the account that owns the item
+#   CWS_CLIENT_ID      Google OAuth client id  — DESKTOP-app client, Chrome Web Store API enabled
+#   CWS_CLIENT_SECRET  Google OAuth client secret (same Desktop client)
+#   CWS_REFRESH_TOKEN  OAuth refresh token minted for that Desktop client
+# Full setup / rotation guide: extension/chrome-extension-publish.txt
 # See: https://developer.chrome.com/docs/webstore/using-api
 name: publish-extension
 
