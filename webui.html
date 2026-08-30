@@ -353,7 +353,7 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
       <button class="ghost" onclick="togglePw('pw',this)">👁</button>
     </div>
     <div id="loginerr" style="color:var(--bad);margin-top:10px;min-height:18px"></div>
-    <button class="primary" style="width:100%;margin-top:8px" data-i18n="unlock" onclick="unlock()">Aç</button>
+    <button class="primary" id="unlockbtn" style="width:100%;margin-top:8px" data-i18n="unlock" onclick="unlock()">Aç</button>
     <div class="foot">conceal<span class="ac">er</span> · v__VERSION__ <a href="https://github.com/fxerkan/concealer" title="GitHub"><svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" style="vertical-align:-2px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a></div>
   </div>
 </div>
@@ -639,14 +639,25 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
         <button data-i18n="backup_now" onclick="doBackup()">⬇ Backup now (.cerbak)</button>
       </div>
       <div class="grid" style="max-width:680px;margin-top:14px">
-        <div class="field"><label class="fld" style="display:flex;gap:8px;align-items:center">
+        <div class="field full"><label class="fld" style="display:flex;gap:8px;align-items:center">
           <input type="checkbox" id="bk_enabled" style="width:auto"> <span data-i18n="bk_auto">Automatic backups</span></label></div>
-        <div class="field"><label class="fld" data-i18n="bk_interval">Every (hours)</label>
-          <input id="bk_interval" type="number" min="1" max="8760"></div>
+        <div class="field"><label class="fld" data-i18n="bk_interval">Every</label>
+          <div style="display:flex;gap:8px">
+            <input id="bk_interval" type="number" min="1" style="max-width:110px">
+            <select id="bk_unit">
+              <option value="1" data-i18n="bk_u_hour">hours</option>
+              <option value="24" data-i18n="bk_u_day">days</option>
+              <option value="168" data-i18n="bk_u_week">weeks</option>
+              <option value="720" data-i18n="bk_u_month">months</option>
+            </select>
+          </div></div>
         <div class="field"><label class="fld" data-i18n="bk_keep">Keep last (files)</label>
           <input id="bk_keep" type="number" min="1" max="365"></div>
         <div class="field"><label class="fld" data-i18n="bk_dir">Destination folder</label>
-          <input id="bk_dir" type="text" placeholder="/Users/…/concealer-backups"></div>
+          <div style="display:flex;gap:8px">
+            <input id="bk_dir" type="text" placeholder="/Users/…/concealer-backups">
+            <button class="ghost" type="button" onclick="bkBrowse()" style="white-space:nowrap">📁 <span data-i18n="browse">Browse</span></button>
+          </div></div>
         <div class="field"><label class="fld" data-i18n="bk_pw">Backup password <span id="bk_pw_set" class="mut"></span></label>
           <input id="bk_pw" type="password" data-i18n-ph="bk_pw_ph" placeholder="set / change (leave blank to keep)"></div>
       </div>
@@ -675,8 +686,8 @@ let SPAGE=1; let SPAGE_SIZE=parseInt(localStorage.getItem('concealer_psize'))||2
 
 // ---------- i18n ----------
 const I18N={
- tr:{login_sub:"YZ kodlama çağı için yerel, tek dosyalı gizli bilgi yöneticisi.",master_pw:"Master password",unlock:"Aç",
-  wrong_pw:"Yanlış master password.",secrets:"Sırlar",audit_log:"Denetim Kayıtları",lock:"🔒 Kilitle",filters:"Filtreler",search:"ara",
+ tr:{login_sub:"YZ kodlama çağı için yerel gizli bilgi yöneticisi.",master_pw:"Master password",unlock:"Aç",
+  wrong_pw:"Yanlış master password.",locked_wait:s=>`Çok fazla hatalı deneme — ${s} sn bekleyin.`,secrets:"Sırlar",audit_log:"Denetim Kayıtları",lock:"🔒 Kilitle",filters:"Filtreler",search:"ara",
   search_secrets:"🔎 ara: ad, url, etiket, not…",all_types:"tüm tipler",new_secret:"+ Yeni Sır",
   th_name:"Ad",th_type:"Tip",th_scope:"Kapsam (tenant/proje/ortam/repo)",th_tags:"Etiketler",th_updated:"Güncellendi",th_actions:"İşlemler",
   no_records:"kayıt yok",records:"kayıt",view:"Görüntüle",edit:"Düzenle",del:"Sil",more:"Daha fazla",per_page:"sayfa başına",
@@ -757,7 +768,7 @@ const I18N={
   exported:"dışa aktarma indirildi",imp_pick:"önce .age dosyası seç",imp_fail:"içe aktarma başarısız",imp_corrupt:"bozuk / okunamayan dosya",imported_n:(n,u,s)=>`+${n} yeni, ~${u} güncellendi, =${s||0} atlandı`,
   imp_mode_overwrite:"Çakışmada: üzerine yaz",imp_mode_skip:"Çakışmada: atla",imp_mode_duplicate:"Çakışmada: kopyala",
   set_backup:"Yedek (.cerbak)",set_backup_hint:"Bir .cerbak yedeği, tüm vault'un master parolandan AYRI özel bir yedek parolasıyla şifrelenmiş halidir — içi açılıp okunamayan opak binary. Yukarıdaki İçe Aktar ile geri yüklenir. Otomatik yedekler, süre dolunca kilit açılışında bir .cerbak'ı yerel klasöre yazar.",
-  backup_now:"⬇ Şimdi yedekle (.cerbak)",bk_auto:"Otomatik yedek",bk_interval:"Her (saat)",bk_keep:"Son (dosya) tut",bk_dir:"Hedef klasör",
+  backup_now:"⬇ Şimdi yedekle (.cerbak)",bk_auto:"Otomatik yedek",bk_interval:"Her",bk_u_hour:"saat",bk_u_day:"gün",bk_u_week:"hafta",bk_u_month:"ay",bk_keep:"Son (dosya) tut",bk_dir:"Hedef klasör",
   bk_pw:"Yedek parolası",bk_pw_ph:"belirle / değiştir (boş = değişmesin)",bk_pw_isset:"(ayarlı)",bk_pw_unset:"(ayarlı değil)",bk_run:"▶ Otomatik yedeği şimdi al",
   bk_saved:"yedek ayarı kaydedildi",bk_downloaded:"yedek indirildi",bk_ran:s=>`yedek yazıldı: ${s}`,
   bk_pw_short:"yedek parolası en az 8 karakter olmalı",bk_pw_mismatch:"yedek parolaları eşleşmiyor",bk_pw_same:"yedek parolası master paroladan farklı olmalı",
@@ -773,8 +784,8 @@ const I18N={
   ch_trend:"Etkinlik Trendi",ch_type:"Tipe göre",ch_platform:"Platform / Etiket",ch_project:"Projeye göre",
   ch_interface:"Arayüz (kaynak)",ch_action:"Eyleme göre",ch_actor:"Aktöre göre",ch_accessed:"En çok erişilen secret",
   ch_tenant:"Tenant'a göre",ch_env:"Ortama göre",ch_repo:"Repo'ya göre"},
- en:{login_sub:"Local‑only, single‑file secret manager for the AI‑coding era.",master_pw:"Master password",unlock:"Unlock",
-  wrong_pw:"Wrong master password.",secrets:"Secrets",audit_log:"Audit Logs",lock:"🔒 Lock",filters:"Filters",search:"search",
+ en:{login_sub:"The local-only secret manager for the AI-coding era.",master_pw:"Master password",unlock:"Unlock",
+  wrong_pw:"Wrong master password.",locked_wait:s=>`Too many wrong attempts — wait ${s}s.`,secrets:"Secrets",audit_log:"Audit Logs",lock:"🔒 Lock",filters:"Filters",search:"search",
   search_secrets:"🔎 search: name, url, tag, notes…",all_types:"all types",new_secret:"+ New Secret",
   th_name:"Name",th_type:"Type",th_scope:"Scope (tenant/project/env/repo)",th_tags:"Tags",th_updated:"Updated",th_actions:"Actions",
   no_records:"no records",records:"records",view:"View",edit:"Edit",del:"Delete",more:"More",per_page:"per page",
@@ -855,7 +866,7 @@ const I18N={
   exported:"export downloaded",imp_pick:"pick a .age file first",imp_fail:"import failed",imp_corrupt:"corrupt / unreadable file",imported_n:(n,u,s)=>`+${n} new, ~${u} updated, =${s||0} skipped`,
   imp_mode_overwrite:"On conflict: overwrite",imp_mode_skip:"On conflict: skip",imp_mode_duplicate:"On conflict: duplicate",
   set_backup:"Backup (.cerbak)",set_backup_hint:"A .cerbak backup is the whole vault encrypted with a dedicated backup password (separate from your master password) — an opaque binary you can't open to read. Restore it via Import above. Automatic backups write a .cerbak to a local folder on unlock once the interval has elapsed.",
-  backup_now:"⬇ Backup now (.cerbak)",bk_auto:"Automatic backups",bk_interval:"Every (hours)",bk_keep:"Keep last (files)",bk_dir:"Destination folder",
+  backup_now:"⬇ Backup now (.cerbak)",bk_auto:"Automatic backups",bk_interval:"Every",bk_u_hour:"hours",bk_u_day:"days",bk_u_week:"weeks",bk_u_month:"months",bk_keep:"Keep last (files)",bk_dir:"Destination folder",
   bk_pw:"Backup password",bk_pw_ph:"set / change (leave blank to keep)",bk_pw_isset:"(set)",bk_pw_unset:"(not set)",bk_run:"▶ Run auto-backup now",
   bk_saved:"backup settings saved",bk_downloaded:"backup downloaded",bk_ran:s=>`backup written: ${s}`,
   bk_pw_short:"backup password must be at least 8 characters",bk_pw_mismatch:"backup passwords don't match",bk_pw_same:"backup password must differ from the master password",
@@ -949,10 +960,21 @@ function tagChip(name){
 }
 
 // ---------- auth / idle ----------
+let _lockTimer=null;
 async function unlock(){
   const r=await fetch('/api/unlock',{method:'POST',body:JSON.stringify({pw:$('#pw').value})});
-  if(r.ok){ $('#pw').value=''; $('#loginerr').textContent=''; showApp(); }
-  else $('#loginerr').textContent=t('wrong_pw');
+  if(r.ok){ $('#pw').value=''; $('#loginerr').textContent=''; lockCountdown(0); showApp(); return; }
+  if(r.status===429){ const d=await r.json().catch(()=>({})); lockCountdown(d.retry_after||300); return; }
+  $('#loginerr').textContent=t('wrong_pw');
+}
+// Disable the login for `secs` seconds after too many wrong passwords, ticking down a message.
+function lockCountdown(secs){
+  clearInterval(_lockTimer); const btn=$('#unlockbtn'), pw=$('#pw');
+  if(secs<=0){ if(btn)btn.disabled=false; if(pw)pw.disabled=false; $('#loginerr').textContent=''; return; }
+  let left=secs;
+  const tick=()=>{ if(left<=0){ lockCountdown(0); return; }
+    $('#loginerr').textContent=t('locked_wait',left); left--; };
+  if(btn)btn.disabled=true; if(pw)pw.disabled=true; tick(); _lockTimer=setInterval(tick,1000);
 }
 async function lock(){ await fetch('/api/lock',{method:'POST'}); showLogin(); }
 function showLogin(){ clearInterval(idleTimer); closeModal(); $('.menu').classList.remove('open'); $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#pw').focus(); history.replaceState({}, '', location.pathname); }
@@ -963,8 +985,8 @@ async function showApp(startSecs){
   rebuildSelects(); FOPTS.type=Object.keys(TYPES); FDIMS.forEach(renderMsel);
   ['a_source','a_action','a_actor','a_key','a_detail','st_source','st_actor','st_type','st_project'].forEach(renderMsel);
   renderPeriods('#aperiods',APERIOD.k,'aPickPeriod'); renderPeriods('#stperiods',STPERIOD.k,'stPickPeriod'); dtSync();
-  const wide=window.innerWidth>820;
-  ['filter','afilter','stfilter'].forEach(p=>{ $('#'+p+'panel').classList.toggle('hidden',!wide); $('#'+p+'btn').classList.toggle('on',wide); });
+  // Filters start collapsed on every page — the user opens them explicitly.
+  ['filter','afilter','stfilter'].forEach(p=>{ $('#'+p+'panel').classList.add('hidden'); $('#'+p+'btn').classList.remove('on'); });
   measureSticky();
   idleLeft=(startSecs!=null?startSecs:IDLE); startIdle();
   _navlock=true; showTab('secrets'); _navlock=false;
@@ -1072,11 +1094,17 @@ async function loadBackup(){
   if(!$('#bk_enabled'))return;                       // eski sunucu / bu bolum yok → sessizce gec
   const r=await api('/api/backup'); if(!r.ok)return; // eski sunucu 404 → sekmeyi bozma (sunucuyu yeniden baslat)
   const b=await r.json();
-  $('#bk_enabled').checked=!!b.enabled; $('#bk_interval').value=b.interval_h||24; $('#bk_keep').value=b.keep||7;
+  $('#bk_enabled').checked=!!b.enabled; bkSetInterval(b.interval_h||24); $('#bk_keep').value=b.keep||7;
   $('#bk_dir').value=b.dir||''; $('#bk_pw').value='';
   $('#bk_pw_set').textContent=b.has_pw?t('bk_pw_isset'):t('bk_pw_unset');
   $('#bk_last').textContent=b.last?t('bk_last',b.last.replace('T',' ').slice(0,19)):t('bk_last_never');
 }
+// Show interval_h in the largest whole unit (month/week/day/hour).
+function bkSetInterval(h){
+  const u=[720,168,24,1].find(f=>h%f===0)||1;
+  $('#bk_unit').value=u; $('#bk_interval').value=h/u;
+}
+async function bkBrowse(){ const d=await (await api('/api/pickdir')).json(); if(d.path)$('#bk_dir').value=d.path.replace(/\/$/,''); }
 // Manuel .cerbak indir: yedek parolasını 2 kez sor (master'dan farklı, min 8).
 function doBackup(){
   const body=`<div class="field"><label class="fld">${t('bk_pw')}</label>
@@ -1101,7 +1129,7 @@ function doBackup(){
 // Oto-yedek ayarını kaydet: master pw ile doğrula; yeni yedek parolası girildiyse gönder.
 function saveBackupCfg(){
   const enabled=$('#bk_enabled').checked;
-  const interval_h=Math.max(1,Math.min(8760,parseInt($('#bk_interval').value)||24));
+  const interval_h=Math.max(1,Math.min(8760,(parseInt($('#bk_interval').value)||1)*(parseInt($('#bk_unit').value)||1)));
   const keep=Math.max(1,Math.min(365,parseInt($('#bk_keep').value)||7));
   const dir=$('#bk_dir').value.trim(), backup_pw=$('#bk_pw').value;
   if(backup_pw && backup_pw.length<8){toast(t('bk_pw_short'));return;}
@@ -2259,8 +2287,8 @@ function renderStats(S,A){
   $('#stcharts').innerHTML=[
     card(t('ch_trend'),trendSVG(trendData(A,STPERIOD)),true),
     card(t('ch_type'),barsHTML(countBy(S,e=>e.type))),
-    card(t('ch_platform'),barsHTML(countFlat(S,e=>e.tags),{color:tagColor})),
-    card(t('ch_interface'),barsHTML(countBy(A,r=>r.source),{color:tagColor})),
+    card(t('ch_platform'),barsHTML(countFlat(S,e=>e.tags))),
+    card(t('ch_interface'),barsHTML(countBy(A,r=>r.source))),
     card(t('ch_action'),barsHTML(countBy(A,r=>r.action),{label:actLabel})),
     card(t('ch_actor'),barsHTML(countBy(A,r=>r.actor))),
     card(t('ch_accessed'),barsHTML(accByKey)),
