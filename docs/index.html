@@ -257,12 +257,13 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <span class="pill" data-i18n="pill_local">🔒 Local-only</span>
       <span class="pill" data-i18n="pill_ai">🤖 AI-safe by design</span>
       <span class="pill" data-i18n="pill_oss">⭐ Open source (MIT)</span>
-      <span class="pill">🧩 CLI · Web · TUI · MCP</span>
+      <span class="pill">🧩 CLI · Web · TUI · MCP · Extension</span>
     </div>
     <div class="installwrap">
       <div class="ostabs" id="ostabs">
         <button data-os="unix">macOS / Linux</button>
         <button data-os="win">Windows</button>
+        <button data-os="ext">🧩 Chrome Extension</button>
       </div>
       <div id="install" class="install">
         <span class="p" id="installp">$</span>
@@ -272,6 +273,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
     </div>
     <div class="ctarow">
       <a class="btn primary" href="/concealer/getting-started" data-i18n="cta_start">Get started →</a>
+      <a class="btn ghost" href="/concealer/chrome-extension">🧩 <span data-i18n="cta_ext">Chrome Extension</span></a>
       <a class="btn ghost" href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener">★ <span data-i18n="cta_star">Star on GitHub</span></a>
     </div>
   </div>
@@ -299,9 +301,19 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
 <!-- ===== INTERFACES / SCREENSHOTS ===== -->
 <section class="strip"><div class="wrap" style="display:block">
   <div class="sec-h" style="margin-bottom:34px">
-    <div class="eyebrow" data-i18n="ui_eyebrow">Four ways in</div>
-    <h2 data-i18n="ui_h">CLI · Web UI · TUI · MCP</h2>
+    <div class="eyebrow" data-i18n="ui_eyebrow">Five ways in</div>
+    <h2 data-i18n="ui_h">CLI · Web UI · TUI · MCP · Chrome Extension</h2>
     <p data-i18n="ui_p">The same encrypted vault, however you like to work.</p>
+  </div>
+
+  <div class="shot">
+    <div class="txt">
+      <div class="eyebrow">CLI</div>
+      <h3 data-i18n="s_cli_h">One command, any secret</h3>
+      <p data-i18n="s_cli_p">Set, get, run-with and deploy secrets from the terminal — scoped by tenant / project / environment / repo. <code>cer run</code> injects them into a child process's environment and redacts the values from its output.</p>
+      <p><code>cer set · cer get · cer run · cer list</code></p>
+    </div>
+    <figure><img src="/concealer/assets/cli-terminal.png" alt="concealer CLI — set, get, run and list secrets" loading="lazy"></figure>
   </div>
 
   <div class="shot">
@@ -332,6 +344,16 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <p><code>concealer agent register claude</code></p>
     </div>
     <figure><img src="/concealer/assets/mcp-secret-list.gif" alt="Agent listing concealer secrets over MCP — names only, never values" loading="lazy"></figure>
+  </div>
+
+  <div class="shot">
+    <div class="txt">
+      <div class="eyebrow">Chrome Extension</div>
+      <h3 data-i18n="s_ext_h">Copy secrets from your toolbar</h3>
+      <p data-i18n="s_ext_p">Open your vault and copy secret values straight from Chrome — no <code>cer web</code>. Multi-field secrets expand for per-field copy &amp; reveal; the popup starts on demand and self-locks when idle. Dark / White / Matrix themes.</p>
+      <p><code>cer chrome-extension</code> · <a href="/concealer/chrome-extension">full guide →</a></p>
+    </div>
+    <figure><img src="/concealer/assets/ext-list.png" alt="concealer Chrome extension — copy secrets from the toolbar" loading="lazy"></figure>
   </div>
 </div></section>
 
@@ -455,6 +477,13 @@ concealer run --project web --env prod npm run deploy</div>
       <code>pipx install concealer</code>
       <button data-copy data-i18n="copy">Copy</button>
     </div>
+    <div class="cmdlabel">🧩 Chrome Extension <span data-i18n="modal_l_ext">· toolbar UI (after installing concealer)</span></div>
+    <div class="cmd">
+      <span class="p">$</span>
+      <code>cer chrome-extension</code>
+      <button data-copy data-i18n="copy">Copy</button>
+    </div>
+    <p class="alt" data-i18n="modal_ext">Copy secrets from the Chrome toolbar → <a href="/concealer/chrome-extension">Chrome Extension guide</a>.</p>
     <p class="alt" data-i18n="modal_alt">Prefer the manual route? See the <a href="/concealer/installation">Installation guide</a>.</p>
   </div>
 </div>
@@ -518,7 +547,9 @@ const I18N={
   f4_h:"SOPS + age crypto",f4_p:"All encryption is delegated to battle-tested tools: AES-256-GCM over age X25519. The age private key never touches disk in plaintext — key-at-rest.",
   f5_h:"Tamper-evident audit",f5_p:"Every read, write, copy and inject is appended to an HMAC-chained log with a monotonic seq and a tail anchor. Names and actions only — never values.",
   f6_h:"One place, many projects",f6_p:"Disambiguate the same value across repos by tenant / project / environment / repo. The most-specific scope wins at inject time.",
-  ui_eyebrow:"Four ways in",ui_h:"CLI · Web UI · TUI · MCP",ui_p:"The same encrypted vault, however you like to work.",
+  ui_eyebrow:"Five ways in",ui_h:"CLI · Web UI · TUI · MCP · Chrome Extension",ui_p:"The same encrypted vault, however you like to work.",
+  s_cli_h:"One command, any secret",s_cli_p:"Set, get, run-with and deploy secrets from the terminal — scoped by tenant / project / environment / repo. cer run injects them into a child process's environment and redacts the values from its output.",
+  s_ext_h:"Copy secrets from your toolbar",s_ext_p:"Open your vault and copy secret values straight from Chrome — no cer web. Multi-field secrets expand for per-field copy & reveal; the popup starts on demand and self-locks when idle. Dark / White / Matrix themes.",cta_ext:"Chrome Extension",
   s_web_h:"A professional local console",s_web_p:"Type-aware forms, searchable multi-select filters, per-secret deploy renderers, clipboard copy with auto-clear, and a tamper-evident audit viewer. Bilingual (TR/EN), dark/light/matrix themes, localhost only.",
   s_tui_h:"Full terminal interface",s_tui_p:"Browse, search, add, delete and reveal secrets without leaving the terminal — arrow keys, instant filtering, type-aware editing.",
   s_mcp_h:"Agents use secrets, never see them",s_mcp_p:"Register an agent, hand it a revocable token, and it can inject a DB password to run a query — while the value stays redacted from its context. Every call is audited with source=mcp.",
@@ -526,6 +557,7 @@ const I18N={
   cta_h:"Stop pasting keys into chat windows.",cta_p:"Local-only. Portable. Open source. Built for the AI-coding era.",cta_install:"Install now",
   modal_h:"Install concealer",modal_p:"Pick your platform's package manager — each pulls in the sops/age binaries.",
   modal_l_brew:"· macOS / Linux",modal_l_pipx:"· all platforms",
+  modal_l_ext:"· toolbar UI (after installing concealer)",modal_ext:"Copy secrets from the Chrome toolbar → <a href=\"/concealer/chrome-extension\">Chrome Extension guide</a>.",
   modal_alt:"Prefer the manual route? See the <a href=\"/concealer/installation\">Installation guide</a>."},
  tr:{nav_docs:"Dokümanlar",nav_ext:"Eklenti",nav_install:"Kurulum",nav_comparison:"Karşılaştırma",nav_support:"Destek",copy:"Kopyala",copied:"Kopyalandı ✓",
   sup_eyebrow:"Destek",sup_h:"Soru, hata ya da geri bildirim?",sup_p:"Doğrudan yaz — her mesajı okuyoruz ve genelde bir gün içinde yanıtlıyoruz.",sup_btn:"✉️ E-posta ile destek",sup_issue:"GitHub'da konu aç",
@@ -541,7 +573,9 @@ const I18N={
   f4_h:"SOPS + age şifreleme",f4_p:"Tüm şifreleme denenmiş araçlara devredilir: age X25519 üzerinde AES-256-GCM. age özel anahtarı diske asla düz metin yazılmaz — key-at-rest.",
   f5_h:"Kurcalamaya-dayanıklı denetim",f5_p:"Her okuma, yazma, kopyalama ve enjeksiyon; monoton seq ve kuyruk çıpası olan HMAC-zincirli bir günlüğe eklenir. Yalnız ad ve eylem — değer asla.",
   f6_h:"Tek yer, çok proje",f6_p:"Aynı değeri repolar arasında tenant / project / environment / repo ile ayrıştır. Enjeksiyonda en spesifik kapsam kazanır.",
-  ui_eyebrow:"Dört giriş yolu",ui_h:"CLI · Web UI · TUI · MCP",ui_p:"Aynı şifreli kasa, nasıl çalışmak istersen.",
+  ui_eyebrow:"Beş giriş yolu",ui_h:"CLI · Web UI · TUI · MCP · Chrome Eklentisi",ui_p:"Aynı şifreli kasa, nasıl çalışmak istersen.",
+  s_cli_h:"Tek komut, her secret",s_cli_p:"Secret'ları terminalden ekle, al, çalıştır ve dağıt — tenant / proje / ortam / repo ile kapsamlı. cer run bunları bir alt sürecin ortamına enjekte eder ve değerleri çıktıdan maskeler.",
+  s_ext_h:"Secret'ları araç çubuğundan kopyala",s_ext_p:"Kasanı aç ve secret değerlerini doğrudan Chrome'dan kopyala — cer web yok. Çok alanlı secret'lar alan bazlı kopyala & göster için açılır; popup ihtiyaç anında başlar, boşta kendini kilitler. Dark / White / Matrix temaları.",cta_ext:"Chrome Eklentisi",
   s_web_h:"Profesyonel yerel konsol",s_web_p:"Tipe duyarlı formlar, aranabilir çoklu-seçim filtreleri, secret başına deploy şablonları, otomatik-temizlenen panoya kopyalama ve kurcalamaya-dayanıklı denetim görüntüleyici. İki dilli (TR/EN), koyu/açık/matrix temalar, yalnız localhost.",
   s_tui_h:"Tam terminal arayüzü",s_tui_p:"Terminalden çıkmadan secret'ları gez, ara, ekle, sil ve göster — ok tuşları, anlık filtreleme, tipe duyarlı düzenleme.",
   s_mcp_h:"Ajanlar kullanır, asla görmez",s_mcp_p:"Bir ajan kaydet, iptal edilebilir bir token ver; DB parolasını enjekte edip sorgu çalıştırabilir — değer bağlamından maskeli kalır. Her çağrı source=mcp ile denetlenir.",
@@ -549,6 +583,7 @@ const I18N={
   cta_h:"Anahtarları sohbet penceresine yapıştırmayı bırak.",cta_p:"Yalnızca yerel. Taşınabilir. Açık kaynak. YZ çağı için.",cta_install:"Şimdi kur",
   modal_h:"concealer kurulumu",modal_p:"Platformunun paket yöneticisini seç — her biri sops/age ikililerini de kurar.",
   modal_l_brew:"· macOS / Linux",modal_l_pipx:"· tüm platformlar",
+  modal_l_ext:"· araç çubuğu arayüzü (concealer kurulduktan sonra)",modal_ext:"Secret'ları Chrome araç çubuğundan kopyala → <a href=\"/concealer/chrome-extension\">Chrome Eklentisi rehberi</a>.",
   modal_alt:"Elle kurmak mı? <a href=\"/concealer/installation\">Kurulum rehberine</a> bak."}
 };
 function setLang(l){
@@ -572,7 +607,8 @@ document.querySelectorAll('[data-copy]').forEach(btn=>{
 
 /* ===== hero OS one-liner tabs ===== */
 const CMDS={unix:['$','brew install fxerkan/tap/concealer'],
-            win:['>','scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket\nscoop install concealer']};
+            win:['>','scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket\nscoop install concealer'],
+            ext:['$','cer chrome-extension']};
 function setOS(os){
   document.getElementById('installp').textContent=CMDS[os][0];
   document.getElementById('installcmd').textContent=CMDS[os][1];
