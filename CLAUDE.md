@@ -22,7 +22,6 @@
   - **Recovery codes (`keys/recovery.json`):** `init` prints 8 one‑time codes (shown once, only scrypt‑hash + code‑wrapped age key stored). Any code recovers the vault via `recover`; `passwd` **requires** a code as a 2nd factor (consumed) so a stolen master password alone can't take over. `recovery` regenerates the set.
   - Audit: `audit()` appends an HMAC‑SHA256‑chained line to `keys/audit.log` with a monotonic `seq`; `audit_verify()` recomputes the chain **and** compares the tail against the `keys/audit.head` anchor to catch tail‑truncation (deleting the last lines). Ceiling: `audit.key` is on disk, so a full FS‑root attacker can still re‑forge — documented in the `audit_verify` comment.
 - **`webui.html`** — the SPA. Served by the Python server with `__IDLE__` replaced at request time. Talks to a JSON API (`/api/...`). Bilingual (TR/EN) via the `I18N` dict + `t()` + `data-i18n` attributes. Brand is rendered `conceal<span class="ac">er</span>` (the `er` suffix is accent‑colored — house branding rule).
-- **`sm`** — tiny legacy `sops exec-env` helper. Optional.
 
 ## Conventions
 
