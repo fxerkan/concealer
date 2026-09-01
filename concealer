@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "0.9.17"   # advances through 0.x; 1.0 = reserved for the full live/release version
+VERSION = "0.9.18"   # advances through 0.x; 1.0 = reserved for the full live/release version
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -1220,19 +1220,24 @@ def _ask_new_password():
         if p1 != getpass.getpass("Repeat: "): print("did not match, try again."); continue
         return p1
 
-_SN, _SR, _SP = 16384, 8, 1
+_SN, _SR, _SP = 16384, 8, 1   # token/recovery KDF: inputs are already 100-144 bit, so cost factor matters little
+_MASTER_N = 1 << 17           # master-PASSWORD verifier: OWASP scrypt guidance (2^17) — resists offline cracking of master.json
 def _scrypt(pw, salt, n=_SN, r=_SR, p=_SP):
-    return hashlib.scrypt(pw.encode(), salt=salt, n=n, r=r, p=p, dklen=32, maxmem=64 * 1024 * 1024)
+    # maxmem scales with the work factor (128*N*r*p bytes) + headroom, so a higher N never hits the cap.
+    maxmem = 128 * n * r * p + (16 * 1024 * 1024)
+    return hashlib.scrypt(pw.encode(), salt=salt, n=n, r=r, p=p, dklen=32, maxmem=maxmem)
 def write_master(pw):
     salt = os.urandom(16)
     with open(MASTER, "w") as f:
-        json.dump({"salt": salt.hex(), "hash": _scrypt(pw, salt).hex(), "n": _SN, "r": _SR, "p": _SP}, f)
+        json.dump({"salt": salt.hex(), "hash": _scrypt(pw, salt, _MASTER_N).hex(), "n": _MASTER_N, "r": _SR, "p": _SP}, f)
     os.chmod(MASTER, 0o600)
 def verify_master(pw):
     if os.path.exists(MASTER):
         m = json.load(open(MASTER))
-        return hmac.compare_digest(_scrypt(pw, bytes.fromhex(m["salt"]), m["n"], m["r"], m["p"]),
-                                   bytes.fromhex(m["hash"]))
+        ok = hmac.compare_digest(_scrypt(pw, bytes.fromhex(m["salt"]), m["n"], m["r"], m["p"]),
+                                 bytes.fromhex(m["hash"]))
+        if ok and int(m.get("n", 0)) < _MASTER_N: write_master(pw)   # lazy-upgrade legacy vaults to the stronger N
+        return ok
     if os.path.exists(BACKUP):
         rc, _ = _age_pw(["--decrypt", "-o", os.devnull, BACKUP], pw)
         if rc == 0: write_master(pw)
@@ -3040,6 +3045,35 @@ def serve_web(port):
             _last[0] = time.time()
             try: super().handle()
             except (BrokenPipeError, ConnectionResetError): pass
+        def end_headers(self):
+            # Security response headers on EVERY reply (F2/F3). connect-src 'self' means even if
+            # markup injection ran, it could not exfiltrate to a remote origin; frame-ancestors/
+            # X-Frame-Options block clickjacking; nosniff blocks MIME confusion; no-store keeps
+            # revealed secret JSON out of the browser disk cache. script/style 'unsafe-inline' is
+            # still required by the inline handlers/styles in webui.html — remove it once those are
+            # refactored to addEventListener + external CSS (upgrade path, see SECURITY_AUDIT_OWASP.md).
+            self.send_header("Content-Security-Policy",
+                             "default-src 'none'; script-src 'self' 'unsafe-inline'; "
+                             "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+                             "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.send_header("Cache-Control", "no-store")
+            super().end_headers()
+        def _guard(self):
+            # Anti-DNS-rebinding (F4): the loopback bind only helps if the browser actually reached
+            # us as 127.0.0.1/localhost. A rebinding page arrives with Host: evil.com — reject it.
+            # Cross-origin state change is also refused unless the Origin is loopback or the extension.
+            port = self.server.server_address[1]
+            host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip().strip("[]").lower()
+            if host and host not in ("127.0.0.1", "localhost", "::1"):
+                self._json({"error": "forbidden host"}, 403); return False
+            origin = self.headers.get("Origin")
+            if origin and not (origin.startswith("chrome-extension://")
+                               or origin in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")):
+                self._json({"error": "forbidden origin"}, 403); return False
+            return True
         def _tok(self):
             # Header first: the Chrome extension is a cross-origin client, so the SPA's
             # HttpOnly SameSite=Strict cookie never rides along on its fetches. It holds
@@ -3060,6 +3094,7 @@ def serve_web(port):
             return json.loads(self.rfile.read(ln) or "{}")
 
         def do_GET(self):
+            if not self._guard(): return
             u = urllib.parse.urlparse(self.path); path = u.path
             q = {k: v[0] for k, v in urllib.parse.parse_qs(u.query).items()}
             if path == "/" or path == "/index.html":
@@ -3144,6 +3179,7 @@ def serve_web(port):
 
         def do_POST(self):
             global _KEY_CACHE
+            if not self._guard(): return
             path = urllib.parse.urlparse(self.path).path
             if path == "/api/unlock":
                 ip = self.client_address[0] if self.client_address else "?"
@@ -3313,6 +3349,7 @@ def serve_web(port):
             self._json({"error": "not found"}, 404)
 
         def do_PUT(self):
+            if not self._guard(): return
             path = urllib.parse.urlparse(self.path).path
             if not valid(self._tok() or ""): return self._json({"error": "locked"}, 401)
             if path.startswith("/api/secret/"):
@@ -3327,6 +3364,7 @@ def serve_web(port):
             self._json({"error": "not found"}, 404)
 
         def do_DELETE(self):
+            if not self._guard(): return
             path = urllib.parse.urlparse(self.path).path
             if not valid(self._tok() or ""): return self._json({"error": "locked"}, 401)
             if path.startswith("/api/policies/"):
