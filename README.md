@@ -254,7 +254,7 @@ Then click the toolbar icon → unlock → copy. Highlights:
 
 Install & full guide → **[Chrome Extension docs](https://fxerkan.github.io/concealer/chrome-extension)**.
 The native host is **built into concealer** (`concealer native-host`) — no separate program to install.
-_Chrome Web Store listing: coming soon (pending review)._
+**[Add to Chrome →](https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj)** on the Chrome Web Store.
 
 ### MCP (AI agents) — `concealer mcp` - `cer mcp`
 Register once, available in every session. On a hardened (key‑at‑rest) vault the

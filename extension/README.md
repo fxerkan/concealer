@@ -26,7 +26,7 @@ Features: per-field copy (secret + non-secret) with auto-hiding reveal • auto-
 ## Install
 
 **1. Install the extension**
-- From the Chrome Web Store (recommended), or
+- From the [Chrome Web Store](https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj) (recommended), or
 - Unpacked: `chrome://extensions` → Developer mode → **Load unpacked** → this `extension/` folder.
 
 **2. One-time OS setup** (registers the native helper; needs concealer installed):
@@ -57,9 +57,11 @@ cer chrome-extension --list                      # show authorized IDs
 python3 extension/build.py     # → dist/concealer-extension-<version>.zip (self-signed key stripped)
 ```
 
-Upload that zip at <https://chrome.google.com/webstore/devconsole>. After the first upload, the
-store assigns an extension ID — add it to the built-in `_EXT_STORE_ID` in `concealer` (and re-run
-`cer chrome-extension`) so the native host trusts the published build.
+The extension is **live**: <https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj>.
+Its ID (`hecffnhjbhldmdpcnpkpcffmodnemdcj`) is already wired into `concealer` (`_EXT_STORE_ID`), so the
+native host trusts the published build. Version updates publish automatically via
+`.github/workflows/publish-extension.yml` (dispatched by `release.yml`) — or upload the zip by hand
+at <https://chrome.google.com/webstore/devconsole>.
 
 ## How it works
 

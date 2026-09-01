@@ -78,8 +78,8 @@ defteri anahtarlarını yazar. Ardından araç-çubuğu simgesine tıkla.
 Ortam ayrıntıları için [Windows rehberi]({{ site.baseurl }}/tr/WINDOWS)'ne bak.
 </div>
 <div class="cer-panel" data-panel="ext" markdown="1">
-**Chrome Web Mağazası'ndan** — _çok yakında (inceleme aşamasında)._ Yayınlandığında normal bir
-eklenti gibi kurulur; yine de bir kez `cer chrome-extension` çalıştırırsın (mağaza native host
+**Chrome Web Mağazası'ndan** — **[Chrome'a Ekle →](https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj)**.
+Normal bir eklenti gibi kurulur; yine de bir kez `cer chrome-extension` çalıştırırsın (mağaza native host
 kaydedemez).
 
 **Paketlenmemiş yükleme (şimdi çalışır):**

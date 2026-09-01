@@ -1,6 +1,7 @@
 # Chrome Web Store listing — copy/paste content
 
-Item ID: **hecffnhjbhldmdpcnpkpcffmodnemdcj** · Version: **0.9.16**
+Live: <https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj>
+Item ID: **hecffnhjbhldmdpcnpkpcffmodnemdcj** · Version: **0.9.17**
 
 All assets live in `extension/store/` (regenerate with `python3 extension/store/gen.py` — needs
 `rsvg-convert` + `magick`). Screenshots are 1280×800, 24-bit PNG, no alpha — as the store requires.

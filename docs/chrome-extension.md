@@ -77,8 +77,8 @@ Chrome / Edge / Chromium. Then click the concealer toolbar icon.
 See the [Windows guide]({{ site.baseurl }}/WINDOWS) for environment details.
 </div>
 <div class="cer-panel" data-panel="ext" markdown="1">
-**From the Chrome Web Store** — _coming soon (pending review)._ Once live it installs like any
-extension; you still run `cer chrome-extension` once (the store can't register a native host).
+**From the Chrome Web Store** — **[Add to Chrome →](https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj)**.
+It installs like any extension; you still run `cer chrome-extension` once (the store can't register a native host).
 
 **Load unpacked (works today):**
 
