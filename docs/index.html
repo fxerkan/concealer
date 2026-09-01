@@ -602,12 +602,19 @@ document.querySelectorAll('[data-copy]').forEach(btn=>{
 });
 
 /* ===== hero OS one-liner tabs ===== */
+const CWS_URL='https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj';
 const CMDS={unix:['$','brew install fxerkan/tap/concealer'],
-            win:['>','scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket\nscoop install concealer'],
-            ext:['$','cer chrome-extension']};
+            win:['>','scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket\nscoop install concealer']};
 function setOS(os){
-  document.getElementById('installp').textContent=CMDS[os][0];
-  document.getElementById('installcmd').textContent=CMDS[os][1];
+  var p=document.getElementById('installp'),cmd=document.getElementById('installcmd'),copy=document.getElementById('copybtn');
+  if(os==='ext'){ // ext isn't a shell command — link straight to the Chrome Web Store
+    p.style.display='none';copy.style.display='none';
+    var l=(localStorage.getItem('concealer_lang')||'en');
+    cmd.innerHTML='<a href="'+CWS_URL+'" style="color:var(--ac)">➕ '+(l==='tr'?"Chrome'a Ekle":'Add to Chrome')+' →</a>';
+  }else{
+    p.style.display='';copy.style.display='';
+    p.textContent=CMDS[os][0];cmd.textContent=CMDS[os][1];
+  }
   document.querySelectorAll('#ostabs button').forEach(b=>b.classList.toggle('on',b.dataset.os===os));
 }
 document.querySelectorAll('#ostabs button').forEach(b=>b.onclick=()=>setOS(b.dataset.os));
