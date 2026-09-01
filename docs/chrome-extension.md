@@ -32,24 +32,32 @@ child rows so you copy **exactly** the field you need — and reveal it first if
 ---
 
 ## Install & set up
+{: #install }
 
-Two one-time steps: **(1)** add the extension to Chrome, then **(2)** register the native helper so
-the popup can start your vault. Pick your platform:
+### 1. Add to Chrome
+
+<p><a class="btn-cws" href="https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj">➕ Add to Chrome — concealer on the Web Store</a></p>
+
+Installs like any other extension. _(Prefer a local build? See [Developer install](#developer-install) at the bottom.)_
+
+### 2. Register the native helper
+
+The store can't register a native host, so run this **once per machine** so the popup can start your
+vault. Pick your platform:
 
 <div class="cer-tabs">
 <div class="cer-tabbar">
 <button class="cer-tab is-active" data-tab="mac">🍎 macOS / Linux</button>
 <button class="cer-tab" data-tab="win">🪟 Windows</button>
-<button class="cer-tab" data-tab="ext">🧩 Chrome Extension</button>
 </div>
 <div class="cer-panel is-active" data-panel="mac" markdown="1">
-**1. Install concealer** (if you don't have it yet):
+**Install concealer** (if you don't have it yet):
 
 ```bash
 brew install fxerkan/tap/concealer
 ```
 
-**2. Register the native helper** (one-time OS setup):
+**Register the native helper** (one-time OS setup):
 
 ```bash
 cer chrome-extension
@@ -59,14 +67,14 @@ Then click the concealer toolbar icon. The extension shows this setup step until
 Remove it later with `cer chrome-extension --uninstall`.
 </div>
 <div class="cer-panel" data-panel="win" markdown="1">
-**1. Install concealer** (if you don't have it yet):
+**Install concealer** (if you don't have it yet):
 
 ```powershell
 scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket
 scoop install concealer
 ```
 
-**2. Register the native helper** (one-time OS setup):
+**Register the native helper** (one-time OS setup):
 
 ```powershell
 cer chrome-extension
@@ -75,17 +83,6 @@ cer chrome-extension
 This writes the native-host manifest and the `HKCU\…\NativeMessagingHosts` registry keys for
 Chrome / Edge / Chromium. Then click the concealer toolbar icon.
 See the [Windows guide]({{ site.baseurl }}/WINDOWS) for environment details.
-</div>
-<div class="cer-panel" data-panel="ext" markdown="1">
-**From the Chrome Web Store** — **[Add to Chrome →](https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj)**.
-It installs like any extension; you still run `cer chrome-extension` once (the store can't register a native host).
-
-**Load unpacked (works today):**
-
-1. `git clone https://github.com/fxerkan/concealer.git`
-2. Open `chrome://extensions` → enable **Developer mode**
-3. **Load unpacked** → select the `extension/` folder
-4. Run the setup command for your OS (the other tabs), then click the toolbar icon.
 </div>
 </div>
 
@@ -131,7 +128,16 @@ row (see below).
 
 ---
 
-## Developer builds
+## Developer install
+{: #developer-install }
+
+Most people should just [add it from the Web Store](#install). If you'd rather run a local
+build, load it unpacked:
+
+1. `git clone https://github.com/fxerkan/concealer.git`
+2. Open `chrome://extensions` → enable **Developer mode**
+3. **Load unpacked** → select the `extension/` folder
+4. Register the native helper for your platform (step 2 above), then click the toolbar icon.
 
 An unpacked build has a **different extension ID** than the Web Store version. Authorize it for the
 native host with the command shown in **Settings → Developer** (it embeds this build's exact ID):

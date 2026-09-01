@@ -33,24 +33,32 @@ istersen önce görüp doğrularsın.
 ---
 
 ## Kurulum & ayar
+{: #kurulum }
 
-Tek seferlik iki adım: **(1)** eklentiyi Chrome'a ekle, sonra **(2)** popup'ın kasanı
-başlatabilmesi için native yardımcıyı kaydet. Platformunu seç:
+### 1. Chrome'a Ekle
+
+<p><a class="btn-cws" href="https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj">➕ Chrome'a Ekle — concealer, Web Mağazası'nda</a></p>
+
+Normal bir eklenti gibi kurulur. _(Yerel bir derleme mi istiyorsun? En altta [Geliştirici kurulumu](#gelistirici-kurulumu)'na bak.)_
+
+### 2. Native yardımcıyı kaydet
+
+Mağaza native host kaydedemez; bu yüzden popup'ın kasanı başlatabilmesi için bunu **makine başına
+bir kez** çalıştır. Platformunu seç:
 
 <div class="cer-tabs">
 <div class="cer-tabbar">
 <button class="cer-tab is-active" data-tab="mac">🍎 macOS / Linux</button>
 <button class="cer-tab" data-tab="win">🪟 Windows</button>
-<button class="cer-tab" data-tab="ext">🧩 Chrome Eklentisi</button>
 </div>
 <div class="cer-panel is-active" data-panel="mac" markdown="1">
-**1. concealer'ı kur** (henüz yoksa):
+**concealer'ı kur** (henüz yoksa):
 
 ```bash
 brew install fxerkan/tap/concealer
 ```
 
-**2. Native yardımcıyı kaydet** (tek seferlik OS ayarı):
+**Native yardımcıyı kaydet** (tek seferlik OS ayarı):
 
 ```bash
 cer chrome-extension
@@ -60,14 +68,14 @@ Sonra concealer araç-çubuğu simgesine tıkla. Bu adım tamamlanana kadar ekle
 gösterir. Kaldırmak için: `cer chrome-extension --uninstall`.
 </div>
 <div class="cer-panel" data-panel="win" markdown="1">
-**1. concealer'ı kur** (henüz yoksa):
+**concealer'ı kur** (henüz yoksa):
 
 ```powershell
 scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket
 scoop install concealer
 ```
 
-**2. Native yardımcıyı kaydet** (tek seferlik OS ayarı):
+**Native yardımcıyı kaydet** (tek seferlik OS ayarı):
 
 ```powershell
 cer chrome-extension
@@ -76,18 +84,6 @@ cer chrome-extension
 Bu, native-host manifesti ile Chrome / Edge / Chromium için `HKCU\…\NativeMessagingHosts` kayıt
 defteri anahtarlarını yazar. Ardından araç-çubuğu simgesine tıkla.
 Ortam ayrıntıları için [Windows rehberi]({{ site.baseurl }}/tr/WINDOWS)'ne bak.
-</div>
-<div class="cer-panel" data-panel="ext" markdown="1">
-**Chrome Web Mağazası'ndan** — **[Chrome'a Ekle →](https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj)**.
-Normal bir eklenti gibi kurulur; yine de bir kez `cer chrome-extension` çalıştırırsın (mağaza native host
-kaydedemez).
-
-**Paketlenmemiş yükleme (şimdi çalışır):**
-
-1. `git clone https://github.com/fxerkan/concealer.git`
-2. `chrome://extensions` → **Geliştirici modu**'nu aç
-3. **Paketlenmemiş öğe yükle** → `extension/` klasörünü seç
-4. OS'una uygun kurulum komutunu çalıştır (diğer sekmeler), sonra simgeye tıkla.
 </div>
 </div>
 
@@ -122,7 +118,16 @@ Web arayüzüyle eşleşen üç yerleşik tema — **Dark**, **White**, **Matrix
 (10 sn – sunucu süresi, varsayılan 60), gösterimi otomatik-gizleme (5–30 sn, varsayılan 10). Ayrıca
 port, sunucu otomatik-kilidi, kasanın sertleştirilmiş olup olmadığı ve bir **Geliştirici** satırı.
 
-## Geliştirici derlemeleri
+## Geliştirici kurulumu
+{: #gelistirici-kurulumu }
+
+Çoğu kişi için [Web Mağazası'ndan eklemek](#kurulum) yeterlidir. Yerel bir derleme çalıştırmak
+istersen paketlenmemiş olarak yükle:
+
+1. `git clone https://github.com/fxerkan/concealer.git`
+2. `chrome://extensions` → **Geliştirici modu**'nu aç
+3. **Paketlenmemiş öğe yükle** → `extension/` klasörünü seç
+4. Platformuna göre native yardımcıyı kaydet (yukarıdaki 2. adım), sonra simgeye tıkla.
 
 Paketlenmemiş bir derlemenin **eklenti ID'si farklıdır**. **Ayarlar → Geliştirici**'de gösterilen
 komutla onu native host'a yetkilendir:

@@ -40,8 +40,11 @@ concealer init
 Ayrıntılar için [Windows rehberi]({{ site.baseurl }}/tr/WINDOWS).
 </div>
 <div class="cer-panel" data-panel="ext" markdown="1">
-Kasanı gözat ve secret'ları Chrome araç çubuğundan kopyala. concealer'ı kur (macOS/Linux veya
-Windows sekmesi), sonra tek seferlik ayarı çalıştır:
+Kasanı gözat ve secret'ları Chrome araç çubuğundan kopyala.
+
+**[➕ Chrome'a Ekle — Web Mağazası →](https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj)**
+
+Sonra concealer'ı kur (macOS/Linux veya Windows sekmesi) ve tek seferlik native-yardımcı ayarını çalıştır:
 
 ```bash
 cer chrome-extension

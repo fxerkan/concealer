@@ -477,13 +477,9 @@ concealer run --project web --env prod npm run deploy</div>
       <code>pipx install concealer</code>
       <button data-copy data-i18n="copy">Copy</button>
     </div>
-    <div class="cmdlabel">🧩 Chrome Extension <span data-i18n="modal_l_ext">· toolbar UI (after installing concealer)</span></div>
-    <div class="cmd">
-      <span class="p">$</span>
-      <code>cer chrome-extension</code>
-      <button data-copy data-i18n="copy">Copy</button>
-    </div>
-    <p class="alt" data-i18n="modal_ext">Copy secrets from the Chrome toolbar → <a href="/concealer/chrome-extension">Chrome Extension guide</a>.</p>
+    <div class="cmdlabel">🧩 Chrome Extension <span data-i18n="modal_l_ext">· toolbar UI</span></div>
+    <p style="margin:10px 0 6px"><a class="btn primary" href="https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj">➕ <span data-i18n="modal_cws">Add to Chrome</span></a></p>
+    <p class="alt" data-i18n="modal_ext">Then run <code>cer chrome-extension</code> once → <a href="/concealer/chrome-extension">Chrome Extension guide</a>.</p>
     <p class="alt" data-i18n="modal_alt">Prefer the manual route? See the <a href="/concealer/installation">Installation guide</a>.</p>
   </div>
 </div>
@@ -557,7 +553,7 @@ const I18N={
   cta_h:"Stop pasting keys into chat windows.",cta_p:"Local-only. Portable. Open source. Built for the AI-coding era.",cta_install:"Install now",
   modal_h:"Install concealer",modal_p:"Pick your platform's package manager — each pulls in the sops/age binaries.",
   modal_l_brew:"· macOS / Linux",modal_l_pipx:"· all platforms",
-  modal_l_ext:"· toolbar UI (after installing concealer)",modal_ext:"Copy secrets from the Chrome toolbar → <a href=\"/concealer/chrome-extension\">Chrome Extension guide</a>.",
+  modal_l_ext:"· toolbar UI",modal_cws:"Add to Chrome",modal_ext:"Then run <code>cer chrome-extension</code> once → <a href=\"/concealer/chrome-extension\">Chrome Extension guide</a>.",
   modal_alt:"Prefer the manual route? See the <a href=\"/concealer/installation\">Installation guide</a>."},
  tr:{nav_docs:"Dokümanlar",nav_ext:"Eklenti",nav_install:"Kurulum",nav_comparison:"Karşılaştırma",nav_support:"Destek",copy:"Kopyala",copied:"Kopyalandı ✓",
   sup_eyebrow:"Destek",sup_h:"Soru, hata ya da geri bildirim?",sup_p:"Doğrudan yaz — her mesajı okuyoruz ve genelde bir gün içinde yanıtlıyoruz.",sup_btn:"✉️ E-posta ile destek",sup_issue:"GitHub'da konu aç",
@@ -583,7 +579,7 @@ const I18N={
   cta_h:"Anahtarları sohbet penceresine yapıştırmayı bırak.",cta_p:"Yalnızca yerel. Taşınabilir. Açık kaynak. YZ çağı için.",cta_install:"Şimdi kur",
   modal_h:"concealer kurulumu",modal_p:"Platformunun paket yöneticisini seç — her biri sops/age ikililerini de kurar.",
   modal_l_brew:"· macOS / Linux",modal_l_pipx:"· tüm platformlar",
-  modal_l_ext:"· araç çubuğu arayüzü (concealer kurulduktan sonra)",modal_ext:"Secret'ları Chrome araç çubuğundan kopyala → <a href=\"/concealer/chrome-extension\">Chrome Eklentisi rehberi</a>.",
+  modal_l_ext:"· araç çubuğu arayüzü",modal_cws:"Chrome'a Ekle",modal_ext:"Sonra bir kez <code>cer chrome-extension</code> çalıştır → <a href=\"/concealer/chrome-extension\">Chrome Eklentisi rehberi</a>.",
   modal_alt:"Elle kurmak mı? <a href=\"/concealer/installation\">Kurulum rehberine</a> bak."}
 };
 function setLang(l){

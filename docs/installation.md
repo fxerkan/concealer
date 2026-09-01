@@ -40,8 +40,11 @@ concealer init
 See the [Windows guide]({{ site.baseurl }}/WINDOWS) for details.
 </div>
 <div class="cer-panel" data-panel="ext" markdown="1">
-Browse your vault and copy secrets from the Chrome toolbar. Install concealer (macOS/Linux or
-Windows tab), then run the one-time setup:
+Browse your vault and copy secrets from the Chrome toolbar.
+
+**[➕ Add to Chrome — Web Store →](https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj)**
+
+Then install concealer (macOS/Linux or Windows tab) and run the one-time native-helper setup:
 
 ```bash
 cer chrome-extension
