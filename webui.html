@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- CSP (F2): the server also sends this as a header; the meta is a fallback if the page is opened directly.
+     'unsafe-inline' is still needed by the inline handlers/styles — remove once refactored (see SECURITY_AUDIT_OWASP.md). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
 <title>concealer</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='116' fill='%230a0b0d'/><rect x='128' y='176' width='176' height='38' rx='19' fill='%23272c35'/><rect x='128' y='232' width='256' height='52' rx='26' fill='%23ff4d4d'/><rect x='128' y='302' width='136' height='38' rx='19' fill='%23272c35'/></svg>">
 <style>
@@ -923,7 +926,9 @@ function applyStatic(){
 const $ = s => document.querySelector(s);
 async function api(path,opts){ const r=await fetch(path,opts); if(r.status===401){showLogin();throw 'locked';} return r; }
 function toast(m){ const el=$('#toast'); el.textContent=m; el.classList.add('show'); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2600); }
-function esc(s){ return (s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function esc(s){ return (s??'').toString().replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c])); }
+// Only http/https/mailto may become a live href — blocks javascript:/data:/vbscript: stored-XSS from a record's url field (F1).
+function safeUrl(u){ u=(u??'').toString().trim(); return /^(https?:|mailto:)/i.test(u)?u:'#'; }
 function togglePw(id,btn){ const el=typeof id==='string'?$('#'+id):id; let masked;
   if(el.tagName==='TEXTAREA'){ el.classList.toggle('masked'); masked=el.classList.contains('masked'); }
   else { el.type=el.type==='password'?'text':'password'; masked=el.type==='password'; }
@@ -1599,7 +1604,7 @@ function exRenderResults(rows,aborted){
     rows.map(x=>{
       const pw=x.pwned;
       const badge=pw===-1?exPill('med',t('ex_neterr')):pw>0?exPill('high','⚠ '+t('ex_pwned').replace('%',pw)):pw===0?exPill('low',t('ex_clean')):'<span class="mut">—</span>';
-      const cwe=(x.cwe||[]).map(c=>`<a href="${c.url}" target="_blank" rel="noopener" class="chip" title="${esc(c.title)}">${esc(c.id)}</a>`).join(' ');
+      const cwe=(x.cwe||[]).map(c=>`<a href="${esc(safeUrl(c.url))}" target="_blank" rel="noopener" class="chip" title="${esc(c.title)}">${esc(c.id)}</a>`).join(' ');
       return `<tr onclick="openEditor('${x.id}')" style="cursor:pointer">
         <td class="mono"><b>${esc(x.name)}</b><div class="mut" style="font-size:11px">${esc(x.scope)} · ${esc(x.field)}</div></td>
         <td class="mono">${esc(x.mask)}</td><td>${badge}</td><td>${cwe||'—'}</td>
@@ -1615,8 +1620,8 @@ async function runBreach(){
     const r=await (await api('/api/breach',{method:'POST',body:JSON.stringify({email})})).json();
     let row;
     if(!r.ok){
-      if(r.error==='no_key'){ $('#ex_breach').innerHTML=`<span class="mut">${t('ex_no_key')} </span><a href="${r.manual}" target="_blank" rel="noopener">${t('ex_manual')} ↗</a><div class="mut" style="font-size:12px;margin-top:4px">${t('ex_key_hint')}</div>`; return; }
-      row=`<span class="pill" style="${hlSev('med')}">${esc(r.error||'error')}</span> `+(r.manual?`<a href="${r.manual}" target="_blank" rel="noopener">${t('ex_manual')} ↗</a>`:'');
+      if(r.error==='no_key'){ $('#ex_breach').innerHTML=`<span class="mut">${t('ex_no_key')} </span><a href="${esc(safeUrl(r.manual))}" target="_blank" rel="noopener">${t('ex_manual')} ↗</a><div class="mut" style="font-size:12px;margin-top:4px">${t('ex_key_hint')}</div>`; return; }
+      row=`<span class="pill" style="${hlSev('med')}">${esc(r.error||'error')}</span> `+(r.manual?`<a href="${esc(safeUrl(r.manual))}" target="_blank" rel="noopener">${t('ex_manual')} ↗</a>`:'');
     } else {
       const bs=r.breaches||[];
       row=bs.length?exPill('high',bs.length+' '+t('ex_breaches'))+`<div class="tablewrap" style="margin-top:6px"><table class="cards"><tbody>`+
@@ -1845,7 +1850,7 @@ async function loadSecrets(){
 }
 // --- kolon modeli ---
 function scBaseCols(){ return [
-  {k:'name',    l:t('th_name'),    cls:'mono', v:e=>e.name, r:e=>`<b>${esc(e.name)}</b>${e.url?` <a href="${esc(e.url)}" target="_blank">↗</a>`:''}${e.overdue!=null?` <span class="ovd" title="${esc(t('rot_overdue_d',e.overdue))}">⟳ ${t('overdue')}</span>`:''}`},
+  {k:'name',    l:t('th_name'),    cls:'mono', v:e=>e.name, r:e=>`<b>${esc(e.name)}</b>${e.url?` <a href="${esc(safeUrl(e.url))}" target="_blank" rel="noopener">↗</a>`:''}${e.overdue!=null?` <span class="ovd" title="${esc(t('rot_overdue_d',e.overdue))}">⟳ ${t('overdue')}</span>`:''}`},
   {k:'type',    l:t('th_type'),    v:e=>e.type, r:e=>`<span class="type-badge t-${e.type}">${esc(e.type)}</span>`},
   {k:'collection',l:t('th_collection'),cls:'mut mono',v:e=>e.collection||'',r:e=>e.collection?`<span class="coll">📁 ${esc(e.collection)}</span>`:'<span class="mut">—</span>'},
   {k:'scope',   l:t('th_scope'),   cls:'mut mono', v:e=>DIMS.map(d=>e[d]||'*').join('/'), r:e=>DIMS.map(d=>esc(e[d]||'*')).join(' / ')},
@@ -1994,11 +1999,11 @@ async function viewSecret(id){
       <button class="ghost" onclick="copyVal('${e.id}','${esc(e.name)}','${esc(fn)}')">📋</button></div></div>`;
     return `<div class="field"><label class="fld">${esc(fn)}</label><div class="secretrow">
       <input value="${esc(v)}" readonly>
-      <button class="ghost" onclick="copyText('${esc(v).replace(/'/g,"\\'")}','${esc(e.name)}','${esc(fn)}')">📋</button></div></div>`;
+      <button class="ghost" onclick="copyText(${esc(JSON.stringify(v))},${esc(JSON.stringify(e.name))},${esc(JSON.stringify(fn))})">📋</button></div></div>`;
   }).join('');
   const meta=`<div class="grid"><div><label class="fld">${t('type')}</label><div class="mono">${e.type}</div></div>
     <div><label class="fld">${t('scope')}</label><div class="mono mut">${DIMS.map(d=>esc(e[d]||'*')).join(' / ')}</div></div>
-    ${e.url?`<div class="full"><label class="fld">${t('url')}</label><a href="${esc(e.url)}" target="_blank">${esc(e.url)}</a></div>`:''}
+    ${e.url?`<div class="full"><label class="fld">${t('url')}</label><a href="${esc(safeUrl(e.url))}" target="_blank" rel="noopener">${esc(e.url)}</a></div>`:''}
     ${(e.tags||[]).length?`<div class="full"><label class="fld">${t('tags')}</label>${e.tags.map(tagChip).join('')}</div>`:''}
     ${e.notes?`<div class="full"><label class="fld">${t('notes')}</label><div>${esc(e.notes)}</div></div>`:''}</div><hr style="border-color:var(--line);margin:16px 0">`;
   modal(`👁 ${esc(e.name)}`,meta+fh,[{x:t('edit'),f:()=>{closeModal();openEditor(e.id);}},{x:t('close'),p:1,f:closeModal}]);

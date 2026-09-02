@@ -6,6 +6,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.18] — 2026-09-01
+
+### Security
+- **Hardened the web UI against XSS (OWASP audit F1/F5).** A secret's `url` field is now passed through a
+  scheme allow-list (`safeUrl` → only `http`/`https`/`mailto`) before it can become a clickable link, so a
+  stored `javascript:`/`data:` URI (e.g. planted via the MCP `set_secret` `url` arg) can no longer execute
+  when the owner clicks it. `esc()` now also escapes `'` and backtick, and the copy-value button builds its
+  handler argument via `JSON.stringify` instead of hand-rolled quote-escaping (fixes a backslash/newline
+  breakout). `rel="noopener"` added to the remaining `target="_blank"` links.
+- **Content-Security-Policy + security response headers (F2/F3).** The web server now sends `Content-Security-Policy`
+  (`default-src 'none'`, `connect-src 'self'`, `frame-ancestors 'none'`, …; `script-src`/`style-src` keep
+  `'unsafe-inline'` until the inline handlers are refactored), plus `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and `Cache-Control: no-store` on every response.
+  A matching CSP `<meta>` is embedded in `webui.html` as a fallback.
+- **Anti-DNS-rebinding guard (F4).** The localhost API now rejects requests whose `Host` is not
+  `127.0.0.1`/`localhost` and whose `Origin` (when present) is neither loopback nor a `chrome-extension://`
+  page, returning `403`. Blocks a malicious web page / DNS-rebinding attack from driving the API in the
+  victim's browser.
+- **Stronger master-password KDF (F6).** The `master.json` verifier now uses scrypt `N=2^17` (was `2^14`),
+  matching current OWASP guidance; `maxmem` scales with the cost factor. High-entropy token/recovery hashes
+  keep the cheaper factor. Existing vaults are **lazy-upgraded** to the stronger `N` on the next successful
+  master-password check — no user action needed.
+
 ## [0.9.17] — 2026-08-30
 
 ### Added
