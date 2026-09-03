@@ -169,7 +169,32 @@ textarea.jsonv.masked{-webkit-text-security:disc}
 /* thead sticks to viewport just under header+subbar (no scroll wrapper, or sticky breaks) */
 #view-secrets thead th,#view-audit thead th,#view-leaks thead th{position:sticky;top:calc(var(--hh) + var(--sh));z-index:10}
 .tablewrap{overflow:visible}
-#atable{table-layout:fixed}   /* uzun KEY degeri kolonlari bozmasin; resize genislikleri korunsun */
+#atable{table-layout:auto}    /* auto-size columns to their content (was fixed → TIME wrapped) */
+#atable th{white-space:nowrap}          /* headers stay on one line */
+#atable td.mono.mut{white-space:nowrap} /* timestamps / actor never wrap; KEY & DETAIL still wrap+clamp */
+/* secrets grid: horizontal scroll lives INSIDE the table wrapper (not the page, so
+   the app never shifts sideways). NAME is frozen on the left, ACTIONS frozen on the
+   right, and everything between scrolls. Columns size to their content instead of
+   crushing to fit. The wrapper becomes the scroll container, so the header sticks to
+   its top (top:0) rather than the viewport. */
+@media(min-width:721px){
+  #stablewrap{overflow:auto;max-height:calc(100vh - 200px)}
+  #stable{width:max-content;min-width:100%}
+  #stable th,#stable td{white-space:nowrap}
+  #stable td:not(:first-child):not(:last-child){max-width:460px;overflow:hidden;text-overflow:ellipsis}
+  /* sticky header pinned to the wrapper top */
+  #stablewrap thead th{position:sticky;top:0;z-index:20}
+  /* frozen NAME (first col) */
+  #stable td:first-child{position:sticky;left:0;z-index:5;background:var(--panel);box-shadow:1px 0 0 var(--line2);overflow:hidden;text-overflow:ellipsis}
+  #stable thead th:first-child{position:sticky;left:0;z-index:25}
+  #stable tbody tr:nth-child(even) td:first-child{background:linear-gradient(var(--zebra),var(--zebra)),var(--panel)}   /* --zebra is translucent → layer it over opaque --panel so scrolled columns don't bleed through */
+  #stable tbody tr:hover td:first-child{background:var(--panel2)}
+  /* frozen ACTIONS (last col) */
+  #stable td:last-child{position:sticky;right:0;z-index:5;background:var(--panel);box-shadow:-1px 0 0 var(--line2)}
+  #stable thead th:last-child{position:sticky;right:0;z-index:25}
+  #stable tbody tr:nth-child(even) td:last-child{background:linear-gradient(var(--zebra),var(--zebra)),var(--panel)}
+  #stable tbody tr:hover td:last-child{background:var(--panel2)}
+}
 .btn-filter{display:inline-flex;gap:6px;align-items:center}
 .btn-filter.on{border-color:var(--acc);color:var(--acc)}
 .pagesize{display:flex;gap:6px;align-items:center;color:var(--mut);font-size:12px}
@@ -410,9 +435,10 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
           <button class="b-new" data-i18n="new_secret" onclick="openEditor()">+ New Secret</button>
           <button class="b-scan" onclick="openScan()">🔎 <span data-i18n="scan_folder">Scan folder</span></button>
           <button class="gen" data-i18n="generate" onclick="openGen()">🎲 Generate</button>
+          <button class="ghost" style="margin-left:auto" onclick="scColsMenu()">⚙ <span data-i18n="columns">Columns</span></button>
         </div>
       </div>
-      <div class="tablewrap">
+      <div class="tablewrap" id="stablewrap">
       <table class="cards" id="stable">
         <thead id="shead"></thead>
         <tbody id="srows"></tbody>
@@ -452,6 +478,7 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
           <span class="grow"></span>
           <button class="ghost" onclick="location='/api/audit/export?format=csv'">⬇ CSV</button>
           <button class="ghost" onclick="location='/api/audit/export?format=json'">⬇ JSON</button>
+          <button class="ghost" onclick="aColsMenu()">⚙ <span data-i18n="columns">Columns</span></button>
         </div>
       </div>
       <div class="tablewrap">
@@ -510,7 +537,7 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
             <button class="ghost" onclick="exSelectAll(false)">☐ <span data-i18n="ex_clear_all">Clear</span></button>
             <span class="mut" style="font-size:12px" id="ex_count"></span>
             <span class="grow"></span>
-            <button class="b-scan" onclick="runExposure()">🌐 <span data-i18n="ex_scan">Scan leaks</span></button>
+            <button class="b-scan" id="ex_scan_btn" disabled onclick="runExposure()">🌐 <span data-i18n="ex_scan">Scan leaks</span></button>
           </div>
           <div class="tablewrap exgrid">
             <table class="cards">
@@ -738,7 +765,8 @@ const I18N={
   ex_checked:"kontrol edildi",ex_found:"sızıntıda bulundu",
   ex_breach_title:"E-posta sızıntı kontrolü (Have I Been Pwned)",ex_breach_btn:"E-postaları kontrol et",ex_bad_email:"geçerli e-posta gir",
   ex_pick_secret:"Secret seç",ex_pick_email:"E-posta seç",ex_empty_all:"boş = tüm secret'lar",ex_email_req:"en az bir e-posta seç",ex_copy_all:"Tümünü kopyala",
-  ex_narrow:"1) Hedefi daralt (scope / collection / tag — opsiyonel)",ex_picked:"kayıt seçildi",ex_in_scope:"kayıt kapsamda",ex_empty_scope:"seçim yok = tümü kontrol edilir",
+  ex_narrow:"1) Hedefi daralt (scope / collection / tag — en az 1 zorunlu)",ex_picked:"kayıt seçildi",ex_in_scope:"kayıt kapsamda",ex_empty_scope:"seçim yok = tümü kontrol edilir",
+  ex_need_filter:"Önce yukarıdan en az bir filtre seçin (scope / collection / tag)",ex_pick_first:"önce kontrol edilecek kayıtları seçin",
   ex_pick:"Kontrol edilecek kayıtları seç",ex_select_all:"Tümünü seç",ex_clear_all:"Temizle",ex_no_records:"kapsamda kayıt yok",
   ex_bg_hint:"Kontrol arka planda çalışıyor — yalnızca SHA-1 ön-eki gönderilir, değer gönderilmez. Lütfen bekleyin.",ex_aborted:"tarama iptal edildi (kısmi sonuç)",
   ex_no_key:"HIBP API anahtarı ayarlı değil (Ayarlar).",ex_manual:"tarayıcıda manuel kontrol",ex_key_hint:"Ayarlar → HIBP API key alanına anahtarını girip otomatik sorgu yapabilirsin.",
@@ -777,7 +805,8 @@ const I18N={
   bk_pw_short:"yedek parolası en az 8 karakter olmalı",bk_pw_mismatch:"yedek parolaları eşleşmiyor",bk_pw_same:"yedek parolası master paroladan farklı olmalı",
   bk_pw_need:"otomatik yedek için önce bir yedek parolası belirle",bk_dir_need:"hedef klasör gir",bk_last:s=>`son yedek: ${s}`,bk_last_never:"henüz yedek yok",
   bk_set_pw_title:"Yedek parolası",bk_pw2_ph:"yedek parolasını tekrar gir",
-  columns:"Kolonlar",deploy_btn:"🚀 Deploy",deploy_title:"Deploy / Hedefe Gönder",deploy_target:"hedef",deploy_result:"çıktı (komut/manifest)",
+  columns:"Kolonlar",col_all:"Tümünü seç",col_none:"Hiçbiri",col_default:"Varsayılan",col_template:"Şablon seç",col_search:"kolon ara…",
+  deploy_btn:"🚀 Deploy",deploy_title:"Deploy / Hedefe Gönder",deploy_target:"hedef",deploy_result:"çıktı (komut/manifest)",
   prev:"‹ önceki",next:"sonraki ›",page:(p,t,n)=>`sayfa ${p}/${t} · ${n} kayıt`,
   chain_ok:c=>`✓ bütünlük OK (${c})`,chain_bad:b=>`✗ kırık @ #${b}`,
   audit_rec:"Denetim kaydı",time:"zaman",detail:"detay",hash:"hash (HMAC)",
@@ -836,7 +865,8 @@ const I18N={
   ex_checked:"checked",ex_found:"found in breaches",
   ex_breach_title:"Email breach check (Have I Been Pwned)",ex_breach_btn:"Check emails",ex_bad_email:"enter a valid email",
   ex_pick_secret:"Pick secret",ex_pick_email:"Pick email",ex_empty_all:"empty = all secrets",ex_email_req:"pick at least one email",ex_copy_all:"Copy all",
-  ex_narrow:"1) Narrow the target (scope / collection / tag — optional)",ex_picked:"record(s) picked",ex_in_scope:"in scope",ex_empty_scope:"none picked = all are checked",
+  ex_narrow:"1) Narrow the target (scope / collection / tag — at least 1 required)",ex_picked:"record(s) picked",ex_in_scope:"in scope",ex_empty_scope:"none picked = all are checked",
+  ex_need_filter:"Pick at least one filter above first (scope / collection / tag)",ex_pick_first:"pick the records to check first",
   ex_pick:"Pick records to check",ex_select_all:"Select all",ex_clear_all:"Clear",ex_no_records:"no records in scope",
   ex_bg_hint:"The check runs in the background — only a SHA-1 prefix is sent, never the value. Please wait.",ex_aborted:"scan cancelled (partial results)",
   ex_no_key:"No HIBP API key set (Settings).",ex_manual:"check manually in browser",ex_key_hint:"Add your key in Settings → HIBP API key to query automatically.",
@@ -875,7 +905,8 @@ const I18N={
   bk_pw_short:"backup password must be at least 8 characters",bk_pw_mismatch:"backup passwords don't match",bk_pw_same:"backup password must differ from the master password",
   bk_pw_need:"set a backup password first to enable automatic backups",bk_dir_need:"enter a destination folder",bk_last:s=>`last backup: ${s}`,bk_last_never:"no backup yet",
   bk_set_pw_title:"Backup password",bk_pw2_ph:"re-enter the backup password",
-  columns:"Columns",deploy_btn:"🚀 Deploy",deploy_title:"Deploy / Send to target",deploy_target:"target",deploy_result:"output (command/manifest)",
+  columns:"Columns",col_all:"Select all",col_none:"None",col_default:"Default",col_template:"Pick template",col_search:"search columns…",
+  deploy_btn:"🚀 Deploy",deploy_title:"Deploy / Send to target",deploy_target:"target",deploy_result:"output (command/manifest)",
   prev:"‹ prev",next:"next ›",page:(p,t,n)=>`page ${p}/${t} · ${n} records`,
   chain_ok:c=>`✓ integrity OK (${c})`,chain_bad:b=>`✗ broken @ #${b}`,
   audit_rec:"Audit record",time:"time",detail:"detail",hash:"hash (HMAC)",
@@ -1504,9 +1535,13 @@ MSEL_LABEL.ex_frepo='frepo'; MSEL_LABEL.ex_fcoll='collection'; MSEL_LABEL.ex_fta
 MSEL_LABEL.ex_email='ex_pick_email';
 EX_FILT_DIMS.forEach(d=>MSEL_ON[d]=exApplyFilters);
 MSEL_ON.ex_email=()=>renderMsel('ex_email');
+function exFiltersActive(){ return EX_FILT_DIMS.some(d=>FILT[d].size); }
 function exUpdateCount(){
-  const inScope=exMatchingRecords().length, picked=FILT.ex_secret.size;
-  $('#ex_count').textContent=picked?`${picked} ${t('ex_picked')}`:`${inScope} ${t('ex_in_scope')} · ${t('ex_empty_scope')}`;
+  const picked=FILT.ex_secret.size;
+  const btn=$('#ex_scan_btn'); if(btn)btn.disabled=picked===0;   // no pick → button inert
+  if(!exFiltersActive()){ $('#ex_count').textContent=t('ex_need_filter'); return; }
+  const inScope=exMatchingRecords().length;
+  $('#ex_count').textContent=picked?`${picked} ${t('ex_picked')}`:`${inScope} ${t('ex_in_scope')}`;
 }
 async function exLoadOptions(){
   EX_ALL=await (await api('/api/secrets')).json();
@@ -1542,6 +1577,10 @@ function exApplyFilters(){
 }
 // secrets grid'ine benzer tablo + soldan multi-select (kayit bazli — id)
 function exRenderTable(recs){
+  if(!exFiltersActive()){   // must narrow with >=1 filter before any record list is shown
+    $('#ex_rows').innerHTML=`<tr><td colspan="7" class="mut" style="text-align:center;padding:24px">${t('ex_need_filter')}</td></tr>`;
+    const all=$('#ex_all_chk'); if(all)all.checked=false; exUpdateCount(); return;
+  }
   recs=recs||exMatchingRecords();
   $('#ex_rows').innerHTML=recs.map(e=>{
     const on=FILT.ex_secret.has(e.id);
@@ -1559,6 +1598,7 @@ function exRenderTable(recs){
 }
 function exToggle(id){ FILT.ex_secret.has(id)?FILT.ex_secret.delete(id):FILT.ex_secret.add(id); exRenderTable(); }
 function exSelectAll(on){
+  if(on&&!exFiltersActive())return;   // no bulk-select of the whole vault without narrowing first
   const recs=exMatchingRecords();
   recs.forEach(e=>on?FILT.ex_secret.add(e.id):FILT.ex_secret.delete(e.id));
   exRenderTable(recs);
@@ -1578,9 +1618,8 @@ function exProgressUpdate(done,total){
 let EX_BUSY=false;
 async function runExposure(){
   if(EX_BUSY)return;
-  let ids=[...FILT.ex_secret];
-  if(!ids.length) ids=exMatchingRecords().map(e=>e.id);   // secim yoksa = daraltilmis kitlenin tamami
-  if(!ids.length){toast(t('ex_no_secrets'));return;}
+  const ids=[...FILT.ex_secret];   // explicit pick required — no "none = all" fallback
+  if(!ids.length){toast(t('ex_pick_first'));return;}
   EX_BUSY=true; exProgressOpen(ids.length);
   const CHUNK=6; let all=[], done=0, aborted=false;
   try{
@@ -1863,26 +1902,31 @@ function scFieldCols(){   // kayitlardaki tum field adlari (custom dahil: web_ur
   return names.map(n=>({k:'f:'+n, l:n, cls:'mono', field:n,
     v:e=>{const f=(e.fields||{})[n]; return f?(f.value??f.mask??''):'';},
     r:e=>{const f=(e.fields||{})[n]; if(!f)return '<span class="mut">—</span>';
-      return f.secret?`<span class="mut mono">${esc(f.mask||'••••')}</span>`:`<span class="mono">${esc(f.value??'')}</span>`;}}));
+      // list view fully masks secret fields (no partial "sk-D…xy" leak); the partial
+      // mask stays in detail/risk views where identifying the value is the point
+      return f.secret?`<span class="mut mono">••••••••</span>`:`<span class="mono">${esc(f.value??'')}</span>`;}}));
 }
 function scAllCols(){ return scBaseCols().concat(scFieldCols()); }
-function scHiddenSet(){
-  const raw=localStorage.getItem('sc_col_hidden');
+// allowlist model: a column is visible only if explicitly in sc_col_shown.
+// default = base columns only, so newly-appearing custom-field columns stay hidden
+// until the user opts them in (no more auto-flood of dozens of field columns).
+function scShownSet(){
+  const raw=localStorage.getItem('sc_col_shown');
   if(raw!=null)return new Set(JSON.parse(raw));
-  return new Set(scFieldCols().map(c=>c.k));   // varsayilan: field kolonlari gizli
+  return new Set(scBaseCols().map(c=>c.k));
 }
 function scCols(){
   const all=scAllCols(), byk=Object.fromEntries(all.map(c=>[c.k,c]));
-  const order=JSON.parse(localStorage.getItem('sc_col_order')||'[]'), hidden=scHiddenSet();
+  const order=JSON.parse(localStorage.getItem('sc_col_order')||'[]'), shown=scShownSet();
   const out=[]; order.forEach(k=>{ if(byk[k]){out.push(byk[k]);delete byk[k];} });
   all.forEach(c=>{ if(byk[c.k])out.push(c); });   // yeni/kaydedilmemis kolonlar dogal sirada
-  out.forEach(c=>c.hidden=hidden.has(c.k));
+  out.forEach(c=>c.hidden=!shown.has(c.k));
   return out;
 }
 function scRender(){
   const cols=scCols(), vis=cols.filter(c=>!c.hidden);
   $('#shead').innerHTML='<tr>'+vis.map(c=>`<th class="sortable" onclick="scSort('${c.k}',event)">${esc(c.l)}<span class="sarr">${SC_SORT.k===c.k?(SC_SORT.dir>0?' ▲':' ▼'):''}</span><span class="rsz" onmousedown="gridRz(event,this.parentElement)"></span></th>`).join('')
-    +`<th style="text-align:right"><span>${t('th_actions')}</span><span class="colbtn" title="${t('columns')}" onclick="event.stopPropagation();scColsMenu()">⚙</span></th></tr>`;
+    +`<th style="text-align:right"><span>${t('th_actions')}</span></th></tr>`;
   let rows=SROWS.slice();
   if(SC_SORT.k){ const col=cols.find(c=>c.k===SC_SORT.k); if(col)rows.sort((a,b)=>gridCmp(col.v(a)+'',col.v(b)+'')*SC_SORT.dir); }
   SROWS_SORTED=rows; renderSecretsPage(vis);
@@ -1905,14 +1949,36 @@ function renderSecretsPage(vis){
 // --- kolon secici: gizle/goster + yeniden sirala ---
 function scColsMenu(){
   const cols=scCols();
-  modal('⚙ '+t('columns'),`<div id="colpick">${cols.map((c,i)=>scColRow(c,i,cols.length)).join('')}</div>`,[{x:t('close'),p:1,f:closeModal}]);
+  const presets=Object.keys(TYPES).map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  const head=`<div class="toolbar" style="margin:0 0 8px">
+      <button class="ghost" onclick="scColsAll()">☑ ${t('col_all')}</button>
+      <button class="ghost" onclick="scColsPreset('')">☐ ${t('col_default')}</button>
+      <button class="ghost" onclick="scColsNone()">⊘ ${t('col_none')}</button>
+    </div>
+    <div class="toolbar" style="margin:0 0 8px">
+      <select onchange="scColsPreset(this.value)"><option value="">${t('col_template')}…</option>${presets}</select>
+      <input id="colsearch" placeholder="🔎 ${t('col_search')}" oninput="refreshColPick()" style="flex:1;min-width:120px">
+    </div>`;
+  modal('⚙ '+t('columns'),head+`<div id="colpick">${cols.map((c,i)=>scColRow(c,i,cols.length)).join('')}</div>`,[{x:t('close'),p:1,f:closeModal}]);
+}
+function scColsSetShown(keys){ localStorage.setItem('sc_col_shown',JSON.stringify([...new Set(keys)])); scRender(); refreshColPick(); }
+function scColsAll(){ scColsSetShown(scAllCols().map(c=>c.k)); }
+function scColsNone(){ scColsSetShown([]); }                                  // uncheck everything
+function scColsPreset(type){                                                  // base cols + the type template's fields (that exist)
+  const base=scBaseCols().map(c=>c.k);
+  if(!type){ scColsSetShown(base); return; }
+  const have=new Set(scFieldCols().map(c=>c.k));
+  scColsSetShown(base.concat((TYPES[type]||[]).map(f=>'f:'+f.name).filter(k=>have.has(k))));
 }
 function scColRow(c,i,n){ return `<div class="colrow">
   <label style="flex:1;display:flex;gap:8px;align-items:center"><input type="checkbox" ${c.hidden?'':'checked'} onchange="scColToggle('${c.k}',this.checked)" style="width:auto"> ${esc(c.l)}</label>
   <button class="ghost" ${i===0?'disabled':''} onclick="scColMove('${c.k}',-1)">▲</button>
   <button class="ghost" ${i===n-1?'disabled':''} onclick="scColMove('${c.k}',1)">▼</button></div>`; }
-function refreshColPick(){ const el=$('#colpick'); if(!el)return; const cols=scCols(); el.innerHTML=cols.map((c,i)=>scColRow(c,i,cols.length)).join(''); }
-function scColToggle(k,show){ const h=scHiddenSet(); show?h.delete(k):h.add(k); localStorage.setItem('sc_col_hidden',JSON.stringify([...h])); scRender(); refreshColPick(); }
+function refreshColPick(){ const el=$('#colpick'); if(!el)return;
+  const q=($('#colsearch')&&$('#colsearch').value||'').toLowerCase();
+  const cols=scCols().filter(c=>!q||c.l.toLowerCase().includes(q));
+  el.innerHTML=cols.map((c,i)=>scColRow(c,i,cols.length)).join('')||`<div class="mut" style="padding:10px">—</div>`; }
+function scColToggle(k,show){ const s=scShownSet(); show?s.add(k):s.delete(k); localStorage.setItem('sc_col_shown',JSON.stringify([...s])); scRender(); refreshColPick(); }
 function scColMove(k,dir){ const keys=scCols().map(c=>c.k), i=keys.indexOf(k), j=i+dir;
   if(j<0||j>=keys.length)return; keys.splice(i,1); keys.splice(j,0,k);
   localStorage.setItem('sc_col_order',JSON.stringify(keys)); scRender(); refreshColPick(); }
@@ -2194,7 +2260,7 @@ function aSort(k,ev){ if(ev&&(ev.target.classList.contains('rsz')||ev.target.cla
 function aRender(){
   const cols=aCols(), vis=cols.filter(c=>!c.hidden);
   $('#ahead').innerHTML='<tr>'+vis.map(c=>{const w=aColWof(c);return `<th class="sortable"${w?` style="width:${w}px"`:''} onclick="aSort('${c.k}',event)">${esc(c.l)}<span class="sarr">${AC_SORT.k===c.k?(AC_SORT.dir>0?' ▲':' ▼'):''}</span><span class="rsz" onmousedown="gridRz(event,this.parentElement,px=>aColW('${c.k}',px))"></span></th>`}).join('')
-    +`<th style="width:38px;text-align:right"><span class="colbtn" title="${t('columns')}" onclick="event.stopPropagation();aColsMenu()">⚙</span></th></tr>`;
+    +`<th style="width:38px;text-align:right"></th></tr>`;
   let rows=auditFiltered();
   if(AC_SORT.k){ const col=cols.find(c=>c.k===AC_SORT.k); if(col)rows.sort((a,b)=>gridCmp(col.v(a)+'',col.v(b)+'')*AC_SORT.dir); }
   const total=rows.length, pages=Math.max(1,Math.ceil(total/APAGE_SIZE));

@@ -6,6 +6,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.19] — 2026-09-02
+
+### Changed
+- **Secrets table columns no longer auto-flood.** Custom-field columns now use an
+  allowlist (`sc_col_shown`, default = base columns only), so newly-appearing
+  field columns stay hidden until the user opts them in — instead of dozens of
+  columns sliding in on every load.
+- **Columns picker** moved from the table header ⚙ into a toolbar button next to
+  New Secret / Scan folder / Generate. The modal gained Select all / Default /
+  None buttons, per-type template presets (pick a type → show its standard
+  fields), and a live search box.
+- **Risks → Exposure (online leak check)** now requires narrowing: at least one
+  filter (scope/collection/tag) must be selected before any record list is shown,
+  and **Scan leaks** stays disabled until at least one record is picked — no more
+  implicit "none picked = scan everything".
+- **Secrets table is now a proper frozen-column grid.** Columns size to their
+  content instead of crushing into the viewport (which word-wrapped headers/values
+  into an ugly stack). Horizontal scrolling is contained inside the table — the page
+  no longer shifts sideways — with the NAME column frozen on the left, ACTIONS frozen
+  on the right, and everything between scrolling. NAME is never auto-truncated.
+- **Audit Logs columns picker** moved from the table-header ⚙ into a toolbar button
+  (next to Verify chain / CSV / JSON), matching the Secrets page. The audit grid now
+  auto-sizes columns to their content (was fixed-width), so TIME no longer word-wraps.
+
+### Security
+- **Secret field values are fully masked (`••••••••`) in the secrets list**, instead
+  of the partial `sk-D…xy` mask that leaked the first/last characters. The partial
+  mask still appears in detail/risk views where identifying the value is the point.
+
 ## [0.9.18] — 2026-09-01
 
 ### Security
