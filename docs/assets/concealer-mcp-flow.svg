@@ -76,5 +76,5 @@
   <text x="878" y="608" class="mut" font-size="12">action + name + seq — never the value</text>
 
   <text x="40" y="675" class="mut" font-size="13">Anti-exfiltration: per-agent per_call + window_quota limits cap how many distinct names an agent can reveal in a rolling window.</text>
-  <text x="40" y="700" class="mut" font-size="12">fxerkan.github.io/concealer · MIT</text>
+  <text x="40" y="700" class="mut" font-size="12">concealer.fxerkan.com · MIT</text>
 </svg>

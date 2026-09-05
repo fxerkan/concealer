@@ -112,5 +112,5 @@
   <!-- footnote -->
   <text x="40" y="720" class="mut" font-size="13">No cloud · no telemetry · no account.  Portable: copy the files, type the master password, decrypt anywhere.</text>
   <text x="40" y="746" class="mut" font-size="13">The age private key never touches disk in plaintext — resolved in memory (cache → token → TTY) and passed to sops via SOPS_AGE_KEY.</text>
-  <text x="40" y="788" class="mut" font-size="12">fxerkan.github.io/concealer · MIT</text>
+  <text x="40" y="788" class="mut" font-size="12">concealer.fxerkan.com · MIT</text>
 </svg>

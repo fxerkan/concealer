@@ -44,7 +44,7 @@
 <script>
 /* Docs enhancements: wordmark, dark/light toggle, and an EN/TR language toggle.
    Theme stylesheets are just-the-docs-default.css (amber "dark") and just-the-docs-light.css,
-   so theme names must be 'default'/'light'. Turkish pages live under /concealer/tr/<slug>.html;
+   so theme names must be 'default'/'light'. Turkish pages live under /tr/<slug>.html;
    on those pages we rewrite the shared sidebar to Turkish (labels + /tr/ hrefs) so the nav config
    is never duplicated. NOTE: block comments only — this include is minified onto one line; a //
    comment would swallow the rest of the script. */
@@ -58,10 +58,10 @@
     "Security Model":"Güvenlik Modeli","Portability & Backup":"Taşınabilirlik & Yedekleme",
     "Comparison":"Karşılaştırma","🏠 Home":"🏠 Ana Sayfa"
   };
-  function isTR(){return location.pathname.indexOf('/concealer/tr/')===0;}
+  function isTR(){return location.pathname.indexOf('/tr/')===0;}
   function counterpart(){
     var p=location.pathname;
-    return isTR()?p.replace('/concealer/tr/','/concealer/'):p.replace('/concealer/','/concealer/tr/');
+    return isTR()?p.replace('/tr/','/'):'/tr'+p;
   }
   function wordmark(){
     var st=document.querySelector('.site-title');
@@ -73,8 +73,8 @@
       var t=a.textContent.trim();
       if(NAV[t])a.textContent=NAV[t];
       var h=a.getAttribute('href')||'';
-      if(h.indexOf('/concealer/')===0 && h.indexOf('/concealer/tr/')!==0 && h.indexOf('github')<0 && !a.classList.contains('site-button'))
-        a.setAttribute('href',h.replace('/concealer/','/concealer/tr/'));
+      if(h.charAt(0)==='/' && h.indexOf('/tr/')!==0 && h.indexOf('github')<0 && !a.classList.contains('site-button'))
+        a.setAttribute('href','/tr'+h);
     });
     var si=document.getElementById('search-input');if(si)si.placeholder="concealer'da ara";
   }
