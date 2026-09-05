@@ -1,8 +1,8 @@
 title: concealer
 description: Local-only, single-file secret manager for the AI-coding era (SOPS + age).
 remote_theme: just-the-docs/just-the-docs
-baseurl: "/concealer"
-url: "https://fxerkan.github.io"
+baseurl: ""
+url: "https://concealer.fxerkan.com"
 
 logo: "/assets/logo.svg"
 favicon_ico: "/assets/logo.svg"
@@ -17,7 +17,7 @@ heading_anchors: true
 
 aux_links:
   "🏠 Home":
-    - "https://fxerkan.github.io/concealer/"
+    - "https://concealer.fxerkan.com/"
   "GitHub":
     - "https://github.com/fxerkan/concealer"
   "Homebrew":
