@@ -47,6 +47,36 @@
   "keywords": "secret manager, SOPS, age, local-first, AI coding, MCP, encryption, developer tools"
 }
 </script>
+<!-- WebSite + Organization: gives Google an explicit site name (disambiguates the brand
+     from the cosmetic "concealer" and from the shared fxerkan.github.io host root). -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://fxerkan.github.io/concealer/#website",
+      "url": "https://fxerkan.github.io/concealer/",
+      "name": "concealer",
+      "alternateName": ["concealer secret manager", "concealer — local-only secret manager"],
+      "description": "Local-only, single-file secret manager for the AI-coding era (SOPS + age).",
+      "inLanguage": "en",
+      "publisher": { "@id": "https://fxerkan.github.io/concealer/#org" }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://fxerkan.github.io/concealer/#org",
+      "name": "concealer",
+      "url": "https://fxerkan.github.io/concealer/",
+      "logo": "https://fxerkan.github.io/concealer/assets/logo-512.png",
+      "sameAs": [
+        "https://github.com/fxerkan/concealer",
+        "https://fxerkan.com"
+      ]
+    }
+  ]
+}
+</script>
 <style>
 /* ===== theme (mirrors the app's webui palette) ===== */
 :root, html[data-theme="dark"]{
