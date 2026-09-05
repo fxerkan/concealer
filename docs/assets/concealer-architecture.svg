@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="820" viewBox="0 0 1240 820" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+  <defs>
+    <marker id="arw" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 z" fill="#ff4d4d"/>
+    </marker>
+    <style>
+      .bg{fill:#0a0b0d}
+      .panel{fill:#101216;stroke:#2a2f38;stroke-width:1.5;rx:12}
+      .panel2{fill:#161a20;stroke:#2a2f38;stroke-width:1.5}
+      .core{fill:#12141a;stroke:#ff4d4d;stroke-width:2}
+      .t{fill:#e8e8e6}
+      .mut{fill:#8a909b}
+      .acc{fill:#ff4d4d}
+      .ok{fill:#7ee787}
+      .h{font-weight:700}
+      .ln{stroke:#ff4d4d;stroke-width:2;fill:none}
+      .lnq{stroke:#2a2f38;stroke-width:1.5;fill:none}
+    </style>
+  </defs>
+  <rect class="bg" width="1240" height="820"/>
+
+  <!-- title -->
+  <text x="40" y="52" class="t h" font-size="30">conceal<tspan fill="#0a0b0d" font-weight="700"> er </tspan></text>
+  <rect x="196" y="30" width="52" height="30" rx="5" fill="#ff4d4d"/>
+  <text x="205" y="52" class="t h" font-size="30" fill="#0a0b0d">er</text>
+  <text x="270" y="52" class="mut" font-size="18">— system architecture · single Python file, stdlib only</text>
+
+  <!-- interfaces row -->
+  <text x="40" y="108" class="acc h" font-size="13" letter-spacing="2">FIVE WAYS IN</text>
+  <g>
+    <rect class="panel2" x="40"  y="122" width="212" height="72" rx="12"/>
+    <text x="60" y="152" class="t h" font-size="17">CLI</text>
+    <text x="60" y="176" class="mut" font-size="12.5">cer set · get · run · list</text>
+
+    <rect class="panel2" x="272" y="122" width="212" height="72" rx="12"/>
+    <text x="292" y="152" class="t h" font-size="17">Web UI</text>
+    <text x="292" y="176" class="mut" font-size="12.5">localhost console · TR/EN</text>
+
+    <rect class="panel2" x="504" y="122" width="212" height="72" rx="12"/>
+    <text x="524" y="152" class="t h" font-size="17">TUI</text>
+    <text x="524" y="176" class="mut" font-size="12.5">terminal browser</text>
+
+    <rect class="panel2" x="736" y="122" width="212" height="72" rx="12"/>
+    <text x="756" y="152" class="acc h" font-size="17">MCP Server</text>
+    <text x="756" y="176" class="mut" font-size="12.5">AI agents · names only</text>
+
+    <rect class="panel2" x="968" y="122" width="232" height="72" rx="12"/>
+    <text x="988" y="152" class="t h" font-size="17">Chrome Extension</text>
+    <text x="988" y="176" class="mut" font-size="12.5">copy from toolbar</text>
+  </g>
+
+  <!-- arrows interfaces -> core -->
+  <path class="ln" d="M146,194 L146,236 L620,236 L620,262" marker-end="url(#arw)"/>
+  <path class="ln" d="M378,194 L378,230 L620,230" fill="none"/>
+  <path class="lnq" d="M610,194 L610,230"/>
+  <path class="lnq" d="M842,194 L842,230 L630,230"/>
+  <path class="lnq" d="M1084,194 L1084,230 L640,230"/>
+
+  <!-- core -->
+  <rect class="core" x="330" y="266" width="580" height="150" rx="14"/>
+  <text x="356" y="298" class="t h" font-size="19">concealer core  <tspan class="mut" font-size="13">(one script)</tspan></text>
+  <g font-size="12.5">
+    <rect class="panel" x="352" y="316" width="160" height="34" rx="8" fill="#161a20"/>
+    <text x="366" y="338" class="t">load() / save()</text>
+    <rect class="panel" x="524" y="316" width="180" height="34" rx="8" fill="#161a20"/>
+    <text x="538" y="338" class="t">entry_public() mask</text>
+    <rect class="panel" x="716" y="316" width="176" height="34" rx="8" fill="#161a20"/>
+    <text x="730" y="338" class="t">norm() migrate</text>
+    <rect class="panel" x="352" y="360" width="160" height="34" rx="8" fill="#161a20"/>
+    <text x="366" y="382" class="t">rate_gate()</text>
+    <rect class="panel" x="524" y="360" width="180" height="34" rx="8" fill="#161a20"/>
+    <text x="538" y="382" class="ok">redact() on output</text>
+    <rect class="panel" x="716" y="360" width="176" height="34" rx="8" fill="#161a20"/>
+    <text x="730" y="382" class="t">token resolve</text>
+  </g>
+
+  <!-- core -> sops/age -->
+  <path class="ln" d="M620,416 L620,470" marker-end="url(#arw)"/>
+  <text x="632" y="450" class="mut" font-size="12">shell out</text>
+
+  <!-- sops + age -->
+  <rect class="panel" x="330" y="474" width="580" height="72" rx="12" fill="#101216" stroke="#2a2f38"/>
+  <text x="356" y="504" class="t h" font-size="17">SOPS  +  age</text>
+  <text x="356" y="528" class="mut" font-size="12.5">AES-256-GCM over age X25519 — all crypto delegated to battle-tested tools</text>
+
+  <!-- sops -> vault -->
+  <path class="ln" d="M620,546 L620,592" marker-end="url(#arw)"/>
+
+  <!-- vault -->
+  <rect class="panel" x="330" y="596" width="580" height="72" rx="12" fill="#12141a" stroke="#ff4d4d"/>
+  <text x="356" y="626" class="acc h" font-size="17">🔒 Encrypted vault</text>
+  <text x="356" y="650" class="mut" font-size="12.5">secrets.enc.yaml — never committed, never plaintext on disk</text>
+
+  <!-- keys sidebar -->
+  <text x="968" y="292" class="acc h" font-size="13" letter-spacing="2">keys/ (git-ignored)</text>
+  <g font-size="12.5">
+    <rect class="panel2" x="968" y="304" width="232" height="40" rx="9"/>
+    <text x="984" y="329" class="t">master.json <tspan class="mut">· scrypt</tspan></text>
+    <rect class="panel2" x="968" y="350" width="232" height="40" rx="9"/>
+    <text x="984" y="375" class="t">age-key.txt.age <tspan class="mut">· at-rest</tspan></text>
+    <rect class="panel2" x="968" y="396" width="232" height="40" rx="9"/>
+    <text x="984" y="421" class="t">agents.json <tspan class="mut">· tokens</tspan></text>
+    <rect class="panel2" x="968" y="442" width="232" height="40" rx="9"/>
+    <text x="984" y="467" class="t">recovery.json <tspan class="mut">· codes</tspan></text>
+    <rect class="panel2" x="968" y="488" width="232" height="40" rx="9"/>
+    <text x="984" y="513" class="ok">audit.log <tspan class="mut" fill="#8a909b">· HMAC chain</tspan></text>
+  </g>
+  <path class="lnq" d="M910,360 L968,360"/>
+  <path class="lnq" d="M910,416 L968,416"/>
+  <path class="lnq" d="M910,500 L968,500"/>
+
+  <!-- footnote -->
+  <text x="40" y="720" class="mut" font-size="13">No cloud · no telemetry · no account.  Portable: copy the files, type the master password, decrypt anywhere.</text>
+  <text x="40" y="746" class="mut" font-size="13">The age private key never touches disk in plaintext — resolved in memory (cache → token → TTY) and passed to sops via SOPS_AGE_KEY.</text>
+  <text x="40" y="788" class="mut" font-size="12">fxerkan.github.io/concealer · MIT</text>
+</svg>

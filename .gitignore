@@ -43,4 +43,5 @@ build/
 extension/_test.html
 
 # internal working docs (SEO plan, Medium drafts, diagrams) — never published
-docs/_internal/seo/
+docs/_internal/
+

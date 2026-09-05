@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="720" viewBox="0 0 1240 720" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+  <defs>
+    <marker id="a2" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 z" fill="#ff4d4d"/>
+    </marker>
+    <marker id="a2ok" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 z" fill="#7ee787"/>
+    </marker>
+    <style>
+      .bg{fill:#0a0b0d}.t{fill:#e8e8e6}.mut{fill:#8a909b}.acc{fill:#ff4d4d}.ok{fill:#7ee787}
+      .h{font-weight:700}
+      .lane{fill:#0d0f13;stroke:#1c1f26;stroke-width:1.5}
+      .box{fill:#161a20;stroke:#2a2f38;stroke-width:1.5}
+      .step{stroke:#ff4d4d;stroke-width:2;fill:none}
+      .stepok{stroke:#7ee787;stroke-width:2;fill:none}
+    </style>
+  </defs>
+  <rect class="bg" width="1240" height="720"/>
+  <text x="40" y="50" class="t h" font-size="26">Agents use secrets — <tspan class="acc">without ever seeing them</tspan></text>
+  <text x="40" y="78" class="mut" font-size="15">MCP contract: the plaintext value is injected into a child process env and redacted from everything the agent reads.</text>
+
+  <!-- lanes -->
+  <rect class="lane" x="40"  y="110" width="360" height="520" rx="14"/>
+  <rect class="lane" x="440" y="110" width="360" height="520" rx="14"/>
+  <rect class="lane" x="840" y="110" width="360" height="520" rx="14"/>
+  <text x="60"  y="142" class="acc h" font-size="15">AI AGENT (MCP client)</text>
+  <text x="460" y="142" class="acc h" font-size="15">concealer MCP server</text>
+  <text x="860" y="142" class="acc h" font-size="15">encrypted vault + child proc</text>
+
+  <!-- step 1 -->
+  <rect class="box" x="60" y="168" width="320" height="66" rx="10"/>
+  <text x="78" y="196" class="t h" font-size="14">1 · list_secrets(project=web)</text>
+  <text x="78" y="220" class="mut" font-size="12.5">"what DB creds exist here?"</text>
+  <path class="step" d="M380,201 L440,201" marker-end="url(#a2)"/>
+
+  <rect class="box" x="460" y="168" width="320" height="66" rx="10"/>
+  <text x="478" y="196" class="t h" font-size="14">registered agent? rate_gate()</text>
+  <text x="478" y="220" class="mut" font-size="12.5">unregistered token → access denied</text>
+
+  <!-- return names -->
+  <path class="stepok" d="M460,255 L80,255 L80,278" marker-end="url(#a2ok)"/>
+  <text x="500" y="250" class="ok" font-size="12.5">← returns NAMES only (no values), audited source=mcp</text>
+
+  <rect class="box" x="60" y="282" width="320" height="60" rx="10"/>
+  <text x="78" y="308" class="t" font-size="13">sees: DB_PASSWORD, DB_URL</text>
+  <text x="78" y="330" class="mut" font-size="12">values = ••••••• (never sent)</text>
+
+  <!-- step 2 -->
+  <rect class="box" x="60" y="380" width="320" height="80" rx="10"/>
+  <text x="78" y="408" class="t h" font-size="14">2 · run_with_secrets(</text>
+  <text x="78" y="430" class="t" font-size="12.5">   names=[DB_PASSWORD],</text>
+  <text x="78" y="450" class="t" font-size="12.5">   cmd="psql -c '…'" )</text>
+  <path class="step" d="M380,420 L440,420" marker-end="url(#a2)"/>
+
+  <rect class="box" x="460" y="380" width="320" height="80" rx="10"/>
+  <text x="478" y="408" class="t h" font-size="14">decrypt only DB_PASSWORD</text>
+  <text x="478" y="430" class="mut" font-size="12.5">least-privilege: just the named</text>
+  <text x="478" y="450" class="mut" font-size="12.5">secret, not the whole scope</text>
+  <path class="step" d="M780,420 L840,420" marker-end="url(#a2)"/>
+
+  <rect class="box" x="860" y="380" width="320" height="80" rx="10"/>
+  <text x="878" y="408" class="t h" font-size="14">inject into child env</text>
+  <text x="878" y="430" class="ok" font-size="12.5">DB_PASSWORD=•••• → run</text>
+  <text x="878" y="450" class="mut" font-size="12.5">value lives only in the subprocess</text>
+
+  <!-- redacted output back -->
+  <path class="stepok" d="M1020,462 L1020,540 L80,540 L80,562" marker-end="url(#a2ok)"/>
+  <text x="470" y="534" class="ok" font-size="12.5">← command output, values redact()ed before the agent ever reads it</text>
+
+  <rect class="box" x="60" y="566" width="320" height="52" rx="10"/>
+  <text x="78" y="590" class="t h" font-size="13">agent gets: query result ✓</text>
+  <text x="78" y="608" class="mut" font-size="12">secret value: still ••••••• in context</text>
+
+  <rect class="box" x="860" y="566" width="320" height="52" rx="10"/>
+  <text x="878" y="590" class="acc h" font-size="13">audit.log  +=  HMAC line</text>
+  <text x="878" y="608" class="mut" font-size="12">action + name + seq — never the value</text>
+
+  <text x="40" y="675" class="mut" font-size="13">Anti-exfiltration: per-agent per_call + window_quota limits cap how many distinct names an agent can reveal in a rolling window.</text>
+  <text x="40" y="700" class="mut" font-size="12">fxerkan.github.io/concealer · MIT</text>
+</svg>
