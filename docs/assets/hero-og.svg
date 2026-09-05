@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+  <defs>
+    <radialGradient id="glow" cx="82%" cy="-10%" r="90%">
+      <stop offset="0%" stop-color="#1a1113"/>
+      <stop offset="45%" stop-color="#101116"/>
+      <stop offset="100%" stop-color="#0a0b0d"/>
+    </radialGradient>
+    <marker id="harw" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 z" fill="#ff4d4d"/>
+    </marker>
+    <style>
+      .t{fill:#e8e8e6}.mut{fill:#8a909b}.acc{fill:#ff4d4d}.ok{fill:#7ee787}.bad{fill:#ff8080}
+      .h{font-weight:700}
+      .card{fill:#101216;stroke:#2a2f38;stroke-width:1.5}
+      .ln{stroke:#ff4d4d;stroke-width:2.5;fill:none}
+    </style>
+  </defs>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- brand: "concealer" joined, red badge behind "er" only -->
+  <text x="80" y="120" class="t h" font-size="64">conceal</text>
+  <rect x="347" y="66" width="86" height="70" rx="12" fill="#ff4d4d"/>
+  <text x="352" y="120" class="h" font-size="64" fill="#0a0b0d">er</text>
+
+  <text x="80" y="176" class="t" font-size="27" font-family="-apple-system,Segoe UI,system-ui,sans-serif" font-weight="600">Your AI assistant reads everything. Your secrets shouldn't be readable.</text>
+  <text x="80" y="212" class="mut" font-size="20" font-family="-apple-system,Segoe UI,system-ui,sans-serif">The local-only secret manager for the AI-coding era — no cloud, no account, no telemetry.</text>
+
+  <!-- story: plaintext -> vault -> masked -->
+  <!-- card 1: before -->
+  <rect class="card" x="60" y="270" width="320" height="200" rx="16"/>
+  <text x="86" y="308" class="mut" font-size="15">your repo · .env</text>
+  <text x="86" y="352" class="t" font-size="17">OPENAI_API_KEY=</text>
+  <text x="86" y="378" class="bad" font-size="17">sk-live-4f8a2c91…</text>
+  <text x="86" y="434" class="bad h" font-size="16">✕ plaintext, one cat away</text>
+
+  <path class="ln" d="M388,370 L432,370" marker-end="url(#harw)"/>
+
+  <!-- card 2: vault -->
+  <rect class="card" x="440" y="270" width="320" height="200" rx="16" stroke="#ff4d4d" stroke-width="2"/>
+  <!-- padlock -->
+  <path d="M578,330 v-12 a22,22 0 0 1 44,0 v12" fill="none" stroke="#e8e8e6" stroke-width="7" stroke-linecap="round"/>
+  <rect x="568" y="330" width="64" height="48" rx="9" fill="#ff4d4d"/>
+  <circle cx="600" cy="350" r="6.5" fill="#0a0b0d"/>
+  <rect x="597" y="352" width="6" height="13" rx="3" fill="#0a0b0d"/>
+  <text x="600" y="412" class="t h" font-size="19" text-anchor="middle">encrypted vault</text>
+  <text x="600" y="440" class="mut" font-size="15" text-anchor="middle">only on your machine · SOPS + age</text>
+
+  <path class="ln" d="M768,370 L812,370" marker-end="url(#harw)"/>
+
+  <!-- card 3: after -->
+  <rect class="card" x="820" y="270" width="320" height="200" rx="16"/>
+  <text x="846" y="308" class="mut" font-size="15">what your AI assistant sees</text>
+  <text x="846" y="352" class="t" font-size="17">OPENAI_API_KEY=</text>
+  <text x="846" y="378" class="ok" font-size="17">••••••••••••••</text>
+  <text x="846" y="434" class="ok h" font-size="16">✓ works — key never revealed</text>
+
+  <!-- footer -->
+  <text x="80" y="552" class="mut" font-size="18">$ <tspan class="acc h">brew</tspan> install fxerkan/tap/concealer</text>
+  <text x="1120" y="552" class="mut" font-size="16" text-anchor="end">concealer.fxerkan.com · open source · MIT</text>
+</svg>

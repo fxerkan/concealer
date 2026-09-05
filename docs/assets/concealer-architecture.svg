@@ -20,10 +20,10 @@
   <rect class="bg" width="1240" height="820"/>
 
   <!-- title -->
-  <text x="40" y="52" class="t h" font-size="30">conceal<tspan fill="#0a0b0d" font-weight="700"> er </tspan></text>
-  <rect x="196" y="30" width="52" height="30" rx="5" fill="#ff4d4d"/>
-  <text x="205" y="52" class="t h" font-size="30" fill="#0a0b0d">er</text>
-  <text x="270" y="52" class="mut" font-size="18">— system architecture · single Python file, stdlib only</text>
+  <text x="40" y="52" class="t h" font-size="30">conceal</text>
+  <rect x="165" y="27" width="41" height="33" rx="6" fill="#ff4d4d"/>
+  <text x="167" y="52" class="h" font-size="30" fill="#0a0b0d">er</text>
+  <text x="226" y="52" class="mut" font-size="18">— system architecture · single Python file, stdlib only</text>
 
   <!-- interfaces row -->
   <text x="40" y="108" class="acc h" font-size="13" letter-spacing="2">FIVE WAYS IN</text>
