@@ -15,6 +15,10 @@ concealer ships an MCP stdio server so AI agents can **use** secrets without eve
 
 ---
 
+**How it works — the value never enters the agent's context:**
+
+![concealer MCP flow — the agent lists names, then runs a command with a named secret injected into a child process; the value stays out of its context and the output comes back redacted]({{ site.baseurl }}/assets/concealer-mcp-flow.png)
+
 **Agents list secret names — values stay hidden:**
 
 ![Agent listing concealer secrets over MCP — names and scopes only, never values]({{ site.baseurl }}/assets/mcp-secret-list.gif)

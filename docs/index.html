@@ -204,6 +204,11 @@ section{padding:64px 0}
 .shot figure{margin:0;border:1px solid var(--line2);border-radius:12px;overflow:hidden;background:var(--panel);box-shadow:0 22px 60px rgba(0,0,0,.4)}
 .shot figure img{display:block;width:100%;height:auto}
 
+/* architecture diagrams (dark-native SVGs on a matching frame) */
+.diagram{margin:0;border:1px solid var(--line2);border-radius:14px;overflow:hidden;background:#0a0b0d;box-shadow:0 22px 60px rgba(0,0,0,.4)}
+.diagram img{display:block;width:100%;height:auto}
+.diagcap{text-align:center;color:var(--mut);font-size:14px;margin:14px 0 0}
+
 /* code block */
 .codeblk{background:#06070a;border:1px solid var(--line2);border-radius:12px;padding:18px 20px;overflow:auto;
   white-space:pre;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;line-height:1.7;color:#d7dbe3}
@@ -325,6 +330,20 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <div class="card"><div class="ico">🧾</div><h3 data-i18n="f5_h">Tamper-evident audit</h3><p data-i18n="f5_p">Every read, write, copy and inject is appended to an HMAC-chained log with a monotonic seq and a tail anchor. Names and actions only — never values.</p></div>
       <div class="card"><div class="ico">🎯</div><h3 data-i18n="f6_h">One place, many projects</h3><p data-i18n="f6_p">Disambiguate the same value across repos by tenant / project / environment / repo. The most-specific scope wins at inject time.</p></div>
     </div>
+  </div>
+</section>
+
+<!-- ===== ARCHITECTURE ===== -->
+<section>
+  <div class="wrap">
+    <div class="sec-h">
+      <div class="eyebrow" data-i18n="arch_eyebrow">Under the hood</div>
+      <h2 data-i18n="arch_h">One file, delegated crypto, five ways in</h2>
+      <p data-i18n="arch_p">Every interface funnels into a single Python script that shells out to SOPS + age. The encrypted vault and key material never leave your machine.</p>
+    </div>
+    <figure class="diagram"><img src="/assets/concealer-architecture.png" alt="concealer system architecture — CLI, Web UI, TUI, MCP and Chrome extension over a single-file core, SOPS + age, and an encrypted vault" loading="lazy"></figure>
+    <figure class="diagram" style="margin-top:22px"><img src="/assets/concealer-mcp-flow.png" alt="concealer MCP flow — an AI agent lists secret names and runs a command with a named secret injected, while the value stays redacted from its context" loading="lazy"></figure>
+    <p class="diagcap" data-i18n="arch_cap">The MCP flow: agents use a secret without the value ever entering their context.</p>
   </div>
 </section>
 
@@ -573,6 +592,7 @@ const I18N={
   f4_h:"SOPS + age crypto",f4_p:"All encryption is delegated to battle-tested tools: AES-256-GCM over age X25519. The age private key never touches disk in plaintext — key-at-rest.",
   f5_h:"Tamper-evident audit",f5_p:"Every read, write, copy and inject is appended to an HMAC-chained log with a monotonic seq and a tail anchor. Names and actions only — never values.",
   f6_h:"One place, many projects",f6_p:"Disambiguate the same value across repos by tenant / project / environment / repo. The most-specific scope wins at inject time.",
+  arch_eyebrow:"Under the hood",arch_h:"One file, delegated crypto, five ways in",arch_p:"Every interface funnels into a single Python script that shells out to SOPS + age. The encrypted vault and key material never leave your machine.",arch_cap:"The MCP flow: agents use a secret without the value ever entering their context.",
   ui_eyebrow:"Five ways in",ui_h:"CLI · Web UI · TUI · MCP · Chrome Extension",ui_p:"The same encrypted vault, however you like to work.",
   s_cli_h:"One command, any secret",s_cli_p:"Set, get, run-with and deploy secrets from the terminal — scoped by tenant / project / environment / repo. cer run injects them into a child process's environment and redacts the values from its output.",
   s_ext_h:"Copy secrets from your toolbar",s_ext_p:"Open your vault and copy secret values straight from Chrome — no cer web. Multi-field secrets expand for per-field copy & reveal; the popup starts on demand and self-locks when idle. Dark / White / Matrix themes.",cta_ext:"Chrome Extension",
@@ -599,6 +619,7 @@ const I18N={
   f4_h:"SOPS + age şifreleme",f4_p:"Tüm şifreleme denenmiş araçlara devredilir: age X25519 üzerinde AES-256-GCM. age özel anahtarı diske asla düz metin yazılmaz — key-at-rest.",
   f5_h:"Kurcalamaya-dayanıklı denetim",f5_p:"Her okuma, yazma, kopyalama ve enjeksiyon; monoton seq ve kuyruk çıpası olan HMAC-zincirli bir günlüğe eklenir. Yalnız ad ve eylem — değer asla.",
   f6_h:"Tek yer, çok proje",f6_p:"Aynı değeri repolar arasında tenant / project / environment / repo ile ayrıştır. Enjeksiyonda en spesifik kapsam kazanır.",
+  arch_eyebrow:"Kaputun altında",arch_h:"Tek dosya, devredilmiş şifreleme, beş giriş yolu",arch_p:"Her arayüz, SOPS + age'e shell açan tek bir Python betiğine akar. Şifreli kasa ve anahtar malzemesi makineni asla terk etmez.",arch_cap:"MCP akışı: ajanlar bir secret'ı, değeri context'lerine hiç girmeden kullanır.",
   ui_eyebrow:"Beş giriş yolu",ui_h:"CLI · Web UI · TUI · MCP · Chrome Eklentisi",ui_p:"Aynı şifreli kasa, nasıl çalışmak istersen.",
   s_cli_h:"Tek komut, her secret",s_cli_p:"Secret'ları terminalden ekle, al, çalıştır ve dağıt — tenant / proje / ortam / repo ile kapsamlı. cer run bunları bir alt sürecin ortamına enjekte eder ve değerleri çıktıdan maskeler.",
   s_ext_h:"Secret'ları araç çubuğundan kopyala",s_ext_p:"Kasanı aç ve secret değerlerini doğrudan Chrome'dan kopyala — cer web yok. Çok alanlı secret'lar alan bazlı kopyala & göster için açılır; popup ihtiyaç anında başlar, boşta kendini kilitler. Dark / White / Matrix temaları.",cta_ext:"Chrome Eklentisi",

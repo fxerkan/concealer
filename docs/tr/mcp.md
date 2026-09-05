@@ -15,6 +15,10 @@ concealer, AI ajanlarının secret'ları hiç **görmeden** **kullanabilmesi** i
 
 ---
 
+**Nasıl çalışır — değer, ajanın context'ine hiç girmez:**
+
+![concealer MCP akışı — ajan isimleri listeler, sonra adlandırılmış bir secret'ı bir alt sürece enjekte ederek komutu çalıştırır; değer context'in dışında kalır ve çıktı maskelenmiş döner]({{ site.baseurl }}/assets/concealer-mcp-flow.png)
+
 **Ajanlar secret isimlerini listeler — değerler gizli kalır:**
 
 ![Bir ajan MCP üzerinden concealer secret'larını listeliyor — yalnızca isimler ve scope'lar, asla değerler]({{ site.baseurl }}/assets/mcp-secret-list.gif)
