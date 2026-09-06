@@ -1,3 +1,20 @@
+{%- comment -%} seo4me: hreflang EN<->TR, emitted only when the counterpart page exists {%- endcomment -%}
+{%- assign _url = page.url -%}
+{%- if _url contains '/tr/' -%}
+  {%- assign _is_tr = true -%}{%- assign _en = _url | remove_first: '/tr' -%}{%- assign _tr = _url -%}
+{%- else -%}
+  {%- assign _is_tr = false -%}{%- assign _en = _url -%}{%- assign _tr = '/tr' | append: _url -%}
+{%- endif -%}
+{%- assign _cp = _tr -%}{%- if _is_tr -%}{%- assign _cp = _en -%}{%- endif -%}
+{%- assign _exists = false -%}
+{%- comment -%} the EN homepage (/) is a raw HTML file → lives in static_files, not site.pages {%- endcomment -%}
+{%- if _cp == '/' -%}{%- assign _exists = true -%}{%- endif -%}
+{%- unless _exists -%}{%- for p in site.pages -%}{%- if p.url == _cp -%}{%- assign _exists = true -%}{%- break -%}{%- endif -%}{%- endfor -%}{%- endunless -%}
+{%- if _exists -%}
+<link rel="alternate" hreflang="en" href="{{ _en | absolute_url }}">
+<link rel="alternate" hreflang="tr" href="{{ _tr | absolute_url }}">
+<link rel="alternate" hreflang="x-default" href="{{ _en | absolute_url }}">
+{%- endif -%}
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-QSRHNYG7SG"></script>
 <script>

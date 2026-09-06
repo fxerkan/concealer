@@ -1,0 +1,25 @@
+# concealer
+
+> Local-only, single-file secret manager for the AI-coding era. Encrypted with SOPS + age. No cloud, no telemetry, no account. AI agents use secrets (API keys, tokens, DB passwords) via CLI, Web UI, TUI, or an MCP server — without ever seeing the plaintext values. MIT-licensed, open source.
+
+## Docs
+- [Getting Started](https://concealer.fxerkan.com/getting-started.html): Install and store your first secret.
+- [Installation](https://concealer.fxerkan.com/installation.html): macOS, Linux, Windows, Chrome extension.
+- [Concepts](https://concealer.fxerkan.com/concepts.html): The single-file, local-only model (SOPS + age).
+- [CLI Reference](https://concealer.fxerkan.com/cli-reference.html): Every command and parameter (`cer` = `concealer`).
+- [Secret Types](https://concealer.fxerkan.com/secret-types.html): Single-value and multi-field secrets, scopes.
+- [MCP for AI Agents](https://concealer.fxerkan.com/mcp.html): How agents inject secrets without reading them.
+- [Web UI](https://concealer.fxerkan.com/web-ui.html): Searchable, scoped secret management.
+- [TUI](https://concealer.fxerkan.com/tui.html): Terminal secret browser.
+- [Security Model](https://concealer.fxerkan.com/security.html): Threat model and guarantees.
+- [Portability & Backup](https://concealer.fxerkan.com/portability.html): Move and back up the encrypted vault.
+
+## Reference
+- [Comparison](https://concealer.fxerkan.com/comparison.html): concealer vs cloud secret managers.
+- [Risks](https://concealer.fxerkan.com/risks.html): Known limits and mitigations.
+- [Policy](https://concealer.fxerkan.com/policy.html): Access and usage policy.
+- [Tokens & Recovery](https://concealer.fxerkan.com/tokens-recovery.html): Key recovery.
+
+## Optional
+- [GitHub repository](https://github.com/fxerkan/concealer): Source, issues, releases.
+- [Türkçe](https://concealer.fxerkan.com/tr/): Turkish documentation.

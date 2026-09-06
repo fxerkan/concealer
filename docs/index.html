@@ -15,6 +15,9 @@
 <meta name="description" content="Local-only, single-file secret manager for the AI-coding era. Encrypted with SOPS + age. No cloud, no telemetry, no account. CLI · Web UI · TUI · MCP.">
 <link rel="icon" href="/assets/logo.svg">
 <link rel="canonical" href="https://concealer.fxerkan.com/">
+<link rel="alternate" hreflang="en" href="https://concealer.fxerkan.com/">
+<link rel="alternate" hreflang="tr" href="https://concealer.fxerkan.com/tr/">
+<link rel="alternate" hreflang="x-default" href="https://concealer.fxerkan.com/">
 <meta name="keywords" content="secret manager, secrets management, SOPS, age encryption, local-first, AI coding, MCP server, env vars, API keys, vault, developer tools, open source">
 <meta name="author" content="FXerkan">
 <meta name="theme-color" content="#0a0b0d">
@@ -341,8 +344,8 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <h2 data-i18n="arch_h">One file, delegated crypto, five ways in</h2>
       <p data-i18n="arch_p">Every interface funnels into a single Python script that shells out to SOPS + age. The encrypted vault and key material never leave your machine.</p>
     </div>
-    <figure class="diagram"><img src="/assets/concealer-architecture.png" alt="concealer system architecture — CLI, Web UI, TUI, MCP and Chrome extension over a single-file core, SOPS + age, and an encrypted vault" loading="lazy"></figure>
-    <figure class="diagram" style="margin-top:22px"><img src="/assets/concealer-mcp-flow.png" alt="concealer MCP flow — an AI agent lists secret names and runs a command with a named secret injected, while the value stays redacted from its context" loading="lazy"></figure>
+    <figure class="diagram"><img src="/assets/concealer-architecture.png" width="1240" height="820" alt="concealer system architecture — CLI, Web UI, TUI, MCP and Chrome extension over a single-file core, SOPS + age, and an encrypted vault" loading="lazy"></figure>
+    <figure class="diagram" style="margin-top:22px"><img src="/assets/concealer-mcp-flow.png" width="2480" height="1440" alt="concealer MCP flow — an AI agent lists secret names and runs a command with a named secret injected, while the value stays redacted from its context" loading="lazy"></figure>
     <p class="diagcap" data-i18n="arch_cap">The MCP flow: agents use a secret without the value ever entering their context.</p>
   </div>
 </section>
@@ -362,7 +365,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <p data-i18n="s_cli_p">Set, get, run-with and deploy secrets from the terminal — scoped by tenant / project / environment / repo. <code>cer run</code> injects them into a child process's environment and redacts the values from its output.</p>
       <p><code>cer set · cer get · cer run · cer list</code></p>
     </div>
-    <figure><img src="/assets/cli-terminal.png" alt="concealer CLI — set, get, run and list secrets" loading="lazy"></figure>
+    <figure><img src="/assets/cli-terminal.png" width="1200" height="720" alt="concealer CLI — set, get, run and list secrets" loading="lazy"></figure>
   </div>
 
   <div class="shot">
@@ -372,7 +375,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <p data-i18n="s_web_p">Type-aware forms, searchable multi-select filters, per-secret deploy renderers, clipboard copy with auto-clear, and a tamper-evident audit viewer. Bilingual (TR/EN), dark/light/matrix themes, localhost only.</p>
       <p><code>concealer web</code> → http://127.0.0.1:8787</p>
     </div>
-    <figure><img src="/assets/app-secrets.png" alt="concealer Web UI — searchable, scoped secrets" loading="lazy"></figure>
+    <figure><img src="/assets/app-secrets.png" width="3570" height="2380" alt="concealer Web UI — searchable, scoped secrets" loading="lazy"></figure>
   </div>
 
   <div class="shot">
@@ -382,7 +385,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <p data-i18n="s_tui_p">Browse, search, add, delete and reveal secrets without leaving the terminal — arrow keys, instant filtering, type-aware editing.</p>
       <p><code>concealer tui</code></p>
     </div>
-    <figure><img src="/assets/tui-secrets.png" alt="concealer TUI — terminal secret browser" loading="lazy"></figure>
+    <figure><img src="/assets/tui-secrets.png" width="2546" height="1650" alt="concealer TUI — terminal secret browser" loading="lazy"></figure>
   </div>
 
   <div class="shot">
@@ -392,7 +395,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <p data-i18n="s_mcp_p">Register an agent, hand it a revocable token, and it can inject a DB password to run a query — while the value stays redacted from its context. Every call is audited with source=mcp.</p>
       <p><code>concealer agent register claude</code></p>
     </div>
-    <figure><img src="/assets/mcp-secret-list.gif" alt="Agent listing concealer secrets over MCP — names only, never values" loading="lazy"></figure>
+    <figure><img src="/assets/mcp-secret-list.gif" width="1200" height="866" alt="Agent listing concealer secrets over MCP — names only, never values" loading="lazy"></figure>
   </div>
 
   <div class="shot">
@@ -402,7 +405,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <p data-i18n="s_ext_p">Open your vault and copy secret values straight from Chrome — no <code>cer web</code>. Multi-field secrets expand for per-field copy &amp; reveal; the popup starts on demand and self-locks when idle. Dark / White / Matrix themes.</p>
       <p><a href="https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj">Add to Chrome →</a> · <code>cer chrome-extension</code> · <a href="/chrome-extension">full guide →</a></p>
     </div>
-    <figure><img src="/assets/ext-list.png" alt="concealer Chrome extension — copy secrets from the toolbar" loading="lazy"></figure>
+    <figure><img src="/assets/ext-list.png" width="1280" height="800" alt="concealer Chrome extension — copy secrets from the toolbar" loading="lazy"></figure>
   </div>
 </div></section>
 
