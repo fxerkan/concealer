@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "0.9.19"   # advances through 0.x; 1.0 = reserved for the full live/release version
+VERSION = "0.9.20"   # advances through 0.x; 1.0 = reserved for the full live/release version
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -192,11 +192,28 @@ def now_iso(): return datetime.now(timezone.utc).isoformat(timespec="seconds")
 def mask(v):
     v = str(v); return v[:4] + "…" + v[-2:] if len(v) > 8 else ("•" * len(v) or "—")
 
+# ---------------- error text scrubbing ----------------
+# concealer delegates encryption to external tools, but no user-facing surface (CLI, TUI, web, MCP,
+# extension) names them. Subprocess stderr does, so scrub every error string on its way to the user.
+# Internal identifiers (file paths, env vars, argv) are untouched — only what gets printed.
+_SCRUB_MAP = [(r"(?:keys[/\\\\])?age-key\.txt\.age", "the encrypted vault key"),
+              (r"(?:keys[/\\\\])?age-key\.txt", "the vault key file"),
+              (r"\.sops\.yaml", "the vault crypto config"),
+              (r"SOPS_AGE_KEY(?:_FILE)?", "the vault key variable"),
+              (r"\bage-keygen\b", "the key generator"),
+              (r"\bsops\b", "the encryption engine"),
+              (r"\bage\b", "the encryption engine")]
+# one capturing group per entry (longest patterns first) → m.lastindex picks the replacement
+_SCRUB = re.compile("(?i)" + "|".join("(%s)" % p for p, _ in _SCRUB_MAP))
+def scrub(x):
+    """Replace crypto-tool names/paths in an error string with neutral wording."""
+    return _SCRUB.sub(lambda m: _SCRUB_MAP[m.lastindex - 1][1], str(x))
+
 # ---------------- store ----------------
 def load():
     r = subprocess.run(["sops", "-d", "--output-type", "json", FILE],
                        env=_env(), capture_output=True, text=True)
-    if r.returncode: sys.exit(f"decrypt error: {r.stderr.strip()}")
+    if r.returncode: sys.exit(f"decrypt error: {scrub(r.stderr.strip())}")
     d = json.loads(r.stdout); d.setdefault("secrets", [])
     for e in d["secrets"]: norm(e)
     return d
@@ -221,7 +238,7 @@ def save(d):
             except OSError: pass
     else:
         r = subprocess.run(cmd + ["/dev/stdin"], input=payload, env=_env(), capture_output=True, text=True)
-    if r.returncode: sys.exit(f"encrypt error: {r.stderr.strip()}")
+    if r.returncode: sys.exit(f"encrypt error: {scrub(r.stderr.strip())}")
     with open(FILE, "w") as f: f.write(r.stdout)
 
 def norm(e):
@@ -1046,7 +1063,7 @@ def merge_secrets(d, incoming, mode="overwrite"):
     return n_new, n_upd, n_skip
 
 def export_bundle(pw):
-    """Decrypt the vault to JSON and encrypt with the master password via 'age -p'; returns portable .age bytes."""
+    """Decrypt the vault to JSON and encrypt with the master password via 'age -p'; returns portable age bytes (callers wrap them into a .cerbak)."""
     d = load()
     plain = json.dumps({"secrets": secs(d), "exported": now_iso()}).encode()
     # ponytail: age wants a file argument → plaintext briefly in temp (0600), removed in finally
@@ -1054,7 +1071,7 @@ def export_bundle(pw):
     try:
         tin.write(plain); tin.close(); os.chmod(tin.name, 0o600)
         rc, err = _age_pw(["-p", "-o", tout, tin.name], pw, confirm=True)
-        if rc: raise RuntimeError(err.strip() or "age encrypt error")
+        if rc: raise RuntimeError(scrub(err.strip()) or "encryption error")
         return open(tout, "rb").read()
     finally:
         for p in (tin.name, tout):
@@ -1124,7 +1141,7 @@ def _age_enc_pub(data):
     tin.write(data if isinstance(data, bytes) else data.encode()); tin.close(); tout = tin.name + ".age"
     try:
         r = subprocess.run(["age", "-r", rcpt, "-o", tout, tin.name], capture_output=True, text=True)
-        if r.returncode: raise RuntimeError(r.stderr.strip() or "age recipient enc error")
+        if r.returncode: raise RuntimeError(scrub(r.stderr.strip()) or "encryption error")
         return open(tout, "rb").read()
     finally:
         for p in (tin.name, tout):
@@ -1138,7 +1155,7 @@ def _age_dec_priv(blob):
     try:
         if key: r = subprocess.run(["age", "-d", "-i", "-", tin.name], input=key, capture_output=True, text=True)
         else:   r = subprocess.run(["age", "-d", "-i", KEY, tin.name], capture_output=True, text=True)
-        if r.returncode: raise RuntimeError(r.stderr.strip() or "age decrypt error")
+        if r.returncode: raise RuntimeError(scrub(r.stderr.strip()) or "decryption error")
         return r.stdout
     finally:
         try: os.remove(tin.name)
@@ -1315,7 +1332,7 @@ def _age_enc_bytes(data, pw):
     tout = tin.name + ".age"
     try:
         rc, err = _age_pw(["-p", "-o", tout, tin.name], pw, confirm=True)
-        if rc: raise RuntimeError(err.strip() or "age enc error")
+        if rc: raise RuntimeError(scrub(err.strip()) or "encryption error")
         return open(tout, "rb").read()
     finally:
         for p in (tin.name, tout):
@@ -1437,12 +1454,14 @@ def _banner():
     utf8 = (sys.stdout.encoding or "").lower().startswith("utf")
     art = _LOGO if utf8 else ["concealer"]
     for ln in art: print(_c(ln, "38;5;203;1"))   # amber, bold
-    print(_c("  local-only secret manager  ·  SOPS + age  ·  v" + VERSION, "38;5;203"))
+    print(_c("  local-only secret manager  ·  v" + VERSION, "38;5;203"))
     print()
 
 def init(force=False):
-    if os.path.exists(KEY) and not force:
-        sys.exit(f"already set up: {KEY}\nto reinstall: concealer init --force")
+    # A hardened vault has no KEY on disk (only BACKUP) — checking KEY alone let `init` walk straight
+    # over an existing vault and generate a fresh keypair, orphaning the secrets. Check both.
+    if (os.path.exists(KEY) or os.path.exists(BACKUP)) and not force:
+        sys.exit("already set up.\nto reinstall: concealer init --force")
     _banner()
     print(_c("Setting up vault…", "1") + f"  ({HOME})\n")
     print(_c("Step 1/2", "38;5;203;1") + " — set a master password (this opens the vault; if lost you need a recovery code).")
@@ -1452,7 +1471,7 @@ def init(force=False):
     for f in (KEY, PUBKEY, BACKUP, MASTER):
         if os.path.exists(f): os.remove(f)
     r = subprocess.run(["age-keygen", "-o", KEY], capture_output=True, text=True)
-    if r.returncode: sys.exit(f"age-keygen error: {r.stderr.strip()}")
+    if r.returncode: sys.exit(f"key generation error: {scrub(r.stderr.strip())}")
     os.chmod(KEY, 0o600)
     pub = next(w for w in (r.stderr + r.stdout).split() if w.startswith("age1"))
     with open(PUBKEY, "w") as f: f.write(pub + "\n")
@@ -1474,7 +1493,7 @@ def init(force=False):
     # key-at-rest: remove the age private key from disk (only the encrypted BACKUP remains).
     os.remove(KEY); audit("harden", source="cli")
     tok = mint_token(keytext, "cli", "cli", ttl=TOKEN_TTL)
-    print("\n" + _c("✓ Done.", "38;5;40;1") + f"  KEY-AT-REST on — the age private key is no longer plaintext on disk.")
+    print("\n" + _c("✓ Done.", "38;5;40;1") + f"  KEY-AT-REST on — the vault key is no longer plaintext on disk.")
     print(f"  public key: {pub}\n")
     print(_c("Next steps:", "1"))
     print("  1) Add the CLI token to your shell (~%dh valid, refresh: eval \"$(concealer unlock)\"):" % (TOKEN_TTL // 3600))
@@ -1577,7 +1596,7 @@ def harden():
             with open(gi, "a") as f: f.write("\n".join(miss) + "\n")
     except OSError: pass
     tok = mint_token(keytext, "cli", "cli", ttl=TOKEN_TTL)
-    print("hardened: the age private key was removed from disk (only the encrypted backup remains).")
+    print("hardened: the plaintext vault key was removed from disk (only the encrypted copy remains).")
     print(f"  export CONCEALER_TOKEN={tok}   (~{TOKEN_TTL // 3600}h; agent: concealer agent register <name>)")
 
 # ---------------- injection ----------------
@@ -1879,7 +1898,7 @@ def _tui_main(scr, data):
 
     def reload_(msg=""):
         try: st["d"] = load()
-        except SystemExit as ex: st["msg"] = str(ex); return
+        except SystemExit as ex: st["msg"] = scrub(ex); return
         apply(); st["msg"] = msg
 
     def cur():
@@ -2444,7 +2463,7 @@ def _splash(scr, C, curses):
         try: scr.addstr(y0 + i, x, ln[:W - 1], C["acc"] | curses.A_BOLD)
         except (curses.error, UnicodeError, ValueError): pass
     dot = "  ·  " if _TUI_UTF8 else "  -  "
-    for txt, dy, at in [(f"local-only secret manager{dot}SOPS + age", len(art) + 1, C["mut"]),
+    for txt, dy, at in [("local-only secret manager", len(art) + 1, C["mut"]),
                         (f"v{VERSION}", len(art) + 2, C["mut"]),
                         (f"press any key{dot}? for keyboard shortcuts", len(art) + 4, C["acc"])]:
         try: scr.addstr(y0 + dy, max(0, (W - len(txt)) // 2), txt, at)
@@ -2473,7 +2492,7 @@ def _print(rows):
 def _mkhelp():
     R = lambda syn, desc: f"  {syn:<46}{desc}"
     lines = [
-        f"concealer {VERSION} — local-only secret manager (SOPS + age)   ·   alias: cer",
+        f"concealer {VERSION} — local-only secret manager   ·   alias: cer",
         "",
         "USAGE",
         "  concealer <command> [options]                 # short: cer <command>",
@@ -2482,7 +2501,7 @@ def _mkhelp():
         "VAULT / KEY",
         R("init [--force]", "set up a new vault; prints master password, 8 recovery codes, CLI token"),
         R("unlock", "get a time-limited (TTL) token for a human, via the master password"),
-        R("harden", "harden an old vault (remove the plaintext age key from disk)"),
+        R("harden", "harden an old vault (remove the plaintext vault key from disk)"),
         R("passwd", "change the master password (requires a recovery code)"),
         R("recover", "access the vault with a recovery code (forgotten password)"),
         R("recovery", "regenerate the recovery-code set"),
@@ -2511,8 +2530,8 @@ def _mkhelp():
         R("run [scope] <cmd...>", "inject secrets into env and run a command (no values leak)"),
         "",
         "TRANSFER / AUDIT / INTERFACE",
-        R("export [file]", "export a password-protected .age bundle"),
-        R("import <bundle.age|.cerbak> [--mode=overwrite|skip|duplicate]", "import a bundle / restore a .cerbak backup (conflict handling)"),
+        R("export [file]", "export a password-protected .cerbak bundle"),
+        R("import <bundle.cerbak> [--mode=overwrite|skip|duplicate]", "import a bundle / restore a .cerbak backup (conflict handling)"),
         R("backup [--dir D]", "write a .cerbak vault backup (uses the Settings backup password; for cron/launchd)"),
         R("audit [verify]", "HMAC-chained audit log (verify: integrity check)"),
         R("audit anchor [--file F][--syslog][--webhook U]", "push head hash to an off-machine sink (tamper-evidence)"),
@@ -2550,23 +2569,23 @@ def _mkhelp():
     return "\n".join(lines)
 HELP = _mkhelp()
 
-# external dependencies; the brew formula installs these automatically, but give a clear error on manual install.
+# External dependencies. The packaged installs (brew tap / scoop) pull them in; on a manual install
+# point at the installer rather than naming the tools — no user-facing surface names them (see scrub()).
 _DEPS = {"sops": "sops", "age": "age", "age-keygen": "age", "expect": "expect"}
+_DEPS_DOC = "https://concealer.fxerkan.com/installation"
 def _preflight():
     _win = sys.platform.startswith("win")
-    deps = {b: p for b, p in _DEPS.items() if not (_win and b == "expect")}  # Windows: pywinpty replaces expect
-    missing = sorted({deps[b] for b in deps if not shutil.which(b)})
+    deps = [b for b in _DEPS if not (_win and b == "expect")]  # Windows: pywinpty replaces expect
+    missing = [b for b in deps if not shutil.which(b)]
     if _win:
-        try: import winpty  # noqa: F401 — the ConPTY driver for age (see concealer_win.py)
-        except ImportError: missing.append("pywinpty (pip install pywinpty)")
+        try: import winpty  # noqa: F401 — the ConPTY driver for the passphrase prompt (see concealer_win.py)
+        except ImportError: missing.append("pywinpty")
     if not missing: return
-    if _win:
-        hint = "scoop install sops age  (and: pip install pywinpty)"
-    else:
-        hint = ("brew install " + " ".join(missing)) if shutil.which("brew") else \
-               ("install with apt/dnf: " + ", ".join(missing))
-    sys.exit(f"missing dependency: {', '.join(missing)}\ninstall: {hint}\n"
-             "(with homebrew, 'brew install fxerkan/tap/concealer' installs everything together)")
+    hint = "scoop install fxerkan/concealer" if _win else \
+           "brew install fxerkan/tap/concealer" if shutil.which("brew") else None
+    sys.exit("concealer is missing the components it encrypts with.\n" +
+             (f"install everything together:  {hint}\nmanual setup: {_DEPS_DOC}"
+              if hint else f"setup guide: {_DEPS_DOC}"))
 
 # ---------------- Chrome extension: built-in native-messaging host + one-time setup ----------------
 # The host lives INSIDE concealer (no separate script), so a brew/scoop install needs no extra files.
@@ -2952,21 +2971,22 @@ def cli(argv):
             print("history cleanup guide: run `concealer web` → Risks → Exposure → 'Show cleanup guide' "
                   "(concealer NEVER rewrites history for you).")
     elif cmd == "export":
-        out = a[0] if a and not a[0].startswith("--") else f"concealer-export-{now_iso()[:10]}.age"
+        out = a[0] if a and not a[0].startswith("--") else f"concealer-export-{now_iso()[:10]}{CER_EXT}"
         pw = getpass.getpass("Master password (bundle encryption): ")
         if not verify_master(pw): sys.exit("wrong password.")
-        blob = export_bundle(pw); open(out, "wb").write(blob)
+        blob = _cer_wrap(export_bundle(pw))   # same opaque .cerbak container as backups; import auto-detects
+        open(out, "wb").write(blob)
         audit("export", source="cli", detail=out); print(f"export: {out} ({len(blob)} bytes)")
     elif cmd == "import":
         mode = "overwrite"; files = []
         for x in a:
             if x.startswith("--mode="): mode = x.split("=", 1)[1]
             else: files.append(x)
-        if not files: sys.exit("usage: concealer import <bundle.age|.cerbak> [--mode=overwrite|skip|duplicate]")
+        if not files: sys.exit("usage: concealer import <bundle.cerbak> [--mode=overwrite|skip|duplicate]")
         if mode not in ("overwrite", "skip", "duplicate"): sys.exit("mode must be overwrite|skip|duplicate")
         pw = getpass.getpass("Bundle password: ")
         try: nn, nu, ns = import_bundle(pw, open(files[0], "rb").read(), mode)
-        except Exception as ex: sys.exit(f"import error: {ex}")
+        except Exception as ex: sys.exit(f"import error: {scrub(ex)}")
         audit("import", source="cli", detail=f"{files[0]} mode={mode}")
         print(f"import ({mode}): +{nn} new, ~{nu} updated, ={ns} skipped")
     elif cmd == "config":
@@ -3272,10 +3292,10 @@ def serve_web(port):
                 b = self._body()
                 if not verify_master(b.get("pw", "")):
                     audit("export_fail", source="web"); return self._json({"error": "bad_pw"}, 403)
-                try: blob = export_bundle(b.get("pw", ""))
-                except Exception as ex: return self._json({"error": str(ex)}, 500)
+                try: blob = _cer_wrap(export_bundle(b.get("pw", "")))   # opaque .cerbak container (see make_backup)
+                except Exception as ex: return self._json({"error": scrub(ex)}, 500)
                 audit("export", source="web", detail=f"{len(secs(load()))} secrets")
-                return self._json({"ok": True, "filename": f"concealer-export-{now_iso()[:10]}.age",
+                return self._json({"ok": True, "filename": f"concealer-export-{now_iso()[:10]}{CER_EXT}",
                                    "b64": base64.b64encode(blob).decode()})
             if path == "/api/import":      # pw = the bundle's password (may not be the local master)
                 b = self._body()
@@ -3284,7 +3304,7 @@ def serve_web(port):
                 mode = b.get("mode", "overwrite")
                 if mode not in ("overwrite", "skip", "duplicate"): mode = "overwrite"
                 try: nn, nu, ns = import_bundle(b.get("pw", ""), blob, mode)
-                except Exception as ex: return self._json({"error": str(ex)}, 400)
+                except Exception as ex: return self._json({"error": scrub(ex)}, 400)
                 audit("import", source="web", detail=f"mode={mode} +{nn} ~{nu} ={ns}")
                 return self._json({"ok": True, "imported": nn, "updated": nu, "skipped": ns})
             if path == "/api/backup":      # manual .cer download — BACKUP password (different from master, required)
@@ -3293,7 +3313,7 @@ def serve_web(port):
                 if pw != b.get("pw2", ""): return self._json({"error": "backup_pw_mismatch"}, 400)
                 if verify_master(pw): return self._json({"error": "backup_pw_same_as_master"}, 400)
                 try: blob = make_backup(pw)
-                except Exception as ex: return self._json({"error": str(ex)}, 500)
+                except Exception as ex: return self._json({"error": scrub(ex)}, 500)
                 audit("backup", source="web", detail=f"{len(secs(load()))} secrets")
                 return self._json({"ok": True, "filename": _cer_name(), "b64": base64.b64encode(blob).decode()})
             if path == "/api/backup/config":   # auto-backup config — master pw required (sensitive)
@@ -3312,7 +3332,7 @@ def serve_web(port):
                     if len(bp) < 8: return self._json({"error": "backup_pw_short"}, 400)
                     if verify_master(bp): return self._json({"error": "backup_pw_same_as_master"}, 400)
                     try: c["pw_wrapped"] = base64.b64encode(_age_enc_pub(bp)).decode()
-                    except Exception as ex: return self._json({"error": str(ex)}, 500)
+                    except Exception as ex: return self._json({"error": scrub(ex)}, 500)
                 if c["enabled"] and not c.get("pw_wrapped"):
                     return self._json({"error": "backup_pw_required"}, 400)
                 _save_backup_cfg(c)
@@ -3321,7 +3341,7 @@ def serve_web(port):
                                    "keep": c["keep"], "last": c["last"], "has_pw": bool(c.get("pw_wrapped"))})
             if path == "/api/backup/run":      # write the auto-backup to disk now (test/manual trigger)
                 try: p = run_auto_backup()
-                except Exception as ex: return self._json({"error": str(ex)}, 400)
+                except Exception as ex: return self._json({"error": scrub(ex)}, 400)
                 return self._json({"ok": True, "path": p})
             if path == "/api/deploy":
                 b = self._body(); target = b.get("target", "dotenv")
@@ -3517,7 +3537,7 @@ def mcp_stdio():
         elif m == "tools/call":
             p = req.get("params", {})
             try: text = _mcp_call(p.get("name"), p.get("arguments", {}))
-            except Exception as e: text = f"error: {e}"
+            except Exception as e: text = f"error: {scrub(e)}"
             send({"jsonrpc": "2.0", "id": mid, "result": {"content": [{"type": "text", "text": text}]}})
         elif mid is not None:
             send({"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": f"method not found: {m}"}})

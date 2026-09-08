@@ -282,15 +282,15 @@ concealer run --project web --env prod npm run deploy
 concealer export [file]
 ```
 
-Export a **password-protected `.age` bundle** of the whole vault. Prompts for the master password to confirm, then writes the bundle. Default filename: `concealer-export-YYYY-MM-DD.age`.
+Export a **password-protected `.cerbak` bundle** of the whole vault — the same opaque container as a backup, encrypted with the master password. Prompts for the master password to confirm, then writes the bundle. Default filename: `concealer-export-YYYY-MM-DD.cerbak`.
 
 ## import
 
 ```bash
-concealer import <bundle.age|.cerbak|.cer> [--mode=overwrite|skip|duplicate]
+concealer import <bundle.cerbak> [--mode=overwrite|skip|duplicate]
 ```
 
-Import a bundle or restore a `.cerbak` backup (older `.cer` files still restore — import is extension-agnostic). Prompts for the bundle password. Reports how many records were added / updated / skipped.
+Import a bundle or restore a `.cerbak` backup (older `.cer` / `.age` files still restore — import auto-detects the format). Prompts for the password the file was written with (the backup password, or the source machine's master password for an export). Reports how many records were added / updated / skipped.
 
 | `--mode` | On a record that already exists… |
 |---|---|

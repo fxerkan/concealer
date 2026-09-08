@@ -29,7 +29,7 @@ def age_pw(args, passphrase, confirm=False):
     try:
         from winpty import PtyProcess
     except ImportError:
-        return 127, ("pywinpty not installed. On Windows concealer needs it to drive age.\n"
+        return 127, ("pywinpty not installed. On Windows concealer needs it to drive the passphrase prompt.\n"
                      "Install with:  pip install pywinpty   (or reinstall: pipx install concealer)")
 
     argv = ["age"] + list(args)
@@ -76,7 +76,7 @@ def age_pw(args, passphrase, confirm=False):
     text = "".join(out)
     if t.is_alive():
         # Hung (never got the prompt, or age is waiting on something). Fail like a timeout.
-        return 1, text + "\n[concealer] age timed out after %ds (pty)" % TIMEOUT
+        return 1, text + "\n[concealer] encryption engine timed out after %ds (pty)" % TIMEOUT
     if "error" in result:
         return 1, text + "\n[concealer] pty error: " + result["error"]
     return int(result.get("rc", 1)), text

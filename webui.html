@@ -302,8 +302,8 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
 /* tum ekrana dagilmis kod parcalari (JS uretir); her biri kendi konum/zaman/suresiyle redakte olur */
 .loginbg{position:absolute;inset:0;overflow:hidden;z-index:1;pointer-events:none;user-select:none;
   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--mut);opacity:.26}
-/* her parça bir yaşam döngüsü sürer: yüksel-belir → açık değer → redakte → sönerek kaybol → yeni yerde tekrar.
-   süre/gecikme parça başına --dur/--del (rx pseudo'larına custom-prop olarak miras geçer, aynı fazda) */
+/* Each fragment runs a lifecycle: rise-in -> plaintext value -> redacted -> fade out -> reappear elsewhere.
+   Duration/delay are per-fragment (--dur/--del); the .rx::after wipe inherits them so it stays in phase. */
 .loginbg .frag{position:absolute;white-space:nowrap;opacity:0;will-change:transform,opacity;
   animation:fraglife var(--dur,10s) ease-in-out var(--del,0s) infinite}
 .loginbg .k{color:var(--acc2)}          /* keyword/type */
@@ -311,19 +311,15 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
 .rx{position:relative;color:var(--txt);border-radius:3px}
 .rx::after{content:"";position:absolute;inset:-1px -3px;background:var(--acc);border-radius:3px;will-change:transform;
   transform:scaleX(0);transform-origin:left center;animation:rxwipe var(--dur,10s) ease var(--del,0s) infinite}
-.rx::before{content:"";position:absolute;left:-3px;right:-3px;top:50%;height:2px;background:var(--ink);
-  transform:scaleX(0);transform-origin:left center;z-index:1;opacity:0;will-change:transform;animation:rxstrike var(--dur,10s) linear var(--del,0s) infinite}
 /* opacity 0'da başlar/biter → yeniden konumlandırma (JS animationiteration) görünmez sınırda gerçekleşir */
 @keyframes fraglife{0%{opacity:0;transform:translateY(7px)}9%{opacity:1;transform:translateY(0)}55%{opacity:1;transform:translateY(0)}70%{opacity:0;transform:translateY(-7px)}100%{opacity:0;transform:translateY(-7px)}}
 @keyframes rxwipe{0%,27%{transform:scaleX(0)}40%,100%{transform:scaleX(1)}}
-@keyframes rxstrike{0%,29%{transform:scaleX(0);opacity:0}34%{opacity:.9}40%,100%{transform:scaleX(1);opacity:.9}}
 /* azaltılmış-hareket: konum/ölçek hareketini bırak, yalnız opaklık cross-fade ile akışı sürdür (vestibüler-dostu) */
 @keyframes fraglife-soft{0%{opacity:0}12%{opacity:1}56%{opacity:1}72%{opacity:0}100%{opacity:0}}
 @keyframes rxfade{0%,30%{opacity:0}42%,100%{opacity:1}}
 @media(prefers-reduced-motion:reduce){
   .loginbg .frag{animation-name:fraglife-soft;transform:none}
   .rx::after{transform:scaleX(1);animation-name:rxfade}
-  .rx::before{display:none}
 }
 
 /* --- period quick-select (audit + stats) --- */
@@ -651,8 +647,8 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
       <hr style="border-color:var(--line);margin:22px 0;max-width:680px">
       <label class="fld" data-i18n="set_portability">Portability (move between machines)</label>
       <div class="toolbar" style="margin-top:8px">
-        <button data-i18n="export_btn" onclick="doExport()">⬇ Export (.age)</button>
-        <input type="file" id="imp_file" accept=".age,.cer,.cerbak" style="width:auto">
+        <button data-i18n="export_btn" onclick="doExport()">⬇ Export (.cerbak)</button>
+        <input type="file" id="imp_file" accept=".cerbak,.cer" style="width:auto">
         <select id="imp_mode" title="conflict handling" style="width:auto">
           <option value="overwrite" data-i18n="imp_mode_overwrite">On conflict: overwrite</option>
           <option value="skip" data-i18n="imp_mode_skip">On conflict: skip</option>
@@ -660,7 +656,7 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
         </select>
         <button data-i18n="import_btn" onclick="doImport()">⬆ Import</button>
       </div>
-      <p class="mut" style="max-width:680px" data-i18n="set_export_hint">Export encrypts the whole vault with your master password (age). Import merges records into this vault (also restores a .cerbak backup).</p>
+      <p class="mut" style="max-width:680px" data-i18n="set_export_hint">Export writes a .cerbak of the whole vault, encrypted with your master password. Import merges its records into this vault (restores an exported or backed-up .cerbak).</p>
 
       <hr style="border-color:var(--line);margin:22px 0;max-width:680px">
       <label class="fld" data-i18n="set_backup">Backup (.cerbak)</label>
@@ -793,10 +789,10 @@ const I18N={
   set_limits_hint:"AI ajanlar secret'ları yalnız kayıtlı bir agent token'ıyla okuyabilir. Çağrı başı tek yanıtı, pencere kotası ise bir ajanın pencere içinde açabileceği DISTINCT secret sayısını sınırlar — tekrarlı sorgularla tüm vault toplanamaz. Bir ajanı tamamen engellemek için pencere kotasını 0 yap.",
   lim_who:"Kim",lim_default:"Varsayılan (tüm ajanlar)",lim_per_call:"Çağrı başı",lim_quota:"Pencere kotası (distinct)",lim_window:"Pencere (sn)",
   lim_add:"Ajan limiti ekle",lim_add_ph:"ajan seç…",lim_remove:"override'ı kaldır",lim_no_agents:"Kayıtlı ajan yok — <code>concealer agent register &lt;ad&gt;</code> ile ekle.",
-  lim_not_hardened:"Vault HARDENED değil: diskte düz-metin age anahtarı (keys/age-key.txt) var. Bu yüzden MCP/CLI, secret'ları token/kayıt OLMADAN okuyabiliyor (bu sayfadaki limitler ve kayıt zorunluluğu bu haldeyken uygulanamaz). Zorunlu kılmak için: (1) <code>concealer harden</code> — düz-metin anahtarı kaldırır; (2) <code>concealer agent register claude-code</code> — CONCEALER_TOKEN üretir; (3) token'ı Claude Code MCP env'ine ekle; (4) MCP sunucusunu yeniden başlat.",
-  set_portability:"Taşınabilirlik (makineler arası)",export_btn:"⬇ Dışa Aktar (.age)",import_btn:"⬆ İçe Aktar",
-  set_export_hint:"Dışa aktarma tüm vault'u master parolayla (age) şifreler; başka makineye taşınabilir. İçe aktarma kayıtları bu vault'a birleştirir.",
-  exported:"dışa aktarma indirildi",imp_pick:"önce .age dosyası seç",imp_fail:"içe aktarma başarısız",imp_corrupt:"bozuk / okunamayan dosya",imported_n:(n,u,s)=>`+${n} yeni, ~${u} güncellendi, =${s||0} atlandı`,
+  lim_not_hardened:"Vault HARDENED değil: diskte düz-metin vault anahtarı var. Bu yüzden MCP/CLI, secret'ları token/kayıt OLMADAN okuyabiliyor (bu sayfadaki limitler ve kayıt zorunluluğu bu haldeyken uygulanamaz). Zorunlu kılmak için: (1) <code>concealer harden</code> — düz-metin anahtarı kaldırır; (2) <code>concealer agent register claude-code</code> — CONCEALER_TOKEN üretir; (3) token'ı Claude Code MCP env'ine ekle; (4) MCP sunucusunu yeniden başlat.",
+  set_portability:"Taşınabilirlik (makineler arası)",export_btn:"⬇ Dışa Aktar (.cerbak)",import_btn:"⬆ İçe Aktar",
+  set_export_hint:"Dışa aktarma, tüm vault'u master parolanla şifreleyip bir .cerbak dosyası yazar; başka makineye taşınabilir. İçe aktarma, dosyadaki kayıtları bu vault'a birleştirir (dışa aktarılmış ya da yedeklenmiş .cerbak).",
+  exported:"dışa aktarma indirildi",file_pw:"Dosyanın parolası (yedek/dışa aktarma parolası)",imp_pick:"önce .cerbak dosyası seç",imp_fail:"içe aktarma başarısız",imp_corrupt:"bozuk / okunamayan dosya",imported_n:(n,u,s)=>`+${n} yeni, ~${u} güncellendi, =${s||0} atlandı`,
   imp_mode_overwrite:"Çakışmada: üzerine yaz",imp_mode_skip:"Çakışmada: atla",imp_mode_duplicate:"Çakışmada: kopyala",
   set_backup:"Yedek (.cerbak)",set_backup_hint:"Bir .cerbak yedeği, tüm vault'un master parolandan AYRI özel bir yedek parolasıyla şifrelenmiş halidir — içi açılıp okunamayan opak binary. Yukarıdaki İçe Aktar ile geri yüklenir. Otomatik yedekler, süre dolunca kilit açılışında bir .cerbak'ı yerel klasöre yazar.",
   backup_now:"⬇ Şimdi yedekle (.cerbak)",bk_auto:"Otomatik yedek",bk_interval:"Her",bk_u_hour:"saat",bk_u_day:"gün",bk_u_week:"hafta",bk_u_month:"ay",bk_keep:"Son (dosya) tut",bk_dir:"Hedef klasör",
@@ -893,10 +889,10 @@ const I18N={
   set_limits_hint:"AI agents may only read secrets through a registered agent token. Per call caps a single response; the window quota caps how many distinct secrets an agent may reveal within the window — repeated queries can't reassemble the whole vault. Set the window quota to 0 to fully block an agent.",
   lim_who:"Who",lim_default:"Default (all agents)",lim_per_call:"Per call",lim_quota:"Window quota (distinct)",lim_window:"Window (sec)",
   lim_add:"Add agent limit",lim_add_ph:"pick agent…",lim_remove:"remove override",lim_no_agents:"No registered agents — add one with <code>concealer agent register &lt;name&gt;</code>.",
-  lim_not_hardened:"Vault is NOT hardened: a plaintext age key (keys/age-key.txt) is on disk, so MCP/CLI can read secrets WITHOUT a token or registration (the limits and registration requirement on this page can't be enforced in this state). To enforce them: (1) <code>concealer harden</code> — removes the plaintext key; (2) <code>concealer agent register claude-code</code> — prints a CONCEALER_TOKEN; (3) put that token in the Claude Code MCP env; (4) restart the MCP server.",
-  set_portability:"Portability (move between machines)",export_btn:"⬇ Export (.age)",import_btn:"⬆ Import",
-  set_export_hint:"Export encrypts the whole vault with your master password (age); portable to another machine. Import merges records into this vault.",
-  exported:"export downloaded",imp_pick:"pick a .age file first",imp_fail:"import failed",imp_corrupt:"corrupt / unreadable file",imported_n:(n,u,s)=>`+${n} new, ~${u} updated, =${s||0} skipped`,
+  lim_not_hardened:"Vault is NOT hardened: a plaintext vault key is on disk, so MCP/CLI can read secrets WITHOUT a token or registration (the limits and registration requirement on this page can't be enforced in this state). To enforce them: (1) <code>concealer harden</code> — removes the plaintext key; (2) <code>concealer agent register claude-code</code> — prints a CONCEALER_TOKEN; (3) put that token in the Claude Code MCP env; (4) restart the MCP server.",
+  set_portability:"Portability (move between machines)",export_btn:"⬇ Export (.cerbak)",import_btn:"⬆ Import",
+  set_export_hint:"Export writes a .cerbak of the whole vault, encrypted with your master password; portable to another machine. Import merges its records into this vault.",
+  exported:"export downloaded",file_pw:"Password of the file (backup / export password)",imp_pick:"pick a .cerbak file first",imp_fail:"import failed",imp_corrupt:"corrupt / unreadable file",imported_n:(n,u,s)=>`+${n} new, ~${u} updated, =${s||0} skipped`,
   imp_mode_overwrite:"On conflict: overwrite",imp_mode_skip:"On conflict: skip",imp_mode_duplicate:"On conflict: duplicate",
   set_backup:"Backup (.cerbak)",set_backup_hint:"A .cerbak backup is the whole vault encrypted with a dedicated backup password (separate from your master password) — an opaque binary you can't open to read. Restore it via Import above. Automatic backups write a .cerbak to a local folder on unlock once the interval has elapsed.",
   backup_now:"⬇ Backup now (.cerbak)",bk_auto:"Automatic backups",bk_interval:"Every",bk_u_hour:"hours",bk_u_day:"days",bk_u_week:"weeks",bk_u_month:"months",bk_keep:"Keep last (files)",bk_dir:"Destination folder",
@@ -1109,8 +1105,9 @@ function showTab(tab){
 }
 
 // ---------- master-parola onay modali ----------
-function askPw(title, cb){
-  const body=`<div class="field"><label class="fld">${t('master_pw')}</label>
+function askPw(title, cb){ askPwFor(title, t('master_pw'), cb); }
+function askPwFor(title, label, cb){
+  const body=`<div class="field"><label class="fld">${label}</label>
     <input id="ap_pw" type="password" ${NOPM} onkeydown="if(event.key==='Enter')document.getElementById('ap_go').click()"></div>`;
   modal('🔑 '+title, body, [{x:t('confirm'),p:1,f:()=>{const v=$('#ap_pw').value;closeModal();cb(v);}},{x:t('cancel'),f:closeModal}]);
   window._ov.querySelector('.foot button.primary').id='ap_go';
@@ -1388,12 +1385,19 @@ function doExport(){
     toast(t('exported'));
   });
 }
+// Chunked base64: String.fromCharCode(...bytes) overflows the call stack past ~100 KB (a .cerbak is much bigger).
+function b64enc(buf){
+  const u=new Uint8Array(buf); let s='';
+  for(let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));
+  return btoa(s);
+}
 function doImport(){
   const f=$('#imp_file').files[0]; if(!f){toast(t('imp_pick'));return;}
   const rd=new FileReader();
   const mode=$('#imp_mode').value;
-  rd.onload=()=>{ const b64=btoa(String.fromCharCode(...new Uint8Array(rd.result)));
-    askPw(t('import_btn'),async pw=>{
+  rd.onerror=()=>toast(t('imp_fail'));
+  rd.onload=()=>{ let b64; try{ b64=b64enc(rd.result); }catch(e){ toast(t('imp_fail')); return; }
+    askPwFor(t('import_btn'),t('file_pw'),async pw=>{
       const r=await api('/api/import',{method:'POST',body:JSON.stringify({pw,b64,mode})});
       const d=await r.json();
       if(!r.ok){const k='imp_'+(d.error||''); toast(I18N[LANG][k]?t(k):(d.error||t('imp_fail')));return;}

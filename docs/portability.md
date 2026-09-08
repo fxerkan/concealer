@@ -48,13 +48,13 @@ The vault is also **cross-platform**: a vault created on macOS/Linux opens on **
 For a single portable, password-protected file:
 
 ```bash
-concealer export                     # writes concealer-export-YYYY-MM-DD.age (prompts master pw)
-concealer export mybundle.age        # custom filename
+concealer export                     # writes concealer-export-YYYY-MM-DD.cerbak (prompts master pw)
+concealer export mybundle.cerbak     # custom filename
 
-concealer import mybundle.age        # prompts the bundle password; reports +new / ~updated
+concealer import mybundle.cerbak     # prompts the file's password; reports +new / ~updated
 ```
 
-`import` also restores `.cerbak` backups (older `.cer` files still restore — import is extension-agnostic). Pick how existing records are handled with `--mode=overwrite|skip|duplicate` (default `overwrite`).
+`import` also restores `.cerbak` backups written by the Backup section (older `.cer` / `.age` files still restore — import auto-detects the format). Pick how existing records are handled with `--mode=overwrite|skip|duplicate` (default `overwrite`).
 
 ---
 

@@ -167,16 +167,13 @@ html[data-theme="light"] .install{background:linear-gradient(180deg,#1b1e24 0%,#
 .rx{position:relative;color:var(--txt);border-radius:3px}
 .rx::after{content:"";position:absolute;inset:-1px -3px;background:var(--acc);border-radius:3px;will-change:transform;
   transform:scaleX(0);transform-origin:left center;animation:rxwipe var(--dur,10s) ease var(--del,0s) infinite}
-.rx::before{content:"";position:absolute;left:-3px;right:-3px;top:50%;height:2px;background:var(--ink);
-  transform:scaleX(0);transform-origin:left center;z-index:1;opacity:0;will-change:transform;animation:rxstrike var(--dur,10s) linear var(--del,0s) infinite}
 @keyframes fraglife{0%{opacity:0;transform:translateY(7px)}9%{opacity:1;transform:translateY(0)}55%{opacity:1;transform:translateY(0)}70%{opacity:0;transform:translateY(-7px)}100%{opacity:0;transform:translateY(-7px)}}
 @keyframes rxwipe{0%,27%{transform:scaleX(0)}40%,100%{transform:scaleX(1)}}
-@keyframes rxstrike{0%,29%{transform:scaleX(0);opacity:0}34%{opacity:.9}40%,100%{transform:scaleX(1);opacity:.9}}
 @keyframes fraglife-soft{0%{opacity:0}12%{opacity:1}56%{opacity:1}72%{opacity:0}100%{opacity:0}}
 @keyframes rxfade{0%,30%{opacity:0}42%,100%{opacity:1}}
 @media(prefers-reduced-motion:reduce){
   .loginbg .frag{animation-name:fraglife-soft;transform:none}
-  .rx::after{transform:scaleX(1);animation-name:rxfade}.rx::before{display:none}
+  .rx::after{transform:scaleX(1);animation-name:rxfade}
 }
 
 /* ===== sections ===== */

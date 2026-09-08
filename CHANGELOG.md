@@ -6,6 +6,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.20] — 2026-09-08
+
+### Fixed
+- **Import in the web UI did nothing when clicked.** The file was base64-encoded
+  with `btoa(String.fromCharCode(...new Uint8Array(buf)))`, which blows the JS call
+  stack for any file over ~100 KB — a real `.cerbak` is far bigger, so the reader
+  callback threw before the password prompt could open and the click looked inert.
+  Encoding is now chunked (`b64enc()`), and read/encode failures surface a toast
+  instead of dying silently.
+- Import now asks for **"password of the file (backup / export password)"** rather
+  than "master password" — a `.cerbak` is opened with the password it was written
+  with, which is usually not this machine's master password.
+- **`concealer init` could overwrite a hardened vault.** The "already set up" guard only
+  checked `keys/age-key.txt`, which hardening deliberately removes — so on a hardened vault
+  `init` sailed past the guard and generated a fresh keypair, orphaning every secret. It now
+  also checks the encrypted key backup.
+- **Login background: redaction bars no longer draw a line through themselves.**
+  Each redacted fragment painted a solid bar (`.rx::after`) *and* a second
+  strike-through rule (`.rx::before`, `rxstrike`) across its middle, so a covered
+  secret read as struck-out rather than concealed. The strike layer is gone — a
+  redaction is now just the bar. Same fix in the docs landing page, which carries
+  a copy of the animation.
+
+### Changed
+- **No user-facing surface names the underlying crypto tools any more.** The CLI banner,
+  `--help` header, TUI splash, `init`/`harden` output, dependency-missing message, web UI
+  warnings and every error string now say "vault key" / "encryption engine" instead of
+  naming SOPS or age. Subprocess stderr is passed through a new `scrub()` at each boundary
+  that reaches a user (CLI exits, web `/api/*` errors, MCP tool errors, TUI status line), so
+  a leaking tool error can't reintroduce the names. Implementation is unchanged — encryption
+  is still delegated, and internal paths, env vars and argv keep their real names.
+- **One extension everywhere: `.cerbak`.** Export no longer writes `.age` — the web
+  and CLI both produce `concealer-export-YYYY-MM-DD.cerbak`, in the same opaque
+  container as backups. Buttons, hints, file picker and `--help` follow. Existing
+  `.age` / `.cer` files still import unchanged (the reader auto-detects the format).
+
 ## [0.9.19] — 2026-09-02
 
 ### Changed
