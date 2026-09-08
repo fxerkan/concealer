@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "0.9.23"   # advances through 0.x; 1.0 = reserved for the full live/release version
+VERSION = "0.9.24"   # advances through 0.x; 1.0 = reserved for the full live/release version
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -47,6 +47,19 @@ RATESTATE= os.path.join(HOME, "keys", "ratestate.json")  # per-agent disclosure 
 BACKUPCFG= os.path.join(HOME, "keys", "backup.json")     # auto-backup config + age-recipient-wrapped backup password (NO plaintext password)
 SOPSCFG  = os.path.join(HOME, ".sops.yaml")
 WEBUI    = os.path.join(BASE, "webui.html")
+def _read_webui():
+    """webui.html bytes, or None. Falls back to the current PATH install's copy when BASE's
+    was removed by an in-place upgrade (a running server's versioned dir gets gc'd) — self-heals
+    the 'not found' blank page for a server that outlived its own files."""
+    cands = [WEBUI]
+    for name in ("concealer", "cer"):
+        p = shutil.which(name)
+        if p: cands.append(os.path.join(os.path.dirname(os.path.realpath(p)), "webui.html"))
+    for p in cands:
+        try:
+            with open(p, "rb") as f: return f.read()
+        except OSError: continue
+    return None
 DIMS = ["tenant", "project", "environment", "repo"]
 FLAGS = {"--tenant": "tenant", "--project": "project", "--env": "environment",
          "--repo": "repo", "--name": "name", "--type": "type"}
@@ -3193,8 +3206,13 @@ def serve_web(port):
             u = urllib.parse.urlparse(self.path); path = u.path
             q = {k: v[0] for k, v in urllib.parse.parse_qs(u.query).items()}
             if path == "/" or path == "/index.html":
-                try: page = open(WEBUI, "rb").read().replace(b"__IDLE__", str(CFG["idle"]).encode()).replace(b"__VERSION__", VERSION.encode())
-                except FileNotFoundError: page = b"<h1>webui.html bulunamadi</h1>"
+                page = _read_webui()
+                if page is None:
+                    page = (b"<h1 style='font:600 20px system-ui;margin:2em'>The app was updated in place.</h1>"
+                            b"<p style='font:15px system-ui;margin:0 2em'>This server is running from an old, "
+                            b"removed install. Quit it and run <code>cer web</code> again.</p>")
+                else:
+                    page = page.replace(b"__IDLE__", str(CFG["idle"]).encode()).replace(b"__VERSION__", VERSION.encode())
                 self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers(); self.wfile.write(page); return
             if path == "/api/session":

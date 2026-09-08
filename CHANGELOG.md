@@ -6,6 +6,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.24] — 2026-09-09
+
+### Fixed
+- **Web UI showed a blank “webui.html not found” page after an in-place upgrade.** A `concealer web`
+  server started before the upgrade keeps running from its versioned install dir, which the package
+  manager deletes — so it can no longer read its own `webui.html`. The server now falls back to the
+  current install’s copy (resolved via the `concealer`/`cer` on `PATH`) and, if truly gone, shows an
+  actionable “quit and run `cer web` again” message instead of a blank page. (Existing stale servers
+  from before this version must still be quit once — this heals the *next* upgrade.)
+
+### Changed
+- **Chrome extension no longer stalls on open with a large vault.** The popup rendered a DOM row for
+  every secret at once, which felt like a hang. It now renders the first 50 matches and shows
+  “showing 50 of N — type to filter”; the search box still filters the whole vault instantly.
+
 ## [0.9.23] — 2026-09-08
 
 ### Fixed

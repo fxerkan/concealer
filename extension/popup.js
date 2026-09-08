@@ -145,11 +145,13 @@ function matches(e,q){
     .some(v => (v||"").toLowerCase().includes(q));
 }
 
+const RENDER_CAP = 50;   // don't build thousands of DOM nodes on open (felt like a hang) — search narrows it
 function render(q){
   const box=$("#rows"); box.textContent="";
   const list = ROWS.filter(e=>matches(e,q));
   if(!list.length){ const d=document.createElement("div"); d.className="empty"; d.textContent="no secrets"; box.appendChild(d); return; }
-  for(const e of list){
+  const shown = list.slice(0, RENDER_CAP);
+  for(const e of shown){
     const fnames=Object.keys(e.fields||{});
     const multi=fnames.length>1;
     const item=document.createElement("div"); item.className="item";
@@ -168,6 +170,11 @@ function render(q){
       } else { panel.hidden=true; cp.textContent="▸"; row.classList.remove("open"); }
     };
     item.append(row,panel); box.appendChild(item);
+  }
+  if(list.length > shown.length){
+    const d=document.createElement("div"); d.className="empty";
+    d.textContent=`showing ${shown.length} of ${list.length} — type to filter`;
+    box.appendChild(d);
   }
 }
 
