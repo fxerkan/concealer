@@ -6,6 +6,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.22] — 2026-09-08
+
+### Fixed
+- **Chrome extension stuck on the old version / "webui.html not found" after an upgrade.**
+  A `concealer web` server started before the upgrade keeps running from the now-deleted
+  install directory, so it can no longer find its own `webui.html`. The extension's native
+  host saw the port already open and blindly reused that dead server. The native host now
+  checks the running server's version (new `version` field in `/api/session`); if it does
+  not match, it asks the old server to stop (new `/api/shutdown`) and launches the current
+  one. Upgrades from this version on heal automatically; a server already running from a
+  pre-0.9.22 install must be quit once (or reboot) — the popup now says so instead of
+  showing a blank page.
+
+### Added
+- The extension shows a **version-mismatch banner** when its version differs from the running
+  app, with a reminder to update concealer (brew/scoop/pip) and reload the extension.
+- `concealer version --check` — opt-in, on-demand check for a newer release. concealer makes
+  **no** network calls unless you run this; there is no automatic/background update polling.
+
 ## [0.9.21] — 2026-09-08
 
 ### Fixed

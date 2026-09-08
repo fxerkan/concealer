@@ -85,6 +85,8 @@ button.ok{color:var(--ok);border-color:var(--ok)}
 .status{padding:0 12px;color:var(--mut);font-size:12px}
 .status:empty{display:none}
 .status.err{color:var(--bad);padding:12px}
+.verwarn{margin:8px 12px;padding:8px 10px;border:1px solid var(--warn,#b8860b);border-radius:8px;color:var(--warn,#b8860b);font-size:12px;line-height:1.4}
+.verwarn[hidden]{display:none}
 .setupcard{background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:14px}
 .setupcard b{font-size:14px}
 .setupcard p{margin:8px 0;color:var(--mut);font-size:12px}

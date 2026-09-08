@@ -100,6 +100,11 @@ async function boot(){
     return;
   }
   setStatus(""); IDLE = s.idle||0;
+  const extVer = chrome.runtime.getManifest().version, w=$("#verwarn");
+  if(s.version && s.version!==extVer){
+    w.textContent = `Version mismatch: extension v${extVer}, app v${s.version}. Update concealer (brew/scoop/pip) and reload the extension so both match.`;
+    w.hidden=false;
+  } else w.hidden=true;
   if(s.unlocked){
     const dl=await getDeadline();
     const extRem = dl ? (dl-Date.now())/1000 : effIdle();
