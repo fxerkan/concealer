@@ -385,7 +385,7 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
 <!-- APP -->
 <div id="app" class="hidden">
   <header>
-    <span class="brand"><svg class="logo" viewBox="0 0 512 512" width="32" height="32"><rect x="128" y="176" width="176" height="38" rx="19" fill="#8a909b"/><rect x="128" y="232" width="256" height="52" rx="26" fill="#ff4d4d"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#8a909b"/></svg>conceal<span class="ac">er</span></span>
+    <span class="brand" style="cursor:pointer" onclick="showTab('secrets')" title="conceal er"><svg class="logo" viewBox="0 0 512 512" width="32" height="32"><rect x="128" y="176" width="176" height="38" rx="19" fill="#8a909b"/><rect x="128" y="232" width="256" height="52" rx="26" fill="#ff4d4d"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#8a909b"/></svg>conceal<span class="ac">er</span></span>
     <div class="menu">
       <div class="tabs">
         <button id="tab-secrets" class="active" data-i18n="secrets" onclick="showTab('secrets')">Secrets</button>
@@ -692,6 +692,8 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
         <button data-i18n="bk_run" onclick="runBackupNow()">▶ Run auto-backup now</button>
         <span id="bk_last" class="mut"></span>
       </div>
+
+      <div class="foot" style="max-width:680px;margin:30px auto 0;text-align:center">conceal<span class="ac">er</span> · v__VERSION__ <a href="https://github.com/fxerkan/concealer" title="GitHub"><svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" style="vertical-align:-2px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a></div>
     </section>
   </main>
 </div>
@@ -945,7 +947,15 @@ function setLang(l){
   }
 }
 function applyStatic(){
-  document.querySelectorAll('[data-i18n]').forEach(el=>el.textContent=t(el.dataset.i18n));
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const tx=t(el.dataset.i18n);
+    // Preserve child elements (e.g. #hibp_set / #bk_pw_set / #pol_badge live inside a labelled node):
+    // setting textContent would wipe them, which broke loadSettings→loadBackup.
+    if(el.children.length){
+      const n=[...el.childNodes].find(c=>c.nodeType===3);
+      if(n)n.nodeValue=tx+' '; else el.insertBefore(document.createTextNode(tx+' '),el.firstChild);
+    } else el.textContent=tx;
+  });
   document.querySelectorAll('[data-i18n-ph]').forEach(el=>el.placeholder=t(el.dataset.i18nPh));
 }
 

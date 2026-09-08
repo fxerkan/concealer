@@ -6,7 +6,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
-## [0.9.22] — 2026-09-08
+## [0.9.23] — 2026-09-08
+
+### Fixed
+- **Settings page lost the auto-backup config (and HIBP key status) on every refresh.**
+  The i18n pass set `textContent` on every `[data-i18n]` element, which wiped the dynamic
+  `<span>` children living inside labelled nodes (`#hibp_set`, `#bk_pw_set`, `#pol_badge`).
+  With `#hibp_set` gone, `loadSettings()` threw before it reached `loadBackup()`, so the
+  backup fields were never populated and looked empty/unsaved even though the config was on
+  disk. The translation now updates only the leading text node when an element has child
+  elements, preserving those spans.
+
+### Added
+- The **Settings page footer** now shows the brand + version + GitHub link, matching the login screen.
+- Clicking the **concealer logo/name** (top-left) returns to the Secrets home view.
+- **Landing page:** the “concealer” wordmark is marked `translate="no"` so a browser’s built-in
+  page-translation leaves the brand intact instead of mangling it (e.g. into “gizlemeker” in Turkish).
+  The brand stays “concealer” in every language.
 
 ### Fixed
 - **Chrome extension stuck on the old version / "webui.html not found" after an upgrade.**
