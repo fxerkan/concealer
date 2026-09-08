@@ -69,6 +69,11 @@ at <https://chrome.google.com/webstore/devconsole>.
   on open, if nothing is listening on `127.0.0.1:8787` it launches `concealer web 8787` detached
   (`CONCEALER_NO_OPEN=1`, `CONCEALER_WEB_IDLE_EXIT=900`) and replies. The launcher pins the
   install-time `PATH` (so sops/age resolve under Chrome's minimal env) and `CONCEALER_HOME`.
+  It records the *stable* command on `PATH`, never the version-pinned path a package manager
+  resolves to (Homebrew's `Cellar/<ver>/libexec`, scoop's `app/<ver>`) — an upgrade deletes that
+  directory and Chrome then reports only "Native host has exited". `concealer web` also rewrites
+  a launcher left dangling by an older install; if the popup shows the setup card, re-run
+  `cer chrome-extension`.
 - **Popup → web API**: unlock with the master password, then list/reveal over `/api/*`. The
   extension is cross-origin, so it sends its token as `X-Concealer-Token` (the SPA's HttpOnly
   cookie can't ride its fetches). Values are never logged; the clipboard auto-clears.

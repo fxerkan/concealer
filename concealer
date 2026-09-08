@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "0.9.20"   # advances through 0.x; 1.0 = reserved for the full live/release version
+VERSION = "0.9.21"   # advances through 0.x; 1.0 = reserved for the full live/release version
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -2595,6 +2595,20 @@ _HOST_NAME = "com.concealer.host"
 _EXT_DEV_ID = "bkogcelhpcfdfceaoickckmikhglgpae"   # deterministic ID from the repo manifest "key" (unpacked dev build)
 _EXT_STORE_ID = "hecffnhjbhldmdpcnpkpcffmodnemdcj"    # Chrome Web Store item ID (published build)
 
+def _stable_self():
+    """Path to this script that survives an upgrade. `realpath(__file__)` resolves the
+    package manager's symlink down to a versioned dir (Homebrew's Cellar/<ver>/libexec,
+    scoop's app/<ver>) which the NEXT upgrade deletes — the registered native host then
+    dies instantly ("Native host has exited"). A PATH entry is re-pointed on upgrade, so
+    prefer it whenever it resolves to this same file."""
+    real = os.path.realpath(__file__)
+    for name in ("concealer", "cer"):
+        p = shutil.which(name)
+        try:
+            if p and os.path.realpath(p) == real: return p
+        except OSError: pass
+    return real
+
 def native_host():
     """Chrome native-messaging host (stdio). One request per launch:
     {"cmd":"ensure","port":8787} → start `concealer web <port>` if nothing is listening, then reply."""
@@ -2619,7 +2633,7 @@ def native_host():
     kw = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL, "stdin": subprocess.DEVNULL, "env": env}
     if os.name == "nt": kw["creationflags"] = 0x00000008 | 0x00000200  # DETACHED_PROCESS|CREATE_NEW_PROCESS_GROUP
     else: kw["start_new_session"] = True
-    try: subprocess.Popen([sys.executable, os.path.realpath(__file__), "web", str(port)], **kw)
+    try: subprocess.Popen([sys.executable, _stable_self(), "web", str(port)], **kw)
     except Exception as e: return reply({"ok": False, "err": f"launch failed: {e}"})
     for _ in range(40):   # wait up to ~6s for it to bind
         if port_open(port): return reply({"ok": True, "running": True, "port": port, "started": True})
@@ -2642,7 +2656,7 @@ def _chrome_browser_targets():
         subs = ["google-chrome", "google-chrome-beta", "chromium", "BraveSoftware/Brave-Browser", "microsoft-edge"]
     return base, subs
 
-def install_chrome_extension(args):
+def install_chrome_extension(args, quiet=False):
     """One-time OS setup so the Chrome extension can start `concealer web` on demand."""
     import stat, json as _json
     if "--uninstall" in args: return _chrome_uninstall()
@@ -2660,7 +2674,7 @@ def install_chrome_extension(args):
     _json.dump({"ids": sorted(ids)}, open(_chrome_state(), "w"), indent=2)
 
     python = sys.executable or shutil.which("python3") or "python3"
-    concealer = os.path.realpath(__file__)
+    concealer = _stable_self()
     origins = [f"chrome-extension://{i}/" for i in sorted(ids)]
     man = {"name": _HOST_NAME, "description": "concealer native messaging host", "type": "stdio",
            "allowed_origins": origins}
@@ -2676,7 +2690,11 @@ def install_chrome_extension(args):
         launcher = os.path.join(d, "run_host.sh")
         lines = ["#!/bin/sh", f'export PATH="{os.environ.get("PATH","")}"']
         if os.environ.get("CONCEALER_HOME"): lines.append(f'export CONCEALER_HOME="{os.environ["CONCEALER_HOME"]}"')
-        lines.append(f'exec "{python}" "{concealer}" native-host')
+        # Resolve again at run time: if the recorded path ever vanishes (reinstall, upgrade
+        # to a differently-laid-out prefix), fall back to whatever is on PATH.
+        lines += [f'CER="{concealer}"',
+                  '[ -f "$CER" ] || CER="$(command -v concealer 2>/dev/null || command -v cer 2>/dev/null)"',
+                  f'exec "{python}" "$CER" native-host']
         open(launcher, "w").write("\n".join(lines) + "\n")
         os.chmod(launcher, os.stat(launcher).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
     man["path"] = launcher
@@ -2699,12 +2717,30 @@ def install_chrome_extension(args):
             nh = os.path.join(t, "NativeMessagingHosts"); os.makedirs(nh, exist_ok=True)
             _json.dump(man, open(os.path.join(nh, _HOST_NAME + ".json"), "w"), indent=2); written.append(nh)
 
+    if quiet: return
     print("✓ concealer Chrome extension native host registered.")
     print(f"  vault   : {os.environ.get('CONCEALER_HOME') or HOME}")
     print(f"  IDs     : {', '.join(sorted(ids))}")
     for w in written: print("  host    : " + w)
     print("\nNow open the concealer extension in Chrome — no need to type `cer web`.")
     print("Add a dev/unpacked build's ID:  concealer chrome-extension --add-id <extension-id>")
+
+def _chrome_selfheal():
+    """Repair a launcher left dangling by an upgrade. Package managers install into a
+    versioned dir and delete the old one, so a launcher that recorded that dir stops
+    working the moment you upgrade — Chrome only reports "Native host has exited". Any
+    normal `concealer web` run rewrites it, so the extension heals without the user
+    knowing why it broke."""
+    try:
+        f = os.path.join(HOME, "chrome", "run_host.bat" if os.name == "nt" else "run_host.sh")
+        if not os.path.exists(f): return                    # never registered → nothing to heal
+        body = open(f).read()
+        want = _stable_self()
+        if want in body: return
+        paths = re.findall(r'"([^"]*concealer[^"]*)"', body)  # recorded script path(s)
+        if paths and all(os.path.exists(p) for p in paths): return
+        install_chrome_extension([], quiet=True)
+    except Exception: pass                                  # never block the server on this
 
 def _chrome_uninstall():
     removed = []
@@ -3003,7 +3039,7 @@ def cli(argv):
         out = deploy_render(scope, target)
         audit("deploy", source="cli", detail=f"{target} {label(scope)}")
         print(out or "(no match)")
-    elif cmd == "web": serve_web(int(a[0]) if a else 8787)
+    elif cmd == "web": _chrome_selfheal(); serve_web(int(a[0]) if a else 8787)
     elif cmd == "mcp": mcp_stdio()
     elif cmd in ("chrome-extension", "chrome-ext"): install_chrome_extension(a)
     else:

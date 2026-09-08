@@ -86,15 +86,17 @@ async function boot(){
   await loadPrefs();
   TOKEN = await getToken();
   const ens = await ensureServer();
-  const hostMissing = ens.ok===false && /not found|forbidden|access/i.test(ens.err||"");
+  // Any native-host failure has the same fix: re-run the setup command. Besides "not
+  // registered", an upgrade can leave a launcher pointing at the removed old install —
+  // Chrome then reports "Native host has exited", which is not a server problem.
+  const hostBroken = ens.ok===false;
   let s = await sessionUp();
-  if(!s && !hostMissing){   // host is (probably) starting the server → poll briefly while it binds
+  if(!s && !hostBroken){   // host is (probably) starting the server → poll briefly while it binds
     for(let i=0;i<20 && !s;i++){ await new Promise(r=>setTimeout(r,250)); s=await sessionUp(); }
   }
   if(!s){
-    setStatus("");
-    if(hostMissing) show("setup");   // native host not registered → show the `cer chrome-extension` card
-    else setStatus("Couldn't reach the concealer server ("+(ens.err||"no connection")+").", true);
+    if(hostBroken){ show("setup"); setStatus(ens.err||"", true); }   // → the `cer chrome-extension` card
+    else setStatus("Couldn't reach the concealer server (no connection).", true);
     return;
   }
   setStatus(""); IDLE = s.idle||0;

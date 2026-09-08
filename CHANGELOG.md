@@ -6,6 +6,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.21] — 2026-09-08
+
+### Fixed
+- **Chrome extension stopped working after upgrading concealer** ("Couldn't reach the
+  concealer server (Native host has exited.)"). The registered native-host launcher
+  recorded the *resolved* script path, which package managers place under a versioned
+  directory (`…/Cellar/<ver>/libexec/concealer`, scoop's `app/<ver>`); the next upgrade
+  deletes that directory, so the helper died the instant Chrome launched it — and with
+  the helper dead the popup never reached the master-password step either. The launcher
+  now records the stable command on `PATH` (which package managers re-point on upgrade)
+  and re-resolves at run time if that is gone.
+- `concealer web` now repairs a launcher left dangling by an earlier upgrade, so an
+  affected install heals itself on the next run.
+- The extension popup shows the setup card (with the `cer chrome-extension` command)
+  for **any** native-host failure, not just an unregistered host — previously a broken
+  helper produced only a raw Chrome error with no hint of the fix.
+
 ## [0.9.20] — 2026-09-08
 
 ### Fixed
