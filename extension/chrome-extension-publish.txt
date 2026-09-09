@@ -33,7 +33,14 @@ One-time setup / re-configuration (only a store owner can do these)
    Store its client_id + client_secret in concealer:
      secret name `concealer-desktop-app-oauth`, scope */concealer/*/concealer.
 
-3. Mint a refresh token (once; the token is long-lived):
+2b. !!! OAuth consent screen → Publishing status MUST be "In production" (Publish app). !!!
+    While it is "Testing", Google EXPIRES the refresh token after 7 days → every publish then
+    fails with `invalid_grant: Token has been expired or revoked` and the store silently stalls
+    on the last good version. "In production" makes the refresh token durable. (This bit us once:
+    set up 2026-08-30, worked for the 09-03 push, expired ~09-06, 0.9.20–0.9.24 all failed.)
+    Scopes stay the single chromewebstore scope; no Google verification is needed for it.
+
+3. Mint a refresh token (do 2b FIRST, else it expires in 7 days):
    a. Open in a browser, approve, copy the shown code:
       https://accounts.google.com/o/oauth2/auth?response_type=code&access_type=offline&redirect_uri=urn:ietf:wg:oauth:2.0:oob&scope=https://www.googleapis.com/auth/chromewebstore&client_id=<DESKTOP_CLIENT_ID>
    b. Exchange the code for a refresh_token (the code is single-use — get this right first try):
@@ -55,3 +62,11 @@ Rotating creds
 --------------
 Re-run step 3 (new refresh token) and step 4 (re-set CWS_REFRESH_TOKEN, and CWS_CLIENT_ID/SECRET
 if the client changed). The refresh token is bound to its client — rotate them together.
+
+Troubleshooting
+---------------
+- publish-extension fails fast (~12s), store stuck on an old version: it's the refresh token.
+  The Pre-flight step prints `token endpoint: HTTP 400 … "invalid_grant"` when it expired/was
+  revoked. Fix = do step 2b (consent screen → In production) so it stops expiring, then re-mint
+  (step 3) and re-set CWS_REFRESH_TOKEN (step 4). A live re-run: Actions → publish-extension →
+  Run (publish=true), or push a VERSION bump.
