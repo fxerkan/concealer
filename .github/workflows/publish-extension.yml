@@ -34,6 +34,35 @@ jobs:
       - name: Find zip
         id: zip
         run: echo "path=$(ls dist/concealer-extension-*.zip)" >> "$GITHUB_OUTPUT"
+      # Pre-flight: turn the upload action's opaque "400 Bad Request" into an actionable message.
+      # Refreshes the token (logs only HTTP status + Google's error text, never the token) and reads
+      # the item's state. invalid_grant here = the refresh token expired — the OAuth consent screen
+      # in "Testing" status expires refresh tokens after 7 days; set it to "In production" and
+      # re-mint CWS_REFRESH_TOKEN (see extension/chrome-extension-publish.txt).
+      - name: Pre-flight — verify Web Store auth & item state
+        env:
+          CID: ${{ secrets.CWS_CLIENT_ID }}
+          CSECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          RTOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          EXTID: ${{ secrets.CWS_EXTENSION_ID }}
+        run: |
+          set -euo pipefail
+          R=$(curl -s -w '\n%{http_code}' -X POST https://oauth2.googleapis.com/token \
+            -d client_id="$CID" -d client_secret="$CSECRET" \
+            -d refresh_token="$RTOKEN" -d grant_type=refresh_token)
+          CODE=$(printf '%s' "$R" | tail -n1); BODY=$(printf '%s' "$R" | sed '$d')
+          echo "token endpoint: HTTP $CODE"
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Web Store auth failed ($CODE): $BODY"
+            echo "::error::invalid_grant ⇒ the refresh token expired/was revoked. Set the Google Cloud OAuth consent screen to 'In production' and re-mint CWS_REFRESH_TOKEN (extension/chrome-extension-publish.txt)."
+            exit 1
+          fi
+          AT=$(printf '%s' "$BODY" | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
+          echo "access token OK (len ${#AT})"
+          S=$(curl -s -w '\n%{http_code}' -H "Authorization: Bearer $AT" -H 'x-goog-api-version: 2' \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/$EXTID?projection=DRAFT")
+          echo "item state: HTTP $(printf '%s' "$S" | tail -n1)"
+          printf '%s\n' "$S" | sed '$d'
       # Pin to a commit SHA in production for supply-chain safety (this is a 3rd-party action).
       - name: Upload to Chrome Web Store
         uses: mnao305/chrome-extension-upload@v5.0.0
