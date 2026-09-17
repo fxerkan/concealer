@@ -1,5 +1,6 @@
 ---
 title: Comparison
+description: "concealer vs HashiCorp Vault, Doppler, Infisical, 1Password and Bitwarden — a local-only, single-file, open-source secrets-management alternative. See where each fits."
 layout: default
 nav_order: 12
 ---

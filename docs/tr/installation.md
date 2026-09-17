@@ -1,5 +1,6 @@
 ---
 title: Kurulum
+description: "concealer'ı macOS, Linux, Windows'a veya Chrome eklentisi olarak kurun — Homebrew, Scoop, pip ya da tek betikle. SOPS + age dışında bağımlılık yok."
 layout: default
 nav_exclude: true
 ---

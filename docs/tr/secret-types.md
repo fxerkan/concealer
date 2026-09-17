@@ -1,5 +1,6 @@
 ---
 title: Secret Türleri
+description: "concealer'da tek değerli ve çok alanlı secret tipleri; tenant/project/environment/repo kapsamları ve alan bazlı maskeleme. API anahtarı, token ve DB bilgileri modelleyin."
 layout: default
 nav_exclude: true
 ---

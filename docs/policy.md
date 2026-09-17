@@ -1,5 +1,6 @@
 ---
 title: Policy
+description: "concealer access and usage policy: least-privilege secret injection, agent registration, per-agent rate limits, and how the audit trail records every access."
 layout: default
 parent: Web UI
 nav_order: 2

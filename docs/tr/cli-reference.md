@@ -1,5 +1,6 @@
 ---
 title: CLI Referansı
+description: "Eksiksiz concealer CLI referansı — secret saklamak, kapsamlamak ve enjekte etmek için her komut ve parametre. `cer`, `concealer`'ın kısa takma adıdır."
 layout: default
 nav_exclude: true
 ---

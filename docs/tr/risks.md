@@ -1,5 +1,6 @@
 ---
 title: Riskler
+description: "concealer için bilinen sınırlar ve önlemler — yerel, tek dosyalı bir secret yöneticisinin neye karşı koruduğu, neye korumadığı ve kalan riski nasıl azaltacağınız."
 layout: default
 nav_exclude: true
 ---

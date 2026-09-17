@@ -1,5 +1,6 @@
 ---
 title: CLI Reference
+description: "Complete concealer CLI reference — every command, flag, and parameter for storing, scoping, and injecting secrets. `cer` is the short alias for `concealer`."
 layout: default
 nav_order: 5
 ---

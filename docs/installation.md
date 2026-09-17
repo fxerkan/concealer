@@ -1,5 +1,6 @@
 ---
 title: Installation
+description: "Install concealer on macOS, Linux, Windows, or as a Chrome extension — via Homebrew, Scoop, pip, or a single script. No dependencies beyond SOPS + age."
 layout: default
 nav_order: 3
 ---

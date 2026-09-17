@@ -1,5 +1,6 @@
 ---
 title: Web Arayüzü
+description: "concealer'ın yerel web arayüzü: kapsamlı secret'ları tarayıcıda arayın, filtreleyin ve yönetin. Ana parola ile açma, alan bazlı maskeleme ve denetim günlüğü — hepsi makinenizde."
 layout: default
 nav_exclude: true
 ---

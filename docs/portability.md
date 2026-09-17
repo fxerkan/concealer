@@ -1,5 +1,6 @@
 ---
 title: Portability & Backup
+description: "Move and back up your concealer vault safely. It is one portable encrypted file — copy it anywhere, restore on any machine, and keep the master key offline."
 layout: default
 nav_order: 11
 ---

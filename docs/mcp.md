@@ -1,5 +1,6 @@
 ---
 title: MCP for AI Agents
+description: "Give AI agents secrets without exposing plaintext. concealer's MCP server injects API keys and tokens into a child process, redacts values, and audits every call."
 layout: default
 nav_order: 8
 ---

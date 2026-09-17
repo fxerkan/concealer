@@ -1,5 +1,6 @@
 ---
 title: Tokens & Recovery
+description: "How concealer unlock tokens and recovery codes work — TTL human tokens, long-lived revocable agent tokens, and one-time codes to recover a locked vault."
 layout: default
 nav_order: 9
 ---

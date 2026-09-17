@@ -1,5 +1,6 @@
 ---
 title: Web UI
+description: "concealer's local web UI: search, filter, and manage scoped secrets in the browser. Master-password unlock, per-field masking, and an audit log — all on your machine."
 layout: default
 nav_order: 7
 has_children: true

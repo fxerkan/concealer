@@ -1,5 +1,6 @@
 ---
 title: Secret Types
+description: "Single-value and multi-field secret types in concealer, with tenant/project/environment/repo scopes and per-field masking. Model API keys, tokens, and DB creds."
 layout: default
 nav_order: 6
 ---

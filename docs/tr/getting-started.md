@@ -1,5 +1,6 @@
 ---
 title: Başlarken
+description: "concealer'ı kurun ve ilk secret'ınızı dakikalar içinde saklayın — tamamen yerel, SOPS + age ile şifreli, bulut ya da hesap yok. macOS, Linux ve Windows için hızlı başlangıç."
 layout: default
 nav_exclude: true
 ---

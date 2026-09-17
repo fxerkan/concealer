@@ -1,5 +1,6 @@
 ---
 title: Token'lar & Kurtarma
+description: "concealer açma token'ları ve kurtarma kodları nasıl çalışır — TTL'li insan token'ları, uzun ömürlü iptal edilebilir ajan token'ları ve kilitli kasayı kurtaran tek kullanımlık kodlar."
 layout: default
 nav_exclude: true
 ---

@@ -1,5 +1,6 @@
 ---
 title: Security Model
+description: "concealer's security model: SOPS + age encryption, key-at-rest protection, unlock tokens, an HMAC-chained audit log, and recovery codes. Threat model and guarantees."
 layout: default
 nav_order: 10
 ---

@@ -1,5 +1,6 @@
 ---
 title: AI Ajanları için MCP
+description: "AI ajanlarına plaintext göstermeden secret verin. concealer'ın MCP sunucusu API anahtarlarını ve token'ları alt sürece enjekte eder, değerleri maskeler ve her çağrıyı denetler."
 layout: default
 nav_exclude: true
 ---

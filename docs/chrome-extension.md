@@ -1,5 +1,6 @@
 ---
 title: Chrome Extension
+description: "Install the concealer Chrome extension to view and manage your local secrets from the browser, backed by the same encrypted single-file vault. No cloud sync."
 layout: default
 nav_order: 7.2
 ---

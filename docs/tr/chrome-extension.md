@@ -1,5 +1,6 @@
 ---
 title: Chrome Eklentisi
+description: "Yerel secret'larınızı tarayıcıdan görüntülemek ve yönetmek için concealer Chrome eklentisini kurun; aynı şifreli tek dosyalı kasayla çalışır. Bulut senkronizasyonu yok."
 layout: default
 nav_exclude: true
 ---

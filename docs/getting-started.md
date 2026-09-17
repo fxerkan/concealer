@@ -1,5 +1,6 @@
 ---
 title: Getting Started
+description: "Install concealer and store your first secret in minutes — local-only, encrypted with SOPS + age, no cloud or account. Quickstart for macOS, Linux and Windows."
 layout: default
 nav_order: 2
 ---

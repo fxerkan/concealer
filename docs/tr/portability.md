@@ -1,5 +1,6 @@
 ---
 title: Taşınabilirlik & Yedekleme
+description: "concealer kasanızı güvenle taşıyın ve yedekleyin. Kasa tek taşınabilir şifreli dosyadır — her yere kopyalayın, her makinede geri yükleyin, ana anahtarı çevrimdışı tutun."
 layout: default
 nav_exclude: true
 ---

@@ -1,5 +1,6 @@
 ---
 title: Politika
+description: "concealer erişim ve kullanım politikası: en az yetkiyle secret enjeksiyonu, ajan kaydı, ajan bazlı hız limitleri ve denetim izinin her erişimi nasıl kaydettiği."
 layout: default
 nav_exclude: true
 ---

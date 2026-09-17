@@ -1,5 +1,6 @@
 ---
 title: Karşılaştırma
+description: "concealer'a karşı HashiCorp Vault, Doppler, Infisical, 1Password ve Bitwarden — yerel, tek dosyalı, açık kaynak bir secret yönetimi alternatifi. Hangisinin nereye uyduğunu görün."
 layout: default
 nav_exclude: true
 ---

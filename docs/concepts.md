@@ -1,5 +1,6 @@
 ---
 title: Concepts
+description: "How concealer works: one encrypted file, fully local, SOPS + age. Understand secrets, scopes, typed fields, and the zero-cloud model before you dive in."
 layout: default
 nav_order: 4
 ---

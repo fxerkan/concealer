@@ -1,5 +1,6 @@
 ---
 title: Güvenlik Modeli
+description: "concealer güvenlik modeli: SOPS + age şifreleme, anahtarın diskte korunması, açma token'ları, HMAC zincirli denetim günlüğü ve kurtarma kodları. Tehdit modeli ve garantiler."
 layout: default
 nav_exclude: true
 ---

@@ -1,5 +1,6 @@
 ---
 title: Kavramlar
+description: "concealer nasıl çalışır: tek şifreli dosya, tamamen yerel, SOPS + age. Başlamadan önce secret'ları, kapsamları, tipli alanları ve bulutsuz modeli öğrenin."
 layout: default
 nav_exclude: true
 ---

@@ -1,5 +1,6 @@
 ---
 title: TUI
+description: "concealer'ın TUI'siyle secret'ları terminalden yönetin — yerel şifreli kasanız için hızlı, klavye odaklı bir arayüz. Fare yok, bulut gerekmez."
 layout: default
 nav_exclude: true
 ---

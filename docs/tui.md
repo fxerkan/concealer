@@ -1,5 +1,6 @@
 ---
 title: TUI
+description: "Browse and manage secrets from the terminal with concealer's TUI — a fast, keyboard-driven interface for your local encrypted vault. No mouse, no cloud required."
 layout: default
 nav_order: 7.5
 ---

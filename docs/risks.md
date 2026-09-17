@@ -1,5 +1,6 @@
 ---
 title: Risks
+description: "Known limits and mitigations for concealer — what a local-only, single-file secret manager protects against, what it does not, and how to reduce residual risk."
 layout: default
 parent: Web UI
 nav_order: 1
