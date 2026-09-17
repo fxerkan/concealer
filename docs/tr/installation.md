@@ -37,7 +37,7 @@ scoop install concealer
 concealer init
 ```
 
-Ayrıntılar için [Windows rehberi]({{ site.baseurl }}/tr/WINDOWS).
+Ayrıntılar için [Windows rehberi]({{ site.baseurl }}/tr/WINDOWS.html).
 </div>
 <div class="cer-panel" data-panel="ext" markdown="1">
 Kasanı gözat ve secret'ları Chrome araç çubuğundan kopyala.
@@ -50,7 +50,7 @@ Sonra concealer'ı kur (macOS/Linux veya Windows sekmesi) ve tek seferlik native
 cer chrome-extension
 ```
 
-Tam rehber → [Chrome Eklentisi]({{ site.baseurl }}/tr/chrome-extension).
+Tam rehber → [Chrome Eklentisi]({{ site.baseurl }}/tr/chrome-extension.html).
 </div>
 </div>
 
@@ -104,7 +104,7 @@ Betik bağımlılıksız Python'dur — virtualenv yok, paket yok. `cer`, `conce
 concealer init          # generate keys + set master password
 ```
 
-`init`, **8 adet tek kullanımlık kurtarma kodu** ve bir başlangıç `export CONCEALER_TOKEN=…` satırı yazdırır, ardından düz metin age anahtarını diskten kaldırır. Kurtarma kodlarını başka bir yerde saklayın. Tam akış için [Başlarken]({{ site.baseurl }}/tr/getting-started) sayfasına bakın.
+`init`, **8 adet tek kullanımlık kurtarma kodu** ve bir başlangıç `export CONCEALER_TOKEN=…` satırı yazdırır, ardından düz metin age anahtarını diskten kaldırır. Kurtarma kodlarını başka bir yerde saklayın. Tam akış için [Başlarken]({{ site.baseurl }}/tr/getting-started.html) sayfasına bakın.
 
 Mevcut bir kasanın üzerine yeniden başlatmak için `concealer init --force` kullanın (yıkıcıdır — yalnızca tek kullanımlık/test kasasında).
 

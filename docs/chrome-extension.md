@@ -82,7 +82,7 @@ cer chrome-extension
 
 This writes the native-host manifest and the `HKCU\…\NativeMessagingHosts` registry keys for
 Chrome / Edge / Chromium. Then click the concealer toolbar icon.
-See the [Windows guide]({{ site.baseurl }}/WINDOWS) for environment details.
+See the [Windows guide]({{ site.baseurl }}/WINDOWS.html) for environment details.
 </div>
 </div>
 

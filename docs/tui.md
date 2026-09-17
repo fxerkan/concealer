@@ -29,7 +29,7 @@ Unlock the same way as the CLI — a `CONCEALER_TOKEN` in your environment (from
 
 ## Browsing & searching
 
-The screen has three panels — **1 · Filters**, **2 · Secrets**, **3 · Details**. Move focus between them, browse, reveal, copy, and edit entirely from the keyboard. Secret fields stay **masked** until you reveal them — the same record-aware masking rules as everywhere else (see [Secret Types]({{ site.baseurl }}/secret-types)).
+The screen has three panels — **1 · Filters**, **2 · Secrets**, **3 · Details**. Move focus between them, browse, reveal, copy, and edit entirely from the keyboard. Secret fields stay **masked** until you reveal them — the same record-aware masking rules as everywhere else (see [Secret Types]({{ site.baseurl }}/secret-types.html)).
 
 ![concealer TUI — searchable secret list]({{ site.baseurl }}/assets/tui-secrets.png)
 
@@ -107,7 +107,7 @@ Add and edit use the same **type-aware** model as the web UI and CLI: pick a typ
 
 ![concealer TUI — type-aware edit form]({{ site.baseurl }}/assets/tui-edit.png)
 
-Every reveal, create, update, and delete is written to the [tamper-evident audit log]({{ site.baseurl }}/concepts#audit-chain) with `source` recorded — the TUI is a first-class interface, not a bypass.
+Every reveal, create, update, and delete is written to the [tamper-evident audit log]({{ site.baseurl }}/concepts.html#audit-chain) with `source` recorded — the TUI is a first-class interface, not a bypass.
 
 ---
 
@@ -115,7 +115,7 @@ Every reveal, create, update, and delete is written to the [tamper-evident audit
 
 | You want… | Use |
 |---|---|
-| Scripting, CI, piping into `run`/`deploy` | [CLI]({{ site.baseurl }}/cli-reference) |
-| Rich forms, filters, deploy renderers, audit viewer | [Web UI]({{ site.baseurl }}/web-ui) |
+| Scripting, CI, piping into `run`/`deploy` | [CLI]({{ site.baseurl }}/cli-reference.html) |
+| Rich forms, filters, deploy renderers, audit viewer | [Web UI]({{ site.baseurl }}/web-ui.html) |
 | Fast keyboard browsing inside the terminal | **TUI** (this page) |
-| Agents using secrets without seeing them | [MCP]({{ site.baseurl }}/mcp) |
+| Agents using secrets without seeing them | [MCP]({{ site.baseurl }}/mcp.html) |

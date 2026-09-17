@@ -22,7 +22,7 @@ concealer'ı kurun, kasanızı oluşturun, ilk secret'ınızı saklayın ve kull
 brew install fxerkan/tap/concealer
 ```
 
-Ya da tek betiği doğrudan çalıştırın (PATH üzerinde `python3`, `sops`, `age`, `expect` gerekir). Manuel yol ve bağımlılık ayrıntıları için [Kurulum]({{ site.baseurl }}/tr/installation) sayfasına bakın.
+Ya da tek betiği doğrudan çalıştırın (PATH üzerinde `python3`, `sops`, `age`, `expect` gerekir). Manuel yol ve bağımlılık ayrıntıları için [Kurulum]({{ site.baseurl }}/tr/installation.html) sayfasına bakın.
 
 Doğrulayın:
 
@@ -62,7 +62,7 @@ eval "$(cer unlock)"           # asks the master password, exports CONCEALER_TOK
 {: .note }
 > Buradan itibaren kısa takma ad **`cer`** (concealer'a bir symlink) kullanıyoruz — her komut iki isim altında da çalışır. Hangisini isterseniz seçin.
 
-Token değeri **yalnızca** shell ortamınızda (`CONCEALER_TOKEN`) yaşar. Kasa sadece onun hash'ini saklar. [Token'lar ve Kurtarma]({{ site.baseurl }}/tr/tokens-recovery) sayfasına bakın.
+Token değeri **yalnızca** shell ortamınızda (`CONCEALER_TOKEN`) yaşar. Kasa sadece onun hash'ini saklar. [Token'lar ve Kurtarma]({{ site.baseurl }}/tr/tokens-recovery.html) sayfasına bakın.
 
 ---
 
@@ -77,7 +77,7 @@ cer set --name MAIN_DB --type database --tenant acme --project billing --env pro
     host=db.acme.io port=5432 database=billing username=svc password=sk-DUMMY-pw auth_type=password
 ```
 
-Her secret bir **scope** taşır — `tenant / project / environment / repo`. Boş boyutlar joker karakter gibi davranır. [Kavramlar → Scope'lar]({{ site.baseurl }}/tr/concepts#scopes--inheritance) sayfasına bakın.
+Her secret bir **scope** taşır — `tenant / project / environment / repo`. Boş boyutlar joker karakter gibi davranır. [Kavramlar → Scope'lar]({{ site.baseurl }}/tr/concepts.html#scopes--inheritance) sayfasına bakın.
 
 ---
 
@@ -102,7 +102,7 @@ cer run --project web --env prod npm run deploy
 cer web        # http://127.0.0.1:8787 (localhost only) — unlock with the master password
 ```
 
-Tür duyarlı formlar, aranabilir çoklu seçim filtreleri, secret başına deploy renderer'ları, otomatik temizlemeli panoya kopyalama ve kurcalamayı belli eden bir denetim günlüğü görüntüleyici ile tam CRUD. [Web UI]({{ site.baseurl }}/tr/web-ui) sayfasına bakın.
+Tür duyarlı formlar, aranabilir çoklu seçim filtreleri, secret başına deploy renderer'ları, otomatik temizlemeli panoya kopyalama ve kurcalamayı belli eden bir denetim günlüğü görüntüleyici ile tam CRUD. [Web UI]({{ site.baseurl }}/tr/web-ui.html) sayfasına bakın.
 
 ---
 
@@ -115,12 +115,12 @@ claude mcp add --scope user concealer \
   -- /path/to/concealer/concealer mcp
 ```
 
-Ajan artık MCP üzerinden `list_secrets`, `search_secrets`, `run_with_secrets` ve `set_secret` yapabilir — ancak düz metin değerler gördüğü her şeyden **redakte edilir**. [MCP]({{ site.baseurl }}/tr/mcp) sayfasına bakın.
+Ajan artık MCP üzerinden `list_secrets`, `search_secrets`, `run_with_secrets` ve `set_secret` yapabilir — ancak düz metin değerler gördüğü her şeyden **redakte edilir**. [MCP]({{ site.baseurl }}/tr/mcp.html) sayfasına bakın.
 
 ---
 
 ## Sonraki adımlar
 
-- [CLI Referansı]({{ site.baseurl }}/tr/cli-reference) — her komut ve bayrak
-- [Güvenlik Modeli]({{ site.baseurl }}/tr/security) — neyin neyi koruduğu ve dürüst sınırlar
-- [Taşınabilirlik ve Yedekleme]({{ site.baseurl }}/tr/portability) — başka bir makineye güvenle taşıyın
+- [CLI Referansı]({{ site.baseurl }}/tr/cli-reference.html) — her komut ve bayrak
+- [Güvenlik Modeli]({{ site.baseurl }}/tr/security.html) — neyin neyi koruduğu ve dürüst sınırlar
+- [Taşınabilirlik ve Yedekleme]({{ site.baseurl }}/tr/portability.html) — başka bir makineye güvenle taşıyın

@@ -37,7 +37,7 @@ scoop install concealer
 concealer init
 ```
 
-See the [Windows guide]({{ site.baseurl }}/WINDOWS) for details.
+See the [Windows guide]({{ site.baseurl }}/WINDOWS.html) for details.
 </div>
 <div class="cer-panel" data-panel="ext" markdown="1">
 Browse your vault and copy secrets from the Chrome toolbar.
@@ -50,7 +50,7 @@ Then install concealer (macOS/Linux or Windows tab) and run the one-time native-
 cer chrome-extension
 ```
 
-Full guide → [Chrome Extension]({{ site.baseurl }}/chrome-extension).
+Full guide → [Chrome Extension]({{ site.baseurl }}/chrome-extension.html).
 </div>
 </div>
 
@@ -67,7 +67,7 @@ Full guide → [Chrome Extension]({{ site.baseurl }}/chrome-extension).
 
 concealer runs a **preflight check** on every command and exits with an install hint if any of `sops`, `age`, `age-keygen`, or `expect` (Windows: `pywinpty`) are missing.
 
-**Platforms:** macOS, Linux, and **Windows** (native — see the [Windows guide]({{ site.baseurl }}/WINDOWS)). All four interfaces (CLI · Web · MCP · TUI) are verified on each in CI.
+**Platforms:** macOS, Linux, and **Windows** (native — see the [Windows guide]({{ site.baseurl }}/WINDOWS.html)). All four interfaces (CLI · Web · MCP · TUI) are verified on each in CI.
 
 ---
 
@@ -100,7 +100,7 @@ scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket
 scoop install concealer          # pulls in python + sops + age
 ```
 
-See the [Windows guide]({{ site.baseurl }}/WINDOWS) for environment variables and the
+See the [Windows guide]({{ site.baseurl }}/WINDOWS.html) for environment variables and the
 security caveats.
 
 ---
@@ -130,7 +130,7 @@ The script is dependency-free Python — no virtualenv, no packages. `cer` is a 
 concealer init          # generate keys + set master password
 ```
 
-`init` prints **8 one-time recovery codes** and a starter `export CONCEALER_TOKEN=…` line, then removes the plaintext age key from disk. Save the recovery codes elsewhere. See [Getting Started]({{ site.baseurl }}/getting-started) for the full flow.
+`init` prints **8 one-time recovery codes** and a starter `export CONCEALER_TOKEN=…` line, then removes the plaintext age key from disk. Save the recovery codes elsewhere. See [Getting Started]({{ site.baseurl }}/getting-started.html) for the full flow.
 
 Use `concealer init --force` to reinitialize over an existing vault (destructive — only on a throwaway/test vault).
 

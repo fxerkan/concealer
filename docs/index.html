@@ -270,8 +270,8 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
   <div class="wrap">
     <span class="brand" translate="no"><img src="/assets/logo.svg" alt="">conceal<span class="ac">er</span></span>
     <nav>
-      <a class="lnk" data-collapse href="/getting-started" data-i18n="nav_docs">Docs</a>
-      <a class="lnk" data-collapse href="/chrome-extension" data-i18n="nav_ext">Extension</a>
+      <a class="lnk" data-collapse href="/getting-started.html" data-i18n="nav_docs">Docs</a>
+      <a class="lnk" data-collapse href="/chrome-extension.html" data-i18n="nav_ext">Extension</a>
       <a class="lnk" data-collapse href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener">GitHub</a>
       <a class="lnk" data-collapse href="mailto:concealer@fxerkan.com?subject=concealer%20support" data-i18n="nav_support">Support</a>
       <button class="lnk" id="installbtn" data-collapse data-i18n="nav_install" style="border:0;background:none;font-family:inherit;cursor:pointer">Install</button>
@@ -307,8 +307,8 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       </div>
     </div>
     <div class="ctarow">
-      <a class="btn primary" href="/getting-started" data-i18n="cta_start">Get started →</a>
-      <a class="btn ghost" href="/chrome-extension">🧩 <span data-i18n="cta_ext">Chrome Extension</span></a>
+      <a class="btn primary" href="/getting-started.html" data-i18n="cta_start">Get started →</a>
+      <a class="btn ghost" href="/chrome-extension.html">🧩 <span data-i18n="cta_ext">Chrome Extension</span></a>
       <a class="btn ghost" href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener">★ <span data-i18n="cta_star">Star on GitHub</span></a>
     </div>
   </div>
@@ -400,7 +400,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <div class="eyebrow">Chrome Extension</div>
       <h3 data-i18n="s_ext_h">Copy secrets from your toolbar</h3>
       <p data-i18n="s_ext_p">Open your vault and copy secret values straight from Chrome — no <code>cer web</code>. Multi-field secrets expand for per-field copy &amp; reveal; the popup starts on demand and self-locks when idle. Dark / White / Matrix themes.</p>
-      <p><a href="https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj">Add to Chrome →</a> · <code>cer chrome-extension</code> · <a href="/chrome-extension">full guide →</a></p>
+      <p><a href="https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj">Add to Chrome →</a> · <code>cer chrome-extension</code> · <a href="/chrome-extension.html">full guide →</a></p>
     </div>
     <figure><img src="/assets/ext-list.png" width="1280" height="800" alt="concealer Chrome extension — copy secrets from the toolbar" loading="lazy"></figure>
   </div>
@@ -456,7 +456,7 @@ $env:CONCEALER_TOKEN = <span class="a">"…paste from init…"</span>
 <span class="c"># store &amp; use a secret — the value never hits your terminal</span>
 concealer set --name OPENAI_API_KEY --project web --env prod <span class="a">'sk-DUMMY-123'</span>
 concealer run --project web --env prod npm run deploy</div>
-    <p style="text-align:center;margin-top:20px"><a class="btn ghost" href="/getting-started" data-i18n="qs_more">Read the full guide →</a></p>
+    <p style="text-align:center;margin-top:20px"><a class="btn ghost" href="/getting-started.html" data-i18n="qs_more">Read the full guide →</a></p>
   </div>
 </section>
 
@@ -468,7 +468,7 @@ concealer run --project web --env prod npm run deploy</div>
   </div>
   <div class="ctarow" style="margin:0">
     <button class="btn primary" id="installbtn2" data-i18n="cta_install">Install now</button>
-    <a class="btn ghost" href="/getting-started" data-i18n="nav_docs">Docs</a>
+    <a class="btn ghost" href="/getting-started.html" data-i18n="nav_docs">Docs</a>
   </div>
 </div></div>
 
@@ -494,10 +494,11 @@ concealer run --project web --env prod npm run deploy</div>
     <div style="margin-top:8px">Developed by <a href="https://fxerkan.com" target="_blank" rel="noopener">FXerkan</a> — Code more, worry less. · MIT</div>
   </div>
   <div class="links">
-    <a href="/getting-started" data-i18n="nav_docs">Docs</a>
+    <a href="/getting-started.html" data-i18n="nav_docs">Docs</a>
     <a href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener">GitHub</a>
     <a href="https://github.com/fxerkan/concealer/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
-    <a href="/comparison" data-i18n="nav_comparison">Comparison</a>
+    <a href="/comparison.html" data-i18n="nav_comparison">Comparison</a>
+    <a href="/tr/" hreflang="tr" lang="tr">Türkçe</a>
     <a href="mailto:concealer@fxerkan.com?subject=concealer%20support" data-i18n="nav_support">Support</a>
   </div>
 </div></footer>
@@ -528,8 +529,8 @@ concealer run --project web --env prod npm run deploy</div>
     </div>
     <div class="cmdlabel">🧩 Chrome Extension <span data-i18n="modal_l_ext">· toolbar UI</span></div>
     <p style="margin:10px 0 6px"><a class="btn primary" href="https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj">➕ <span data-i18n="modal_cws">Add to Chrome</span></a></p>
-    <p class="alt" data-i18n="modal_ext">Then run <code>cer chrome-extension</code> once → <a href="/chrome-extension">Chrome Extension guide</a>.</p>
-    <p class="alt" data-i18n="modal_alt">Prefer the manual route? See the <a href="/installation">Installation guide</a>.</p>
+    <p class="alt" data-i18n="modal_ext">Then run <code>cer chrome-extension</code> once → <a href="/chrome-extension.html">Chrome Extension guide</a>.</p>
+    <p class="alt" data-i18n="modal_alt">Prefer the manual route? See the <a href="/installation.html">Installation guide</a>.</p>
   </div>
 </div>
 

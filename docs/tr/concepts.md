@@ -72,7 +72,7 @@ Maskeleme **kayda duyarlıdır** ve şu sırayla çözümlenir:
 3. **Ad sezgiseli** — adı `pass|secret|token|value|key|credential|apikey` ile eşleşen bir alan.
 4. **Değer sezgiseli** — gömülü kimlik bilgileri içeren bir değer (`scheme://user:pass@…`, örneğin bir `jdbc_url` veya DSN), aksi takdirde "düz" bir alanda olsa bile maskelenir.
 
-Tam alan kataloğu için bkz. [Secret Türleri]({{ site.baseurl }}/tr/secret-types).
+Tam alan kataloğu için bkz. [Secret Türleri]({{ site.baseurl }}/tr/secret-types.html).
 
 ---
 
@@ -91,7 +91,7 @@ Kullanım anında `concealer` anahtar metnini şu sırayla çözümler ve `sops`
 3. mevcutsa legacy düz metin `keys/age-key.txt` (eski kasalar)
 4. bir TTY üzerinde etkileşimli master-password istemi
 
-`0600 keys/age-key.txt` içeren eski kasalar hâlâ çalışır; bunları diskteki anahtar (key-at-rest) modeline taşımak için [`concealer harden`]({{ site.baseurl }}/tr/cli-reference#harden) çalıştırın.
+`0600 keys/age-key.txt` içeren eski kasalar hâlâ çalışır; bunları diskteki anahtar (key-at-rest) modeline taşımak için [`concealer harden`]({{ site.baseurl }}/tr/cli-reference.html#harden) çalıştırın.
 
 ---
 
@@ -102,7 +102,7 @@ Kullanım anında `concealer` anahtar metnini şu sırayla çözümler ve `sops`
 - **İnsan**: `concealer unlock`, `CONCEALER_TOKEN` olarak dışa aktarılan bir **TTL** token'ı (~8s) üretir.
 - **Agent**: `concealer agent register <name>`, MCP sunucusunun ortamı için **uzun ömürlü, iptal edilebilir** bir token üretir.
 
-Token değeri **yalnızca** istemci ortamında yaşar. Kasa yalnızca onun scrypt hash'ini + age anahtarının token ile sarmalanmış bir kopyasını saklar. Token'ı iptal edin, o kopya işe yaramaz hâle gelir. Bkz. [Token'lar ve Kurtarma]({{ site.baseurl }}/tr/tokens-recovery).
+Token değeri **yalnızca** istemci ortamında yaşar. Kasa yalnızca onun scrypt hash'ini + age anahtarının token ile sarmalanmış bir kopyasını saklar. Token'ı iptal edin, o kopya işe yaramaz hâle gelir. Bkz. [Token'lar ve Kurtarma]({{ site.baseurl }}/tr/tokens-recovery.html).
 
 ---
 
@@ -130,4 +130,4 @@ Her erişim — CLI, Web veya MCP — `keys/audit.log`'a bir satır ekler:
 Audit log, **anahtar adlarını ve eylemleri kaydeder, değerleri asla kaydetmez**.
 
 {: .note }
-> **Dürüst tavan:** `keys/audit.key` yerel olarak saklanır, dolayısıyla tam erişime sahip bir dosya sistemi-root saldırganı zinciri yeniden dövebilir. Gerçek değişmezlik, makine dışı bir anahtar/sabit nokta gerektirir. Bu gizlenmemiş, belgelenmiştir — bkz. [Güvenlik Modeli]({{ site.baseurl }}/tr/security).
+> **Dürüst tavan:** `keys/audit.key` yerel olarak saklanır, dolayısıyla tam erişime sahip bir dosya sistemi-root saldırganı zinciri yeniden dövebilir. Gerçek değişmezlik, makine dışı bir anahtar/sabit nokta gerektirir. Bu gizlenmemiş, belgelenmiştir — bkz. [Güvenlik Modeli]({{ site.baseurl }}/tr/security.html).

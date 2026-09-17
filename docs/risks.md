@@ -38,7 +38,7 @@ Finds the same secret **value** used by more than one record and scores the blas
 
 ## Shell history
 
-Scans your shell history (`GET /api/history`) for secret/credential values that were typed in the clear into `bash`/`zsh`/`fish` history. Import the ones that belong in the vault, then clear them from history. See also **Scan folder** on the [Web UI]({{ site.baseurl }}/web-ui) page (and `scan --envvars` to sweep live environment / shell-profile variables).
+Scans your shell history (`GET /api/history`) for secret/credential values that were typed in the clear into `bash`/`zsh`/`fish` history. Import the ones that belong in the vault, then clear them from history. See also **Scan folder** on the [Web UI]({{ site.baseurl }}/web-ui.html) page (and `scan --envvars` to sweep live environment / shell-profile variables).
 
 ![Shell history — secrets typed in the clear]({{ site.baseurl }}/assets/app-risks-shell-history.png)
 

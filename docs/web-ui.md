@@ -40,16 +40,16 @@ Binds to `127.0.0.1` **only** — it is a single-user local convenience, not a h
 - Metadata: url, tags, notes.
 - **Auto-lock on idle** (default 300s; set with `CONCEALER_IDLE=…` or the Settings page).
 - **Audit Log viewer** — filter by action / source / key / date, pagination, row detail, **chain verification**, CSV/JSON export.
-- **[Risks]({{ site.baseurl }}/risks)** — health overview (rotation / expiry / reuse), reused-value blast radius, shell-history scan, and opt-in **Exposure** checks (HIBP Pwned Passwords, email breach, git-history scan).
-- **[Policy]({{ site.baseurl }}/policy)** — user-defined rotation / expiry / reuse / naming / tagging rules with violation lists, bulk-fix, and notifications; also hosts the per-agent MCP access limits.
+- **[Risks]({{ site.baseurl }}/risks.html)** — health overview (rotation / expiry / reuse), reused-value blast radius, shell-history scan, and opt-in **Exposure** checks (HIBP Pwned Passwords, email breach, git-history scan).
+- **[Policy]({{ site.baseurl }}/policy.html)** — user-defined rotation / expiry / reuse / naming / tagging rules with violation lists, bulk-fix, and notifications; also hosts the per-agent MCP access limits.
 - **Scan folder** — sweep a directory, **shell history**, or **live environment / shell-profile variables** (`scan --envvars`) for stray secrets and import them, tagged by origin, with a server-side folder browser and OS-native picker.
-- **Settings** — idle timeout, which operations require confirmation, and your **HIBP API key**. (Per-agent MCP rate limits moved to [Policy]({{ site.baseurl }}/policy).)
+- **Settings** — idle timeout, which operations require confirmation, and your **HIBP API key**. (Per-agent MCP rate limits moved to [Policy]({{ site.baseurl }}/policy.html).)
 
 ---
 
 ![Audit log viewer with chain verification]({{ site.baseurl }}/assets/app-audit-logs.png)
 
-The **[Risks]({{ site.baseurl }}/risks)** tab surfaces stale, reused, and exposed secrets; the **[Policy]({{ site.baseurl }}/policy)** tab enforces your own rules. **Scan folder** sweeps a directory, shell history, or environment variables for stray secrets and imports them, tagged by origin:
+The **[Risks]({{ site.baseurl }}/risks.html)** tab surfaces stale, reused, and exposed secrets; the **[Policy]({{ site.baseurl }}/policy.html)** tab enforces your own rules. **Scan folder** sweeps a directory, shell history, or environment variables for stray secrets and imports them, tagged by origin:
 
 ![Scan a folder or shell history for leaked secrets]({{ site.baseurl }}/assets/app-scan-folder.png)
 
@@ -58,7 +58,7 @@ The **[Risks]({{ site.baseurl }}/risks)** tab surfaces stale, reused, and expose
 ## Session & locking
 
 - Unlock decrypts the age key into **memory for that session only** (`_SESS_KEY`) — no age/tty prompt in the request path, no plaintext key on disk.
-- The session has a **hard idle auto-lock**: after `idle` seconds of inactivity, the session and the in-memory key references are dropped (followed by `gc.collect()`). Activity does **not** extend the TTL — it's a fixed-lifetime lock. Note: this drops references and reclaims copies but does **not** zeroize memory — CPython cannot overwrite freed `str`/`bytes`, so plaintext may persist in the heap/swap until overwritten. See [Security → Web UI scope]({{ site.baseurl }}/security#web-ui-scope).
+- The session has a **hard idle auto-lock**: after `idle` seconds of inactivity, the session and the in-memory key references are dropped (followed by `gc.collect()`). Activity does **not** extend the TTL — it's a fixed-lifetime lock. Note: this drops references and reclaims copies but does **not** zeroize memory — CPython cannot overwrite freed `str`/`bytes`, so plaintext may persist in the heap/swap until overwritten. See [Security → Web UI scope]({{ site.baseurl }}/security.html#web-ui-scope).
 - **Lock** immediately from the UI, or it happens automatically on idle.
 
 ---

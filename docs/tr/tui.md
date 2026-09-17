@@ -29,7 +29,7 @@ CLI ile aynı şekilde kilit açın — ortamınızdaki bir `CONCEALER_TOKEN` (`
 
 ## Gözatma ve arama
 
-Ekranda üç panel bulunur — **1 · Filtreler**, **2 · Secret'lar**, **3 · Detaylar**. Odağı bunlar arasında taşıyın, gözatın, görüntüleyin, kopyalayın ve tamamen klavyeyle düzenleyin. Secret alanları siz onları görüntüleyene kadar **maskeli** kalır — her yerdeki gibi aynı kayıt-farkındalıklı maskeleme kuralları geçerlidir (bkz. [Secret Türleri]({{ site.baseurl }}/tr/secret-types)).
+Ekranda üç panel bulunur — **1 · Filtreler**, **2 · Secret'lar**, **3 · Detaylar**. Odağı bunlar arasında taşıyın, gözatın, görüntüleyin, kopyalayın ve tamamen klavyeyle düzenleyin. Secret alanları siz onları görüntüleyene kadar **maskeli** kalır — her yerdeki gibi aynı kayıt-farkındalıklı maskeleme kuralları geçerlidir (bkz. [Secret Türleri]({{ site.baseurl }}/tr/secret-types.html)).
 
 ![concealer TUI — aranabilir secret listesi]({{ site.baseurl }}/assets/tui-secrets.png)
 
@@ -107,7 +107,7 @@ Ekleme ve düzenleme, web arayüzü ve CLI ile aynı **tür-farkındalıklı** m
 
 ![concealer TUI — tür-farkındalıklı düzenleme formu]({{ site.baseurl }}/assets/tui-edit.png)
 
-Her görüntüleme, oluşturma, güncelleme ve silme, `source` kaydedilerek [kurcalamaya karşı korumalı audit log'a]({{ site.baseurl }}/tr/concepts#audit-chain) yazılır — TUI birinci sınıf bir arayüzdür, bir baypas değil.
+Her görüntüleme, oluşturma, güncelleme ve silme, `source` kaydedilerek [kurcalamaya karşı korumalı audit log'a]({{ site.baseurl }}/tr/concepts.html#audit-chain) yazılır — TUI birinci sınıf bir arayüzdür, bir baypas değil.
 
 ---
 
@@ -115,7 +115,7 @@ Her görüntüleme, oluşturma, güncelleme ve silme, `source` kaydedilerek [kur
 
 | İsteğiniz… | Kullanın |
 |---|---|
-| Scripting, CI, `run`/`deploy` içine aktarma | [CLI]({{ site.baseurl }}/tr/cli-reference) |
-| Zengin formlar, filtreler, deploy renderer'ları, audit görüntüleyici | [Web Arayüzü]({{ site.baseurl }}/tr/web-ui) |
+| Scripting, CI, `run`/`deploy` içine aktarma | [CLI]({{ site.baseurl }}/tr/cli-reference.html) |
+| Zengin formlar, filtreler, deploy renderer'ları, audit görüntüleyici | [Web Arayüzü]({{ site.baseurl }}/tr/web-ui.html) |
 | Terminal içinde hızlı klavye ile gözatma | **TUI** (bu sayfa) |
-| Secret'ları görmeden kullanan ajanlar | [MCP]({{ site.baseurl }}/tr/mcp) |
+| Secret'ları görmeden kullanan ajanlar | [MCP]({{ site.baseurl }}/tr/mcp.html) |

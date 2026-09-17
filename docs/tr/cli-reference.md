@@ -30,7 +30,7 @@ concealer <command> [options]          # short: cer <command>
 | `--env <E>` | çoğu | environment boyutu |
 | `--repo <R>` | çoğu | repo boyutu |
 | `--name <N>` | get/set/rm/rotate/list | secret adı |
-| `--type <T>` | list/set | secret türü (bkz. [türler]({{ site.baseurl }}/tr/secret-types)) |
+| `--type <T>` | list/set | secret türü (bkz. [türler]({{ site.baseurl }}/tr/secret-types.html)) |
 | `--tag <X>` | list | tek bir tag'e göre filtrele |
 | `--tags a,b` | set | atanacak virgülle ayrılmış tag'ler |
 
@@ -100,7 +100,7 @@ concealer agent list
 concealer agent revoke <name|all>
 ```
 
-Yapay zeka agent'ları (MCP) için uzun ömürlü, iptal edilebilir token'ları yönetir. Bkz. [Token'lar ve Kurtarma]({{ site.baseurl }}/tr/tokens-recovery) ve [MCP]({{ site.baseurl }}/tr/mcp).
+Yapay zeka agent'ları (MCP) için uzun ömürlü, iptal edilebilir token'ları yönetir. Bkz. [Token'lar ve Kurtarma]({{ site.baseurl }}/tr/tokens-recovery.html) ve [MCP]({{ site.baseurl }}/tr/mcp.html).
 
 | Alt komut | Anlamı |
 |---|---|
@@ -350,7 +350,7 @@ Etkileşimli terminal arayüzü — gezinmek, aramak, ekleyip silmek ve secret'l
 concealer web [port]
 ```
 
-Web arayüzünü + JSON API'yi `http://127.0.0.1:<port>` üzerinde sunar (yalnızca localhost; varsayılan `8787`). Master password ile kilit açın. Bkz. [Web Arayüzü]({{ site.baseurl }}/tr/web-ui).
+Web arayüzünü + JSON API'yi `http://127.0.0.1:<port>` üzerinde sunar (yalnızca localhost; varsayılan `8787`). Master password ile kilit açın. Bkz. [Web Arayüzü]({{ site.baseurl }}/tr/web-ui.html).
 
 ## mcp
 
@@ -358,7 +358,7 @@ Web arayüzünü + JSON API'yi `http://127.0.0.1:<port>` üzerinde sunar (yalnı
 CONCEALER_TOKEN=<agent-token> concealer mcp
 ```
 
-Yapay zeka agent'ları için MCP stdio sunucusunu çalıştırır. `CONCEALER_TOKEN` içinde **kayıtlı bir agent** token'ı gerektirir; bir token olmadan fail-closed (kapalı hata) verir. Bkz. [MCP]({{ site.baseurl }}/tr/mcp).
+Yapay zeka agent'ları için MCP stdio sunucusunu çalıştırır. `CONCEALER_TOKEN` içinde **kayıtlı bir agent** token'ı gerektirir; bir token olmadan fail-closed (kapalı hata) verir. Bkz. [MCP]({{ site.baseurl }}/tr/mcp.html).
 
 ## version / help
 

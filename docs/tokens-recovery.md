@@ -35,7 +35,7 @@ concealer agent list                # label · source · expiry/revoked · creat
 concealer agent revoke claude       # revoke one (or `all`)
 ```
 
-Agent tokens are for the MCP server's environment so agents never see a password. See [MCP]({{ site.baseurl }}/mcp).
+Agent tokens are for the MCP server's environment so agents never see a password. See [MCP]({{ site.baseurl }}/mcp.html).
 
 {: .note }
 > Tokens are **per-machine on purpose**. A copied vault folder is inert until someone types the master password on the new machine and mints a fresh token.
@@ -87,7 +87,7 @@ Vaults created before key-at-rest keep a `0600 keys/age-key.txt` on disk. Migrat
 concealer harden       # removes the plaintext age key, prints a fresh CLI token
 ```
 
-After hardening, the age key exists on disk only in password-, recovery-code-, and token-wrapped forms. See [Concepts → Key-at-rest]({{ site.baseurl }}/concepts#key-at-rest).
+After hardening, the age key exists on disk only in password-, recovery-code-, and token-wrapped forms. See [Concepts → Key-at-rest]({{ site.baseurl }}/concepts.html#key-at-rest).
 
 ---
 

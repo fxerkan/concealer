@@ -83,7 +83,7 @@ cer chrome-extension
 
 Bu, native-host manifesti ile Chrome / Edge / Chromium için `HKCU\…\NativeMessagingHosts` kayıt
 defteri anahtarlarını yazar. Ardından araç-çubuğu simgesine tıkla.
-Ortam ayrıntıları için [Windows rehberi]({{ site.baseurl }}/tr/WINDOWS)'ne bak.
+Ortam ayrıntıları için [Windows rehberi]({{ site.baseurl }}/tr/WINDOWS.html)'ne bak.
 </div>
 </div>
 

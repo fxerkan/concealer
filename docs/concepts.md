@@ -72,7 +72,7 @@ Masking is **record-aware**, resolved in this order:
 3. **Name heuristic** — a field whose name matches `pass|secret|token|value|key|credential|apikey`.
 4. **Value heuristic** — a value with embedded credentials (`scheme://user:pass@…`, e.g. a `jdbc_url` or DSN) is masked even in an otherwise "plain" field.
 
-See [Secret Types]({{ site.baseurl }}/secret-types) for the full field catalog.
+See [Secret Types]({{ site.baseurl }}/secret-types.html) for the full field catalog.
 
 ---
 
@@ -91,7 +91,7 @@ At use time, `concealer` resolves the key text in this order and hands it to `so
 3. legacy plaintext `keys/age-key.txt` if present (old vaults)
 4. interactive master-password prompt on a TTY
 
-Old vaults with a `0600 keys/age-key.txt` still work; run [`concealer harden`]({{ site.baseurl }}/cli-reference#harden) to migrate them to key-at-rest.
+Old vaults with a `0600 keys/age-key.txt` still work; run [`concealer harden`]({{ site.baseurl }}/cli-reference.html#harden) to migrate them to key-at-rest.
 
 ---
 
@@ -102,7 +102,7 @@ Humans and agents unlock via **revocable tokens** rather than repeatedly typing 
 - **Human**: `concealer unlock` mints a **TTL** token (~8h) exported as `CONCEALER_TOKEN`.
 - **Agent**: `concealer agent register <name>` mints a **long-lived, revocable** token for the MCP server's environment.
 
-The token value lives **only** in the client environment. The vault stores only its scrypt hash + a token-wrapped copy of the age key. Revoke the token and that copy is dead. See [Tokens & Recovery]({{ site.baseurl }}/tokens-recovery).
+The token value lives **only** in the client environment. The vault stores only its scrypt hash + a token-wrapped copy of the age key. Revoke the token and that copy is dead. See [Tokens & Recovery]({{ site.baseurl }}/tokens-recovery.html).
 
 ---
 
@@ -130,4 +130,4 @@ Every access — CLI, Web, or MCP — appends a line to `keys/audit.log`:
 The audit log records **key names and actions, never values**.
 
 {: .note }
-> **Honest ceiling:** `keys/audit.key` is stored locally, so a filesystem-root attacker with full access could re-forge the chain. True immutability needs an off-machine key/anchor. This is documented, not hidden — see [Security Model]({{ site.baseurl }}/security).
+> **Honest ceiling:** `keys/audit.key` is stored locally, so a filesystem-root attacker with full access could re-forge the chain. True immutability needs an off-machine key/anchor. This is documented, not hidden — see [Security Model]({{ site.baseurl }}/security.html).

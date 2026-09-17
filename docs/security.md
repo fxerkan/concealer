@@ -75,7 +75,7 @@ The web server binds to `127.0.0.1` **only** and is **single-user**. Treat it as
 
 ## Anti-exfiltration (MCP)
 
-Agents are gated: only **registered** agent tokens can call MCP tools, and `list`/`search`/`get` results pass through a per-agent **rate gate** (`per_call`, `window_quota`, `window_sec`) to prevent bulk dumping. `run_with_secrets` redacts values from output. See [MCP]({{ site.baseurl }}/mcp).
+Agents are gated: only **registered** agent tokens can call MCP tools, and `list`/`search`/`get` results pass through a per-agent **rate gate** (`per_call`, `window_quota`, `window_sec`) to prevent bulk dumping. `run_with_secrets` redacts values from output. See [MCP]({{ site.baseurl }}/mcp.html).
 
 ---
 

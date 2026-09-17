@@ -39,16 +39,16 @@ concealer web 8080       # özel port
 - Meta veri: url, etiketler, notlar.
 - **Boşta kalınca otomatik kilitleme** (varsayılan 300sn; `CONCEALER_IDLE=…` ile veya Ayarlar sayfasından ayarlanır).
 - **Denetim Günlüğü (Audit Log) görüntüleyicisi** — action / source / key / tarihe göre filtreleme, sayfalama, satır ayrıntısı, **zincir doğrulaması**, CSV/JSON dışa aktarma.
-- **[Riskler]({{ site.baseurl }}/tr/risks)** — sağlık genel bakışı (rotation / expiry / yeniden kullanım), yeniden kullanılan-değer etki alanı, shell-history taraması ve isteğe bağlı **Maruz kalma** kontrolleri (HIBP Pwned Passwords, e-posta ihlali, git-geçmişi taraması).
-- **[Politika]({{ site.baseurl }}/tr/policy)** — kullanıcı-tanımlı rotation / expiry / yeniden kullanım / adlandırma / etiketleme kuralları; ihlal listeleri, toplu düzeltme ve bildirimler ile; ayrıca agent başına MCP erişim limitlerini barındırır.
+- **[Riskler]({{ site.baseurl }}/tr/risks.html)** — sağlık genel bakışı (rotation / expiry / yeniden kullanım), yeniden kullanılan-değer etki alanı, shell-history taraması ve isteğe bağlı **Maruz kalma** kontrolleri (HIBP Pwned Passwords, e-posta ihlali, git-geçmişi taraması).
+- **[Politika]({{ site.baseurl }}/tr/policy.html)** — kullanıcı-tanımlı rotation / expiry / yeniden kullanım / adlandırma / etiketleme kuralları; ihlal listeleri, toplu düzeltme ve bildirimler ile; ayrıca agent başına MCP erişim limitlerini barındırır.
 - **Klasör tara** — bir dizini, **shell geçmişini** veya **canlı ortam / shell-profil değişkenlerini** (`scan --envvars`) başıboş secret'lar için tarayıp içe aktarır, kaynağa göre etiketleyerek, sunucu tarafı klasör tarayıcısı ve OS-yerel seçici ile birlikte.
-- **Ayarlar** — boşta kalma zaman aşımı, hangi işlemlerin onay gerektirdiği ve **HIBP API anahtarınız**. (Agent başına MCP hız sınırları [Politika]({{ site.baseurl }}/tr/policy)'ya taşındı.)
+- **Ayarlar** — boşta kalma zaman aşımı, hangi işlemlerin onay gerektirdiği ve **HIBP API anahtarınız**. (Agent başına MCP hız sınırları [Politika]({{ site.baseurl }}/tr/policy.html)'ya taşındı.)
 
 ---
 
 ![Zincir doğrulamalı denetim günlüğü görüntüleyicisi]({{ site.baseurl }}/assets/app-audit-logs.png)
 
-**[Riskler]({{ site.baseurl }}/tr/risks)** sekmesi bayat, yeniden kullanılan ve açığa çıkmış secret'ları öne çıkarır; **[Politika]({{ site.baseurl }}/tr/policy)** sekmesi kendi kurallarınızı uygular. **Klasör tara**, bir dizini, shell geçmişini veya ortam değişkenlerini başıboş secret'lar için tarar ve bunları kaynağa göre etiketleyerek içe aktarır:
+**[Riskler]({{ site.baseurl }}/tr/risks.html)** sekmesi bayat, yeniden kullanılan ve açığa çıkmış secret'ları öne çıkarır; **[Politika]({{ site.baseurl }}/tr/policy.html)** sekmesi kendi kurallarınızı uygular. **Klasör tara**, bir dizini, shell geçmişini veya ortam değişkenlerini başıboş secret'lar için tarar ve bunları kaynağa göre etiketleyerek içe aktarır:
 
 ![Bir klasörü veya shell geçmişini sızmış secret'lar için tarayın]({{ site.baseurl }}/assets/app-scan-folder.png)
 

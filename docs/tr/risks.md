@@ -37,7 +37,7 @@ Aynı secret **değerini** birden fazla kaydın kullandığını bulur ve patlam
 
 ## Shell history
 
-Shell geçmişinizi (`GET /api/history`) `bash`/`zsh`/`fish` geçmişine açık şekilde yazılmış secret/kimlik bilgisi değerleri için tarar. Vault'a ait olanları içe aktarın, sonra geçmişten temizleyin. Ayrıca [Web Arayüzü]({{ site.baseurl }}/tr/web-ui) sayfasındaki **Klasör tara**'ya bakın (ve canlı ortam / shell-profil değişkenlerini taramak için `scan --envvars`).
+Shell geçmişinizi (`GET /api/history`) `bash`/`zsh`/`fish` geçmişine açık şekilde yazılmış secret/kimlik bilgisi değerleri için tarar. Vault'a ait olanları içe aktarın, sonra geçmişten temizleyin. Ayrıca [Web Arayüzü]({{ site.baseurl }}/tr/web-ui.html) sayfasındaki **Klasör tara**'ya bakın (ve canlı ortam / shell-profil değişkenlerini taramak için `scan --envvars`).
 
 ![Shell history — açık şekilde yazılmış secret'lar]({{ site.baseurl }}/assets/app-risks-shell-history.png)
 

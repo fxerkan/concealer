@@ -30,7 +30,7 @@ Most commands accept a **scope**: `--tenant T  --project P  --env E  --repo R`. 
 | `--env <E>` | most | environment dimension |
 | `--repo <R>` | most | repo dimension |
 | `--name <N>` | get/set/rm/rotate/list | secret name |
-| `--type <T>` | list/set | secret type (see [types]({{ site.baseurl }}/secret-types)) |
+| `--type <T>` | list/set | secret type (see [types]({{ site.baseurl }}/secret-types.html)) |
 | `--tag <X>` | list | filter by a single tag |
 | `--tags a,b` | set | comma-separated tags to assign |
 
@@ -100,7 +100,7 @@ concealer agent list
 concealer agent revoke <name|all>
 ```
 
-Manage long-lived, revocable tokens for AI agents (MCP). See [Tokens & Recovery]({{ site.baseurl }}/tokens-recovery) and [MCP]({{ site.baseurl }}/mcp).
+Manage long-lived, revocable tokens for AI agents (MCP). See [Tokens & Recovery]({{ site.baseurl }}/tokens-recovery.html) and [MCP]({{ site.baseurl }}/mcp.html).
 
 | Subcommand | Meaning |
 |---|---|
@@ -266,7 +266,16 @@ concealer run [scope] <cmd...>
 Inject matching secrets into a child environment and **exec** the command. Values never appear in the terminal. Unspecified `repo`/`project` are auto-detected from the current git repo; the most-specific scope match wins.
 
 - `api_key` secrets are injected as `NAME=value`.
-- Typed secrets are injected per-field as `NAME_FIELD=value` (uppercased field name).
+- Typed secrets (incl. `website`/`login`) are injected per-field as `NAME_FIELD=value`.
+
+**Env-name rule.** Names are sanitized to valid shell identifiers: upper-cased, any
+character outside `[A-Z0-9_]` becomes `_`, and a leading digit gets a `_` prefix — so
+`grafana-rpifx` (a `website` secret) injects `GRAFANA_RPIFX_USERNAME`,
+`GRAFANA_RPIFX_PASSWORD`, `GRAFANA_RPIFX_WEB_URL`. Set a record's **`env_alias`** to pin
+a stable base (e.g. `GRAFANA`). If two secrets would collide onto the same identifier,
+injection fails loudly rather than clobbering. The child also receives
+`CONCEALER_INJECTED` — a comma-separated list of the injected identifier names (names
+only, never values) so a script can discover exactly what was injected.
 
 ```bash
 concealer run --project web --env prod npm run deploy
@@ -350,7 +359,7 @@ Interactive terminal UI — arrow keys to navigate, search, add/delete, and reve
 concealer web [port]
 ```
 
-Serve the web UI + JSON API on `http://127.0.0.1:<port>` (localhost only; default `8787`). Unlock with the master password. See [Web UI]({{ site.baseurl }}/web-ui).
+Serve the web UI + JSON API on `http://127.0.0.1:<port>` (localhost only; default `8787`). Unlock with the master password. See [Web UI]({{ site.baseurl }}/web-ui.html).
 
 ## mcp
 
@@ -358,7 +367,7 @@ Serve the web UI + JSON API on `http://127.0.0.1:<port>` (localhost only; defaul
 CONCEALER_TOKEN=<agent-token> concealer mcp
 ```
 
-Run the MCP stdio server for AI agents. Requires a **registered agent** token in `CONCEALER_TOKEN`; fails closed without one. See [MCP]({{ site.baseurl }}/mcp).
+Run the MCP stdio server for AI agents. Requires a **registered agent** token in `CONCEALER_TOKEN`; fails closed without one. See [MCP]({{ site.baseurl }}/mcp.html).
 
 ## version / help
 

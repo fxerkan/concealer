@@ -57,7 +57,7 @@ The built-in agent-access policy lives at the bottom of the Policy page (it move
 - **Window quota (distinct)** — caps how many **distinct** secret names an agent may reveal within the rolling window (already-disclosed names re-list free; set the quota to **0** to fully block an agent).
 - **Window (sec)** — the length of the rolling window.
 
-Set a default for all agents plus per-agent overrides. See [MCP for AI Agents]({{ site.baseurl }}/mcp) for how the gate works end-to-end.
+Set a default for all agents plus per-agent overrides. See [MCP for AI Agents]({{ site.baseurl }}/mcp.html) for how the gate works end-to-end.
 
 {: .note }
 > The Policy page is the **human owner's** interface (unlocked by the master password) and is not itself subject to the agent rate limits it configures.

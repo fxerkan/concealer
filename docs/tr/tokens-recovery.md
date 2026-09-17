@@ -35,7 +35,7 @@ concealer agent list                # etiket · kaynak · süre/iptal · oluştu
 concealer agent revoke claude       # birini iptal et (veya `all`)
 ```
 
-Agent token'ları MCP sunucusunun ortamı içindir; böylece agent'lar hiçbir zaman bir şifre görmez. Bkz. [MCP]({{ site.baseurl }}/tr/mcp).
+Agent token'ları MCP sunucusunun ortamı içindir; böylece agent'lar hiçbir zaman bir şifre görmez. Bkz. [MCP]({{ site.baseurl }}/tr/mcp.html).
 
 {: .note }
 > Token'lar **bilinçli olarak makineye özeldir**. Kopyalanmış bir kasa klasörü, yeni makinede birisi master password'ü yazıp taze bir token üretene kadar atıldır.
@@ -87,7 +87,7 @@ key-at-rest'ten önce oluşturulan kasalar diskte bir `0600 keys/age-key.txt` tu
 concealer harden       # plaintext age anahtarını kaldırır, taze bir CLI token yazdırır
 ```
 
-Sağlamlaştırmadan sonra age anahtarı diskte yalnızca password, kurtarma kodu ve token ile sarmalanmış biçimlerde bulunur. Bkz. [Kavramlar → Key-at-rest]({{ site.baseurl }}/tr/concepts#key-at-rest).
+Sağlamlaştırmadan sonra age anahtarı diskte yalnızca password, kurtarma kodu ve token ile sarmalanmış biçimlerde bulunur. Bkz. [Kavramlar → Key-at-rest]({{ site.baseurl }}/tr/concepts.html#key-at-rest).
 
 ---
 

@@ -56,7 +56,7 @@ Yerleşik ajan-erişim politikası Politika sayfasının altında yer alır (bur
 - **Pencere kotası (distinct)** — bir ajanın yuvarlanan pencere içinde açığa çıkarabileceği **farklı** secret adı sayısını sınırlar (zaten açıklanmış adlar ücretsiz yeniden listelenir; ajanı tamamen engellemek için kotayı **0** yapın).
 - **Pencere (sn)** — yuvarlanan pencerenin uzunluğu.
 
-Tüm ajanlar için bir varsayılan ve ajan-başına geçersiz kılmalar ayarlayın. Kapının uçtan uca nasıl çalıştığı için [AI Ajanları için MCP]({{ site.baseurl }}/tr/mcp)'ye bakın.
+Tüm ajanlar için bir varsayılan ve ajan-başına geçersiz kılmalar ayarlayın. Kapının uçtan uca nasıl çalıştığı için [AI Ajanları için MCP]({{ site.baseurl }}/tr/mcp.html)'ye bakın.
 
 {: .note }
 > Politika sayfası **insan sahibinin** arayüzüdür (master parola ile açılır) ve yapılandırdığı ajan hız limitlerine kendisi tabi değildir.

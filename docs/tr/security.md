@@ -75,7 +75,7 @@ Web sunucusu **yalnızca** `127.0.0.1`'e bağlanır ve **tek kullanıcılıdır*
 
 ## Sızdırma önleme (MCP)
 
-Agent'lar kapılıdır: yalnızca **kayıtlı** agent token'ları MCP araçlarını çağırabilir ve `list`/`search`/`get` sonuçları, toplu döküm alınmasını önlemek için agent başına bir **hız kapısından** (`per_call`, `window_quota`, `window_sec`) geçer. `run_with_secrets` değerleri çıktıdan gizler. Bkz. [MCP]({{ site.baseurl }}/tr/mcp).
+Agent'lar kapılıdır: yalnızca **kayıtlı** agent token'ları MCP araçlarını çağırabilir ve `list`/`search`/`get` sonuçları, toplu döküm alınmasını önlemek için agent başına bir **hız kapısından** (`per_call`, `window_quota`, `window_sec`) geçer. `run_with_secrets` değerleri çıktıdan gizler. Bkz. [MCP]({{ site.baseurl }}/tr/mcp.html).
 
 ---
 
