@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "0.9.24"   # advances through 0.x; 1.0 = reserved for the full live/release version
+VERSION = "0.9.27"   # advances through 0.x; 1.0 = reserved for the full live/release version
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -267,6 +267,7 @@ def norm(e):
     e.setdefault("field_meta", {})   # {fname: {"secret":bool,"mask":"partial"|"full"}} — record-specific secrecy
     e.setdefault("collection", "")   # free-form grouping path ("a/b" nested); independent of scope — see feature-plan
     e.setdefault("rotation", {})     # {"every_days":int,"last":iso,"mode":"generate"|"manual"} — empty = no policy
+    e.setdefault("env_alias", "")    # optional identifier base for env injection ("" = derive from name)
     e.setdefault("created", now_iso()); e.setdefault("updated", e["created"])
     return e
 
@@ -1337,7 +1338,9 @@ def _print_codes(codes):
 # optional token/code-wrapped copies. Given to sops from memory via SOPS_AGE_KEY.
 # Token = long-lived (agent) or TTL'd (human/cli); its VALUE lives only in the client env
 # (CONCEALER_TOKEN), on disk only the scrypt hash + token-wrapped key are stored.
-TOKEN_TTL = 8 * 3600   # default lifetime for human/cli token (agent token never expires)
+# Default lifetime for a human/cli token (agent tokens never expire). Shorter = smaller window
+# if a shell holding the token is exposed. Override in seconds with CONCEALER_TOKEN_TTL.
+TOKEN_TTL = int(os.environ.get("CONCEALER_TOKEN_TTL", 3600))   # 1h default
 def _age_enc_bytes(data, pw):
     """Encrypt arbitrary bytes with pw via age -p, return ciphertext."""
     tin = tempfile.NamedTemporaryFile(delete=False)
@@ -1569,12 +1572,170 @@ def unlock():
     keytext = key_from_master(getpass.getpass("Master password: "))
     if not keytext: sys.exit("wrong password.")
     tok = mint_token(keytext, "cli", "cli", ttl=TOKEN_TTL); audit("unlock", source="cli")
-    sys.stderr.write(f"CLI token generated (~{TOKEN_TTL // 3600}h). Run:  eval \"$(concealer unlock)\"\n")
+    sys.stderr.write(f"CLI token generated (~{TOKEN_TTL // 3600 or 1}h). Run:  eval \"$(concealer unlock)\"\n")
+    exp = int(datetime.now(timezone.utc).timestamp()) + TOKEN_TTL   # for the shell auto-unset hook
     print(f"export CONCEALER_TOKEN={tok}")
+    print(f"export CONCEALER_TOKEN_EXP={exp}")
+
+# ---------------- agent auto-setup (detect installed AI agents, wire up MCP + skill) ----------------
+SKILL_MD = """---
+name: concealer
+description: Local secret manager. Use whenever a task needs a credential, API key, token, or DB password. Never write plaintext secrets; inject them with run_with_secrets using least-privilege names.
+---
+
+# concealer — secrets policy
+
+When you need a secret, use the concealer MCP tools — never hardcode, echo, or write a plaintext value.
+
+- **Find names first:** `list_secrets` (project/repo/tag filtered) or `search_secrets`. Neither returns values.
+- **Use a value:** `run_with_secrets` — secrets are injected into the child env and redacted from output. Always pass `names` with ONLY the secrets the command needs (least privilege), and scope narrowly (tenant/project/environment/repo).
+- **Create/update:** `set_secret`.
+- **Never** print, cat, echo, or write a secret value.
+"""
+
+def _mcp_env(tok):
+    env = {"CONCEALER_TOKEN": tok}
+    if HOME != _default_home(): env["CONCEALER_HOME"] = HOME   # non-default vault → tell the server where it is
+    return env
+
+def _mcp_server_obj(tok):
+    """MCP server entry (JSON-config shape) pointing at this concealer + a per-agent token."""
+    script = os.path.abspath(__file__)
+    if sys.platform == "win32":   # a bare shebang path is not runnable on Windows
+        return {"command": sys.executable, "args": [script, "mcp"], "env": _mcp_env(tok)}
+    return {"command": script, "args": ["mcp"], "env": _mcp_env(tok)}
+
+def _install_mcp_json(path, key, tok):
+    """Merge a 'concealer' MCP server into a JSON config under top-level `key` (mcpServers/servers)."""
+    path = os.path.expanduser(path)
+    d = {}
+    if os.path.exists(path):
+        try: d = json.load(open(path)) or {}
+        except Exception: d = {}
+    servers = d.get(key)
+    if not isinstance(servers, dict): servers = {}
+    servers["concealer"] = _mcp_server_obj(tok)
+    d[key] = servers
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w") as f: json.dump(d, f, indent=2)
+    return path
+
+def _install_mcp_toml(path, tok):
+    """Append a [mcp_servers.concealer] block to a TOML config (Codex). ponytail: no TOML parse — if a
+    concealer block already exists we leave it (edit by hand); dedup would need a real TOML parser."""
+    path = os.path.expanduser(path); script = os.path.abspath(__file__)
+    cur = open(path).read() if os.path.exists(path) else ""
+    if "[mcp_servers.concealer]" in cur: return path + " (already present, unchanged)"
+    cmd, args = (json.dumps(sys.executable), [script, "mcp"]) if sys.platform == "win32" else (json.dumps(script), ["mcp"])
+    block = f"\n[mcp_servers.concealer]\ncommand = {cmd}\nargs = {json.dumps(args)}\n\n[mcp_servers.concealer.env]\nCONCEALER_TOKEN = {json.dumps(tok)}\n"
+    if HOME != _default_home(): block += f"CONCEALER_HOME = {json.dumps(HOME)}\n"
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "a") as f: f.write(block)
+    return path
+
+def _install_claude_code(tok):
+    """Prefer the `claude` CLI (authoritative for user scope); fall back to writing ~/.claude.json."""
+    script = os.path.abspath(__file__)
+    if shutil.which("claude"):
+        subprocess.run(["claude", "mcp", "remove", "--scope", "user", "concealer"], capture_output=True)  # idempotent
+        cmd = ["claude", "mcp", "add", "--scope", "user", "concealer", "--env", f"CONCEALER_TOKEN={tok}"]
+        if HOME != _default_home(): cmd += ["--env", f"CONCEALER_HOME={HOME}"]
+        cmd += ["--", script, "mcp"]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode: raise RuntimeError(scrub(r.stderr.strip() or r.stdout.strip() or "claude mcp add failed"))
+        return "via claude CLI (user scope)"
+    return _install_mcp_json("~/.claude.json", "mcpServers", tok)
+
+def _install_skill():
+    """Write the concealer skill for Claude Code (~/.claude/skills/concealer/SKILL.md)."""
+    d = os.path.expanduser("~/.claude/skills/concealer")
+    os.makedirs(d, exist_ok=True)
+    p = os.path.join(d, "SKILL.md")
+    with open(p, "w") as f: f.write(SKILL_MD)
+    return p
+
+def _agent_defs():
+    mac = sys.platform == "darwin"
+    desktop = "~/Library/Application Support/Claude/claude_desktop_config.json" if mac else "~/AppData/Roaming/Claude/claude_desktop_config.json"
+    return [
+        {"id": "claude-code", "name": "Claude Code", "skill": True,
+         "detect": lambda: bool(shutil.which("claude")) or os.path.exists(os.path.expanduser("~/.claude.json")),
+         "install": _install_claude_code},
+        {"id": "cursor", "name": "Cursor",
+         "detect": lambda: os.path.isdir(os.path.expanduser("~/.cursor")),
+         "install": lambda tok: _install_mcp_json("~/.cursor/mcp.json", "mcpServers", tok)},
+        {"id": "windsurf", "name": "Windsurf",
+         "detect": lambda: os.path.isdir(os.path.expanduser("~/.codeium/windsurf")),
+         "install": lambda tok: _install_mcp_json("~/.codeium/windsurf/mcp_config.json", "mcpServers", tok)},
+        {"id": "gemini", "name": "Gemini CLI",
+         "detect": lambda: bool(shutil.which("gemini")) or os.path.isdir(os.path.expanduser("~/.gemini")),
+         "install": lambda tok: _install_mcp_json("~/.gemini/settings.json", "mcpServers", tok)},
+        {"id": "claude-desktop", "name": "Claude Desktop",
+         "detect": lambda: os.path.exists(os.path.expanduser(desktop)),
+         "install": lambda tok: _install_mcp_json(desktop, "mcpServers", tok)},
+        {"id": "codex", "name": "Codex CLI",
+         "detect": lambda: bool(shutil.which("codex")) or os.path.isdir(os.path.expanduser("~/.codex")),
+         "install": lambda tok: _install_mcp_toml("~/.codex/config.toml", tok)},
+    ]
+
+def _detect_agents():
+    out = []
+    for d in _agent_defs():
+        try:
+            if d["detect"](): out.append(d)
+        except Exception: pass
+    return out
+
+def agent_install(a):
+    """Auto-detect installed AI agents, then wire concealer's MCP server (+ skill) into the chosen ones."""
+    opts = {x for x in a if x.startswith("-")}
+    ids  = [x for x in a if not x.startswith("-")]
+    mcp_only, skill_only, want_all = "--mcp-only" in opts, "--skill-only" in opts, "--all" in opts
+    detected = _detect_agents()
+    if not detected:
+        sys.exit("no known AI agents detected (looked for Claude Code, Cursor, Windsurf, Gemini CLI, Claude Desktop, Codex).")
+    det_ids = [d["id"] for d in detected]
+    if ids:
+        miss = [i for i in ids if i not in det_ids]
+        if miss: print("not detected (skipped): " + ", ".join(miss))
+        chosen = [d for d in detected if d["id"] in ids]
+    elif want_all:
+        chosen = detected
+    elif not sys.stdin.isatty():
+        sys.exit("non-interactive: pass agent ids or --all. detected: " + ", ".join(det_ids))
+    else:
+        print("Detected agents:")
+        for i, d in enumerate(detected, 1):
+            print(f"  {i}) {_c(d['name'], '1')}  [{d['id']}]" + ("  (+skill)" if d.get("skill") else ""))
+        sel = input("Set up which? (numbers comma-sep, 'a'=all, blank=cancel): ").strip().lower()
+        if not sel: print("cancelled."); return
+        if sel == "a": chosen = detected
+        else:
+            idx = {int(p) - 1 for p in re.split(r"[\s,]+", sel) if p.isdigit() and 1 <= int(p) <= len(detected)}
+            chosen = [detected[i] for i in sorted(idx)]
+    if not chosen: print("nothing selected."); return
+    keytext = key_from_master(getpass.getpass("Master password: ")) if not skill_only else "x"
+    if not keytext: sys.exit("wrong password.")
+    for d in chosen:
+        try:
+            if not skill_only:
+                tok = mint_token(keytext, d["id"], "agent", ttl=None)   # same label → replaces old token
+                where = d["install"](tok)
+                audit("agent_mcp_install", key=d["id"], source="cli")
+                print(f"  {_c('✓', '32')} {d['name']}: MCP configured → {where}")
+            if d.get("skill") and not mcp_only:
+                print(f"  {_c('✓', '32')} {d['name']}: skill installed → {_install_skill()}")
+            elif skill_only:
+                print(f"  {_c('–', '90')} {d['name']}: no skill support (skipped)")
+        except Exception as e:
+            print(f"  {_c('✗', '31')} {d['name']}: {scrub(str(e))}")
+    print("\nRestart the agent(s) to load the MCP server. Revoke a token anytime: concealer agent revoke <id>")
 
 def agent_cmd(a):
     """Agent tokens: register/list/revoke. An agent registers once, never asked for a password again."""
     sub = a[0] if a else "list"
+    if sub == "install":
+        return agent_install(a[1:])
     if sub == "register":
         if len(a) < 2: sys.exit("usage: concealer agent register <name>")
         keytext = key_from_master(getpass.getpass("Master password: "))
@@ -1613,6 +1774,16 @@ def harden():
     print(f"  export CONCEALER_TOKEN={tok}   (~{TOKEN_TTL // 3600}h; agent: concealer agent register <name>)")
 
 # ---------------- injection ----------------
+def env_key(name, field=None):
+    """Sanitize a secret (+optional field) name into a valid POSIX env identifier.
+    Upper-case; any char outside [A-Z0-9_] -> _; a leading digit gets a _ prefix.
+    Without this, a name like 'grafana-rpifx' emits 'grafana-rpifx_PASSWORD', which
+    is not a valid shell identifier and cannot be referenced by the child (see §3)."""
+    raw = name if field is None else f"{name}_{field}"
+    s = re.sub(r"[^A-Za-z0-9_]", "_", raw).upper()
+    if s and s[0].isdigit(): s = "_" + s
+    return s or "_"
+
 def collect_secrets(target, d=None, names=None):
     """Collect secrets matching the target scopes as {ENV_KEY: value} (most specific wins).
     names: if given (set/list of secret names), inject ONLY those — least-privilege, so a
@@ -1630,11 +1801,17 @@ def collect_secrets(target, d=None, names=None):
         if not ok: continue
         if e["name"] not in chosen or spec > chosen[e["name"]][0]:
             chosen[e["name"]] = (spec, e)
-    kv = {}
+    kv = {}; srcmap = {}   # env_key -> source label, to catch two secrets colliding onto one identifier
     for name, (sp, e) in chosen.items():
-        if e["type"] == "api_key": kv[name] = str(e["fields"].get("value", ""))
+        base = e.get("env_alias") or name   # owner may pin a stable identifier base
+        if e["type"] == "api_key":
+            pairs = [(env_key(base), str(e["fields"].get("value", "")), name)]
         else:
-            for fn, fv in e["fields"].items(): kv[f"{name}_{fn.upper()}"] = str(fv)
+            pairs = [(env_key(base, fn), str(fv), f"{name}.{fn}") for fn, fv in e["fields"].items()]
+        for k, v, src in pairs:
+            if k in kv and srcmap[k] != src:
+                raise ValueError(f"env-name collision: '{srcmap[k]}' and '{src}' both map to {k}; set an env_alias to disambiguate")
+            kv[k] = v; srcmap[k] = src
     return kv, d, [e for sp, e in chosen.values()]
 
 def inject_env(target, source="cli", actor=None, command=None, gate=None, names=None):
@@ -1649,6 +1826,7 @@ def inject_env(target, source="cli", actor=None, command=None, gate=None, names=
             return None, d, note
     env = dict(os.environ); env.update(kv)
     if kv:
+        env["CONCEALER_INJECTED"] = ",".join(sorted(kv))   # names only (identifiers), never values — lets the child discover what was injected
         det = label(target)
         if command is not None: det = redact(f"{det} ↦ {command}", d)   # command goes to audit; the secret value doesn't leak
         audit("inject", key=",".join(sorted(kv)), source=source, detail=det, actor=actor)
@@ -1664,10 +1842,11 @@ def deploy_render(scope, target):
 
 def deploy_render_one(e, target):
     """Render a single secret for the selected deploy target (row-level Deploy)."""
+    base = e.get("env_alias") or e["name"]
     if e["type"] == "api_key":
-        kv = {e["name"]: str(e["fields"].get("value", ""))}
+        kv = {env_key(base): str(e["fields"].get("value", ""))}
     else:
-        kv = {f'{e["name"]}_{fn.upper()}': str(fv) for fn, fv in e["fields"].items()}
+        kv = {env_key(base, fn): str(fv) for fn, fv in e["fields"].items()}
     stem = "-".join(e.get(x) for x in DIMS if e.get(x)) or e["name"]
     return _render_target(kv, stem, target)
 
@@ -1729,7 +1908,15 @@ def tui():
     if ascii_env in ("1", "true", "yes"): _TUI_UTF8 = False
     elif ascii_env in ("0", "false", "no"): _TUI_UTF8 = True
     else: _TUI_UTF8 = utf8_locale and os.environ.get("TERM_PROGRAM") != "vscode"
-    d = load()                       # TTY unlock (master pw prompt) happens here, before curses grabs the screen
+    # The TUI reveals secrets, so it ALWAYS requires the master password — it ignores any
+    # CONCEALER_TOKEN in the environment (parity with the web UI, which unlocks per session).
+    # Without this a shell holding an unlock token would open the TUI with no prompt.
+    global _KEY_CACHE
+    if os.path.exists(BACKUP):        # hardened vault: force a fresh master-pw unlock, bypassing the token
+        if not sys.stdin.isatty(): sys.exit("locked: the TUI needs a terminal to read the master password.")
+        _KEY_CACHE = key_from_master(getpass.getpass("Master password (unlock): "))
+        if not _KEY_CACHE: sys.exit("wrong password.")
+    d = load()                       # key resolved above (hardened) or read from the legacy plaintext file
     try:
         curses.wrapper(_tui_main, d)
     finally:
@@ -2518,6 +2705,7 @@ def _mkhelp():
         R("passwd", "change the master password (requires a recovery code)"),
         R("recover", "access the vault with a recovery code (forgotten password)"),
         R("recovery", "regenerate the recovery-code set"),
+        R("agent install [--all|--mcp-only|--skill-only] [ids]", "auto-detect agents, wire up MCP + skill"),
         R("agent register|list|revoke <name>", "long-lived, revocable token for agents"),
         "",
         "SECRETS",
@@ -2551,6 +2739,7 @@ def _mkhelp():
         R("config [key [val]]", "runtime settings (idle, confirm_ops)"),
         R("tui", "interactive terminal UI (arrow keys, search, add/del/reveal)"),
         R("web [port]", "serve the web UI + JSON API (default 8787)"),
+        R("lan [lan_port [web_port]]", "reach the web UI from a phone on the same LAN (default 8788->8787)"),
         R("mcp", "MCP stdio server (for agents; needs CONCEALER_TOKEN)"),
         R("chrome-extension", "register the Chrome extension's native host (one-time OS setup)"),
         R("version [--check] | help", "version (--check: look for a newer release) / this help"),
@@ -2569,6 +2758,7 @@ def _mkhelp():
         "  cer deploy --target dotenv --project web --env prod > .env",
         "  cer tui                                       # browse/search secrets in the terminal",
         "  cer web 8787                                  # http://localhost:8787 (unlock with master pw)",
+        "  cer lan                                       # phone -> http://<host>.local:8788 (same LAN only)",
         "  cer agent register my-agent                   # prints CONCEALER_TOKEN=…",
         "  CONCEALER_TOKEN=… cer mcp",
         "",
@@ -3092,10 +3282,99 @@ def cli(argv):
         audit("deploy", source="cli", detail=f"{target} {label(scope)}")
         print(out or "(no match)")
     elif cmd == "web": _chrome_selfheal(); serve_web(int(a[0]) if a else 8787)
+    elif cmd == "lan": serve_lan(int(a[0]) if a else 8788, int(a[1]) if len(a) > 1 else 8787)
     elif cmd == "mcp": mcp_stdio()
     elif cmd in ("chrome-extension", "chrome-ext"): install_chrome_extension(a)
     else:
         print(HELP)
+
+# ---------------- LAN bridge (phone access over the local network) ----------------
+# `serve_web` binds 127.0.0.1 only and refuses non-loopback Host/Origin (anti-DNS-
+# rebinding, see H._guard). That keeps a browser on THIS machine safe but blocks a
+# phone. `serve_lan` puts a thin reverse proxy on the LAN: it accepts only clients
+# on a private/link-local address, rewrites Host/Origin back to loopback, and forwards
+# to a local web instance. The master password stays the only gate; no vault state or
+# key lives in this process — it just relays bytes to the web server that holds them.
+_LAN_HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
+            "te", "trailers", "transfer-encoding", "upgrade", "host", "origin"}
+
+def _lan_is_private(ip):
+    """True only for private/loopback/link-local peers — the 'same LAN only' gate."""
+    import ipaddress
+    try: a = ipaddress.ip_address(ip)
+    except ValueError: return False
+    return a.is_private or a.is_loopback or a.is_link_local
+
+def _lan_backend_cmd():
+    """Path to the web-serving instance to run as backend. Prefer an installed
+    `concealer`/`cer` on PATH that ISN'T this checkout, so the LAN bridge opens the
+    user's real (globally configured) vault rather than a repo-local one; fall back
+    to this script only if no separate install is found."""
+    real = os.path.realpath(__file__)
+    for name in ("concealer", "cer"):
+        p = shutil.which(name)
+        try:
+            if p and os.path.realpath(p) != real: return [p]
+        except OSError: pass
+    return [sys.executable, _stable_self()]
+
+def serve_lan(lan_port, web_port):
+    import socket, urllib.error
+    backend = f"127.0.0.1:{web_port}"
+
+    def _up():
+        s = socket.socket(); s.settimeout(0.3)
+        try: s.connect(("127.0.0.1", web_port)); return True
+        except OSError: return False
+        finally: s.close()
+
+    # Start the backend web instance if nothing is already serving on the loopback port.
+    if not _up():
+        cmd = _lan_backend_cmd() + ["web", str(web_port)]
+        kw = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+        if os.name == "nt": kw["creationflags"] = 0x00000008 | 0x00000200
+        else: kw["start_new_session"] = True
+        subprocess.Popen(cmd, **kw)
+        for _ in range(40):                       # wait up to ~6s for it to bind
+            if _up(): break
+            time.sleep(0.15)
+        if not _up():
+            sys.exit(scrub("could not start the web instance to bridge — run `concealer web` first"))
+
+    class LanProxy(http.server.BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+        def _relay(self):
+            if not _lan_is_private(self.client_address[0]):
+                self.send_response(403); self.send_header("Content-Length", "0"); self.end_headers(); return
+            n = int(self.headers.get("Content-Length") or 0)
+            body = self.rfile.read(n) if n else None
+            hdrs = {k: v for k, v in self.headers.items() if k.lower() not in _LAN_HOP}
+            hdrs["Host"] = backend                          # satisfy the backend's loopback Host guard
+            if self.headers.get("Origin"): hdrs["Origin"] = f"http://{backend}"
+            req = urllib.request.Request(f"http://{backend}{self.path}", data=body,
+                                         headers=hdrs, method=self.command)
+            try:
+                with urllib.request.urlopen(req, timeout=30) as r: self._send(r.status, r.headers, r.read())
+            except urllib.error.HTTPError as e:              # pass 4xx/5xx (e.g. wrong password) through verbatim
+                self._send(e.code, e.headers, e.read())
+            except Exception:
+                self.send_response(502); self.send_header("Content-Length", "0"); self.end_headers()
+        def _send(self, code, hdrs, payload):
+            self.send_response(code)
+            for k, v in hdrs.items():
+                if k.lower() in _LAN_HOP or k.lower() == "content-length": continue
+                self.send_header(k, v)
+            self.send_header("Content-Length", str(len(payload))); self.end_headers()
+            try: self.wfile.write(payload)
+            except (BrokenPipeError, ConnectionResetError): pass
+        do_GET = do_POST = do_PUT = do_DELETE = do_PATCH = do_HEAD = _relay
+        def log_message(self, *a): pass
+
+    host = socket.gethostname().split(".")[0]
+    srv = http.server.ThreadingHTTPServer(("0.0.0.0", lan_port), LanProxy)
+    print(f"concealer lan: http://{host}.local:{lan_port}  (same LAN only, unlock with master pw, Ctrl+C to stop)")
+    try: srv.serve_forever()
+    except KeyboardInterrupt: pass
 
 # ---------------- Web (SPA + JSON API) ----------------
 _SESSIONS = {}   # token -> last_activity_epoch
@@ -3129,7 +3408,95 @@ def _lock_clear(tok=None):
     if tok is not None:
         _SESSIONS.pop(tok, None); _SESS_KEY.pop(tok, None)
     _KEY_CACHE = None
+    if not _SESSIONS:                 # last session gone: drop pending autofill jobs + task grants
+        _AF_JOBS.clear(); _AF_GRANTS.clear()
     gc.collect()
+
+# ---------------- Secure Agentic Autofill (fill-without-reveal) ----------------
+# An agent asks (over loopback) for a website/login secret to be typed into the page it is
+# on. A human approves in the web UI; the concealer extension injects the value into the
+# form. The value flows app -> extension -> DOM only — NEVER back to the agent/LLM. Job
+# state lives in the WEB-SERVER process (the MCP process talks to it over 127.0.0.1). All
+# memory-only, cleared on idle auto-lock like the session key.
+_AF_JOBS = {}      # job_id -> {id,agent,domain,secret_id,secret_name,username,status,created,result,exposed}
+_AF_GRANTS = {}    # "agent|domain|secret_id" -> {"exp":epoch,"max":int,"used":int} — "approve for this task"
+_AF_TTL = 120      # seconds a pending/approved job stays live before it expires
+AF_PORT = int(os.environ.get("CONCEALER_WEB_PORT", "8787"))   # loopback port the MCP tool reaches the web server on (extension default: 8787)
+
+def _af_host(url):
+    try: return (urllib.parse.urlparse(url if "://" in (url or "") else "//" + (url or ""), scheme="http").hostname or "").lower()
+    except Exception: return ""
+
+def registrable_domain(host):
+    """Naive eTLD+1: the last two dot-labels. ponytail: no Public Suffix List, so
+    multi-level TLDs (example.co.uk) collapse to 'co.uk'. Good enough here because the
+    content script re-verifies the exact origin before filling; upgrade to a PSL if
+    cross-subdomain phishing on odd TLDs becomes a concern."""
+    parts = [p for p in (host or "").split(".") if p]
+    return ".".join(parts[-2:]) if len(parts) >= 2 else host or ""
+
+def _af_pick_secret(d, target_url, name=None, sel=None):
+    """Find a website/login secret for this request. Returns (record|None, reason).
+    reason: 'ok' | 'nomatch' | 'mismatch:<registrable-domain-of-secret>'."""
+    dom = registrable_domain(_af_host(target_url))
+    cands = [e for e in filt(d, sel) if e["type"] in ("website", "login")]
+    if name:
+        e = next((x for x in cands if x["name"] == name), None)
+        if not e: return None, "nomatch"
+        sdom = registrable_domain(_af_host(e["fields"].get("web_url", "")))
+        if sdom and dom and sdom != dom: return None, f"mismatch:{sdom}"
+        return e, "ok"
+    # else match by domain
+    for e in cands:
+        sdom = registrable_domain(_af_host(e["fields"].get("web_url", "")))
+        if sdom and sdom == dom: return e, "ok"
+    return None, "nomatch"
+
+def _af_grant_k(agent, domain, sid): return f"{agent}|{domain}|{sid}"
+def af_grant_mint(agent, domain, sid, ttl=900, max_uses=10):
+    _AF_GRANTS[_af_grant_k(agent, domain, sid)] = {"exp": time.time() + ttl, "max": max_uses, "used": 0}
+def af_grant_ok(agent, domain, sid):
+    """True (and consumes one use) if a live task-grant covers this fill."""
+    g = _AF_GRANTS.get(_af_grant_k(agent, domain, sid))
+    if not g: return False
+    if time.time() > g["exp"] or g["used"] >= g["max"]:
+        _AF_GRANTS.pop(_af_grant_k(agent, domain, sid), None); return False
+    g["used"] += 1; return True
+
+def _af_expire():
+    """Lazily mark stale pending/approved jobs expired (called on every read)."""
+    now = time.time()
+    for j in _AF_JOBS.values():
+        if j["status"] in ("pending", "approved") and now - j["created"] > _AF_TTL:
+            j["status"] = "expired"
+
+def _af_local(method, path, tok, body=None):
+    """Call the running web server over loopback (used by the MCP process to reach the job queue)."""
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(f"http://127.0.0.1:{AF_PORT}{path}", data=data, method=method,
+        headers={"X-Concealer-Token": tok, "Content-Type": "application/json", "Host": f"127.0.0.1:{AF_PORT}"})
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        return json.loads(resp.read() or "{}")
+
+def _af_new_job(agent, target_url, name):
+    """Create a PENDING job from agent-supplied data only — NO vault access, so this works
+    while the vault is locked. Secret matching happens later in _af_resolve() once unlocked."""
+    jid = _secrets.token_urlsafe(9)
+    _AF_JOBS[jid] = {"id": jid, "agent": agent, "target_url": target_url,
+                     "domain": registrable_domain(_af_host(target_url)), "name": name or "",
+                     "status": "pending", "created": time.time(), "result": "", "exposed": False,
+                     "secret_id": "", "secret_name": "", "username": "", "match": ""}
+    return _AF_JOBS[jid]
+
+def _af_resolve(job, d):
+    """Match a pending job to a secret using the UNLOCKED vault data. Idempotent.
+    Sets secret_id/secret_name/username/match; returns match: 'ok'|'nomatch'|'mismatch:<dom>'."""
+    e, reason = _af_pick_secret(d, job["target_url"], job["name"] or None)
+    job["match"] = reason
+    job["secret_id"] = e["id"] if e else ""
+    job["secret_name"] = e["name"] if e else ""
+    job["username"] = e["fields"].get("username", "") if e else ""
+    return reason
 
 def serve_web(port):
     import time, threading
@@ -3182,6 +3549,11 @@ def serve_web(port):
                                or origin in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")):
                 self._json({"error": "forbidden origin"}, 403); return False
             return True
+        def _af_agent(self):
+            # Autofill request/status are reachable by a REGISTERED AGENT token (no human
+            # session) — the agent may only ASK; approval + value delivery stay session-gated.
+            e = _find_token(self._tok() or "")
+            return e["label"] if e and e.get("source") == "agent" else None
         def _tok(self):
             # Header first: the Chrome extension is a cross-origin client, so the SPA's
             # HttpOnly SameSite=Strict cookie never rides along on its fetches. It holds
@@ -3220,7 +3592,39 @@ def serve_web(port):
                 return self._json({"unlocked": up, "idle": CFG["idle"], "remaining": remaining(tok or ""), "version": VERSION})
             if path == "/api/types":
                 return self._json({t: [{"name": f, "secret": k == "secret"} for f, k in fs] for t, fs in TYPES.items()})
+            if path == "/api/autofill/status":     # agent polls its own job (status string only, never a value)
+                ag = self._af_agent()
+                if not ag: return self._json({"error": "agent token required"}, 403)
+                _af_expire(); j = _AF_JOBS.get(q.get("job", ""))
+                if not j or j["agent"] != ag: return self._json({"status": "expired"})
+                return self._json({"status": j["status"], "result": j["result"]})
+            if path == "/api/autofill/notify":     # LOCKED-SAFE: count + opaque ids only, NO vault data.
+                # Lets the extension badge + notify even while locked. With ?wait=<ids> it long-polls
+                # (hangs up to ~25s until the pending-id set changes), so the badge updates near-instantly
+                # and the MV3 worker stays awake — instead of a ~30s alarm clamp. Threaded server, so a
+                # hanging GET only occupies its own handler thread.
+                def _pend_ids(): _af_expire(); return sorted(j["id"] for j in _AF_JOBS.values() if j["status"] == "pending")
+                if q.get("poll"):   # explicit flag: 'wait' alone is dropped by parse_qs when empty
+                    seen = set(x for x in q.get("wait", "").split(",") if x); end = time.time() + 25
+                    while time.time() < end:
+                        ids = _pend_ids()
+                        if set(ids) != seen: return self._json({"count": len(ids), "ids": ids})
+                        time.sleep(0.5)
+                ids = _pend_ids()
+                return self._json({"count": len(ids), "ids": ids})
             if not valid(self._tok() or ""): return self._json({"error": "locked"}, 401)
+            if path == "/api/autofill/pending":    # approval UI (session): resolve each pending job now that we're unlocked
+                _af_expire(); d = load(); out = []
+                for j in _AF_JOBS.values():
+                    if j["status"] != "pending": continue
+                    _af_resolve(j, d)
+                    out.append({"id": j["id"], "agent": j["agent"], "domain": j["domain"],
+                                "secret_name": j["secret_name"], "username": j["username"], "match": j["match"]})
+                return self._json(out)
+            if path == "/api/autofill/jobs":       # extension SW polls approved jobs (no values here)
+                _af_expire()
+                return self._json([{"id": j["id"], "domain": j["domain"], "secret_name": j["secret_name"]}
+                                   for j in _AF_JOBS.values() if j["status"] == "approved"])
             if path == "/api/secrets":
                 d = load(); sel = {dim: q[dim] for dim in DIMS if q.get(dim)}
                 rows = filt(d, sel, q.get("tag"), q.get("q"), q.get("type"), q.get("collection"))
@@ -3333,7 +3737,68 @@ def serve_web(port):
                 if tok:
                     _lock_clear(tok); audit("lock", source="web")
                 return self._json({"ok": True})
+            if path == "/api/autofill/request":    # AGENT-authed: the agent may only ASK for a fill
+                ag = self._af_agent()
+                if not ag: return self._json({"error": "agent token required"}, 403)
+                b = self._body(); target = b.get("target_url", "")
+                j = _af_new_job(ag, target, b.get("name")); dom = j["domain"]
+                # If the vault is already unlocked, resolve now so the agent gets fast nomatch/
+                # mismatch feedback and a live task-grant can auto-approve. If LOCKED, the job
+                # stays pending and the extension still alerts (locked-safe /notify) — the user
+                # unlocks to review. The request itself never needs the vault to be open.
+                if _SESSIONS:
+                    try: reason = _af_resolve(j, load())
+                    except Exception: reason = ""
+                    if reason == "nomatch":
+                        j["status"] = "denied"
+                        audit("web_autofill_request", key=b.get("name", "") or dom, source="mcp", detail=f"{dom} nomatch", actor=ag)
+                        return self._json({"status": "no matching secret"})
+                    if reason.startswith("mismatch:"):
+                        j["status"] = "denied"
+                        audit("web_autofill_deny", key=b.get("name", ""), source="mcp", detail=f"domain mismatch {dom}!={reason[9:]}", actor=ag)
+                        return self._json({"status": f"domain mismatch: secret is for {reason[9:]}"})
+                    if af_grant_ok(ag, dom, j["secret_id"]):
+                        j["status"] = "approved"   # a live task-grant covers it — no re-prompt
+                        audit("web_autofill_request", key=j["secret_name"], source="mcp", detail=f"{dom} auto-granted", actor=ag)
+                        return self._json({"job": j["id"], "status": "approved"})
+                audit("web_autofill_request", key=j["name"] or dom, source="mcp", detail=dom, actor=ag)
+                return self._json({"job": j["id"], "status": "pending"})
             if not valid(tok or ""): return self._json({"error": "locked"}, 401)
+            if path == "/api/autofill/approve":    # human approves a pending fill (web UI or extension popup)
+                b = self._body(); j = _AF_JOBS.get(b.get("job", ""))
+                if not j or j["status"] != "pending": return self._json({"error": "gone"}, 404)
+                reason = _af_resolve(j, load())    # (re)match now; anti-phishing enforced at approval time
+                if reason != "ok":
+                    j["status"] = "denied"
+                    audit("web_autofill_deny", key=j["secret_name"] or j["name"], source="web", detail=f'{j["domain"]} {reason}')
+                    return self._json({"error": "no matching secret" if reason == "nomatch" else "domain mismatch", "reason": reason}, 409)
+                j["status"] = "approved"
+                task = b.get("scope") == "task"
+                if task: af_grant_mint(j["agent"], j["domain"], j["secret_id"])
+                audit("web_autofill_approve", key=j["secret_name"], source="web", detail=j["domain"] + (" task" if task else ""))
+                return self._json({"ok": True})
+            if path == "/api/autofill/deny":
+                b = self._body(); j = _AF_JOBS.get(b.get("job", ""))
+                if not j: return self._json({"error": "gone"}, 404)
+                j["status"] = "denied"
+                audit("web_autofill_deny", key=j["secret_name"] or j["name"] or j["domain"], source="web", detail=j["domain"])
+                return self._json({"ok": True})
+            if path == "/api/autofill/claim":      # extension SW claims an approved job -> VALUE DELIVERY (session holds the key)
+                b = self._body(); j = _AF_JOBS.get(b.get("job", ""))
+                if not j or j["status"] != "approved": return self._json({"error": "gone"}, 404)
+                d = load(); e = by_id(d, j["secret_id"])
+                if not e: j["status"] = "expired"; return self._json({"error": "gone"}, 404)
+                j["status"] = "filling"
+                return self._json({"domain": j["domain"], "username": e["fields"].get("username", ""),
+                                   "password": e["fields"].get("password", "")})
+            if path == "/api/autofill/result":     # extension reports the fill outcome + post-fill exposure scan
+                b = self._body(); j = _AF_JOBS.get(b.get("job", ""))
+                if not j: return self._json({"error": "gone"}, 404)
+                j["exposed"] = bool(b.get("exposed")); j["result"] = str(b.get("detail", ""))[:200]
+                j["status"] = "done" if b.get("ok") else "failed"
+                audit("web_autofill_fill", key=j["secret_name"], source="web", detail=f'{j["domain"]} {"ok" if b.get("ok") else "fail"}')
+                if j["exposed"]: audit("web_autofill_exposed", key=j["secret_name"], source="web", detail=j["domain"])
+                return self._json({"ok": True})
             if path == "/api/secrets":     # create
                 b = self._body(); d = load(); e = norm(_entry_from_body(b))
                 secs(d).append(e); save(d)
@@ -3562,7 +4027,7 @@ MCP_TOOLS = [
         "collection": {"type": "string", "description": "narrow by collection path (sub-paths included)"}}}},
     {"name": "search_secrets", "description": "Search across name/scope/tag/url/notes (no values returned).",
      "inputSchema": {"type": "object", "properties": {"term": {"type": "string"}}, "required": ["term"]}},
-    {"name": "run_with_secrets", "description": "Run a command with scope-matching secrets injected into env. No values leak; output is masked. Pass 'names' to inject ONLY the secrets you need (least-privilege) instead of the whole scope.",
+    {"name": "run_with_secrets", "description": "Run a command with scope-matching secrets injected into env. No values leak; output is masked. Pass 'names' to inject ONLY the secrets you need (least-privilege) instead of the whole scope. All types are injected, including website/login (as NAME_USERNAME, NAME_PASSWORD, NAME_WEB_URL, ...). Env names are sanitized to valid identifiers (upper-case; non-[A-Z0-9_] -> _; e.g. 'grafana-rpifx' password -> GRAFANA_RPIFX_PASSWORD); the exact injected identifiers are listed on an 'injected:' line and in the child's CONCEALER_INJECTED env var.",
      "inputSchema": {"type": "object", "properties": {"command": {"type": "string"},
         "names": {"type": "array", "items": {"type": "string"}, "description": "restrict injection to these secret names (default: all matching the scope)"},
         **_DIMPROPS}, "required": ["command"]}},
@@ -3574,7 +4039,13 @@ MCP_TOOLS = [
         "tags": {"type": "array", "items": {"type": "string"}}, "url": {"type": "string"},
         "notes": {"type": "string"}, "actor": {"type": "string", "description": "identity of the acting agent"},
         "collection": {"type": "string", "description": "free-form grouping path (optional)"},
+        "env_alias": {"type": "string", "description": "pin a stable env-injection identifier base (e.g. 'GRAFANA'); '' derives from name"},
         **_DIMPROPS}, "required": ["name"]}},
+    {"name": "request_web_login", "description": "Ask concealer to autofill a website/login secret into the browser tab you are on, WITHOUT exposing the value. A human approves in the concealer app; the concealer extension injects the credentials into the page's login form. Returns ONLY a status string — never the password. Requires the concealer app running (unlocked) and its browser extension.",
+     "inputSchema": {"type": "object", "properties": {
+        "target_url": {"type": "string", "description": "URL/origin of the login page you are on"},
+        "name": {"type": "string", "description": "optional exact secret name; else concealer matches by domain"},
+        **_DIMPROPS}, "required": ["target_url"]}},
 ]
 def _fmt(rows): return "\n".join(f"{e['name']:22} {e['type']:9} {label(e):22} [{','.join(e['tags'])}]" for e in rows) or "(empty)"
 def _mcp_call(name, args):
@@ -3600,7 +4071,30 @@ def _mcp_call(name, args):
         env, d, note = inject_env(target, source="mcp", actor=agent, command=args["command"], gate=agent, names=args.get("names"))
         if env is None: return "error: injection blocked — rate limit reached." + (note or "")
         r = subprocess.run(["/bin/sh", "-c", args["command"]], env=env, capture_output=True, text=True)
-        return redact(f"[{label(target)}]\n" + r.stdout + r.stderr, d) or "(no output)"
+        head = f"[{label(target)}]"
+        if env.get("CONCEALER_INJECTED"): head += f"\ninjected: {env['CONCEALER_INJECTED']}"   # identifier names only
+        return redact(head + "\n" + r.stdout + r.stderr, d) or "(no output)"
+    if name == "request_web_login":
+        target = args.get("target_url", ""); tok = os.environ.get("CONCEALER_TOKEN", "")
+        body = {"target_url": target, "name": args.get("name", "")}
+        for dim in DIMS:
+            if args.get(dim): body[dim] = args[dim]
+        try: r0 = _af_local("POST", "/api/autofill/request", tok, body)
+        except Exception:
+            return f"pending: the concealer app isn't reachable on 127.0.0.1:{AF_PORT} — open concealer and unlock, then retry"
+        if "job" not in r0:   # immediate terminal: locked / no match / domain mismatch / rate limited
+            st = r0.get("status", "error")
+            return "pending: concealer is locked — unlock it in the app, then retry" if st == "locked" else st
+        jid = r0["job"]; dom = registrable_domain(_af_host(target)); deadline = time.time() + 90
+        while time.time() < deadline:
+            time.sleep(1.0)
+            try: s = _af_local("GET", f"/api/autofill/status?job={jid}", tok).get("status")
+            except Exception: s = None
+            if s in ("done", "denied", "failed", "expired"):
+                audit("web_autofill_result", key=args.get("name", "") or dom, source="mcp", detail=s, actor=agent)
+                return {"done": f"filled: {args.get('name') or dom}", "denied": "denied by user",
+                        "failed": "fill failed on the page", "expired": "expired: no approval or no extension on this tab"}[s]
+        return "pending: waiting for approval or for the concealer extension on this tab"
     if name == "set_secret":
         actor = args.get("actor") or agent or os.environ.get("CONCEALER_ACTOR", "")
         d = load(); ident = {dim: args.get(dim, "") for dim in DIMS}; ident["name"] = args["name"]
@@ -3615,12 +4109,14 @@ def _mcp_call(name, args):
             if "url" in args: hit["url"] = args["url"]
             if "notes" in args: hit["notes"] = args["notes"]
             if "collection" in args: hit["collection"] = (args["collection"] or "").strip().strip("/")
+            if "env_alias" in args: hit["env_alias"] = (args["env_alias"] or "").strip()
             act = "update"
         else:
             e = dict(ident); e["type"] = args.get("type", "api_key"); e["fields"] = fields
             e["tags"] = [t for t in (args.get("tags") or []) if t]
             e["url"] = args.get("url", ""); e["notes"] = args.get("notes", "")
             e["collection"] = (args.get("collection") or "").strip().strip("/")
+            e["env_alias"] = (args.get("env_alias") or "").strip()
             secs(d).append(norm(e)); act = "create"
         save(d); audit(act, key=args["name"], source="mcp", detail=label(ident), actor=actor)
         return f"{act}: {args['name']} @ {label(ident)}"

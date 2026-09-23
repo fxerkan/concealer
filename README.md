@@ -259,7 +259,18 @@ The native host is **built into concealer** (`concealer native-host`) — no sep
 ### MCP (AI agents) — `concealer mcp` - `cer mcp`
 Register once, available in every session. On a hardened (key‑at‑rest) vault the
 MCP server unlocks with a token, so **give it an agent token instead of your
-password** — it never prompts and you can revoke it anytime:
+password** — it never prompts and you can revoke it anytime.
+
+**One‑shot setup (recommended):** `concealer agent install` auto‑detects the AI agents
+on your machine (Claude Code, Cursor, Windsurf, Gemini CLI, Claude Desktop, Codex), lets
+you pick which to wire up, then registers a per‑agent token, writes the MCP config, and
+installs the concealer skill where supported. Config merges are non‑destructive:
+```bash
+concealer agent install            # interactive: pick from detected agents
+concealer agent install --all      # set up every detected agent
+```
+
+Or do it manually for a single agent:
 ```bash
 concealer agent register claude                 # prints a CONCEALER_TOKEN for this agent
 claude mcp add --scope user concealer \

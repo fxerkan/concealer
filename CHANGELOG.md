@@ -6,6 +6,76 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.27] — 2026-09-23
+
+### Added
+- **`concealer agent install [--all|--mcp-only|--skill-only] [ids]`** — auto-detects the
+  AI agents installed on this machine (Claude Code, Cursor, Windsurf, Gemini CLI, Claude
+  Desktop, Codex), lets you pick which to set up interactively (or by id / `--all`), then
+  wires concealer's MCP server into each one's config with a fresh per-agent token and
+  installs the concealer skill where supported (Claude Code). Replaces the manual
+  `agent register` + `claude mcp add` two-step. Config merges are non-destructive (existing
+  MCP servers preserved) and idempotent. Tokens stay client-side; revoke with
+  `concealer agent revoke <id>`.
+
+## [0.9.26] — 2026-09-21
+
+### Added
+- **`concealer lan [lan_port [web_port]]`** — reach the web UI from a phone (or any
+  device) on the **same local network**. `web` binds loopback only and rejects
+  non-loopback Host/Origin (anti-DNS-rebinding), so it is unreachable from a phone by
+  design. `lan` runs a thin reverse proxy that accepts **only private/loopback/link-local
+  clients**, rewrites Host/Origin back to loopback, and forwards to a local `web`
+  instance (auto-started if not already running, using the installed vault). The master
+  password stays the only gate; the proxy holds no vault state or key. Phone URL is
+  `http://<host>.local:<lan_port>` (default 8788 → web 8787) — resolvable over Bonjour/mDNS
+  with no extra DNS setup. Intended for a trusted LAN (plain HTTP).
+
+## [0.9.25] — 2026-09-15
+
+### Changed
+- **Default CLI unlock-token lifetime is now 1h** (was 8h), overridable with
+  `CONCEALER_TOKEN_TTL` (seconds). Shorter default = smaller window if a shell holding the
+  token is exposed. `unlock` now also exports `CONCEALER_TOKEN_EXP` (expiry epoch) so a
+  shell hook can auto-`unset` the token string once the server-side TTL lapses (the token is
+  already rejected after expiry — a child process cannot unset a var in its parent shell).
+
+### Security
+- **The TUI now always requires the master password.** It previously honored a
+  `CONCEALER_TOKEN` in the environment and would open — and reveal secrets — with no
+  prompt, so any shell holding an unlock token could browse the vault. The TUI now ignores
+  the token and unlocks from the master password on the terminal, matching the web UI's
+  per-session unlock. (Token-driven `get`/`list`/MCP are unchanged.)
+
+### Fixed
+- **`run_with_secrets` / `run` now inject *usable* env vars for secrets whose name isn't a
+  valid shell identifier.** A secret named `grafana-rpifx` previously emitted
+  `grafana-rpifx_PASSWORD` — not referenceable by the child (`$grafana-rpifx_PASSWORD`
+  doesn't parse, `compgen -e` won't list it), so `website`/`login` and other hyphenated
+  secrets looked "not injected". Names are now sanitized to valid identifiers
+  (`grafana-rpifx` → `GRAFANA_RPIFX_PASSWORD`). Colliding names fail loudly instead of
+  silently clobbering.
+
+### Added
+- **`CONCEALER_INJECTED`** — injected into the child env as a comma-separated list of the
+  injected identifier names (names only, never values), and shown on an `injected:` line
+  in the `run_with_secrets` MCP result, so a script/agent can discover what was injected
+  without guessing.
+- **`env_alias`** on a record — pin a stable env-injection base (e.g. `grafana-rpifx` →
+  `GRAFANA`) for scripts that reference fixed variable names. Settable via `set_secret`.
+- **Secure Agentic Autofill (fill-without-reveal).** A new MCP tool `request_web_login`
+  lets a browser-driving agent sign in to a site with a stored `website`/`login` secret
+  **without the value ever entering the agent/LLM context**. The agent only asks; a human
+  approves in the concealer web UI (approve once / for this task / deny, with an
+  anti-phishing domain match); the concealer browser extension injects the credentials
+  into the page's login form and the value flows app → extension → DOM only. Every step is
+  audited (`web_autofill_request/approve/deny/fill/exposed`) and the agent receives only a
+  status string. The extension gains a background service worker + content script (form
+  detection, native-setter fill with `input`/`change` events, and a post-fill DOM exposure
+  scan). Loopback endpoints `/api/autofill/{request,pending,jobs,approve,deny,claim,result,status}`
+  carry the handshake; the MCP process reaches the web server on `CONCEALER_WEB_PORT`
+  (default `8787`).
+
 ## [0.9.24] — 2026-09-09
 
 ### Fixed
