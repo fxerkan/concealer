@@ -30,9 +30,8 @@ jobs:
     defaults: { run: { working-directory: mobile } }
     steps:
       - uses: actions/checkout@v4
-      # monotonic build number so re-runs never collide with an existing upload
-      # (Actions expressions have no arithmetic, so compute it in the shell)
-      - run: echo "ANDROID_VERSION_CODE=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      # epoch-second versionCode: always increasing, never collides with prior uploads
+      - run: echo "ANDROID_VERSION_CODE=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "17" }
       - name: Ensure Android SDK 35 (preinstalled cmdline-tools)
@@ -83,7 +82,7 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - run: echo "IOS_BUILD_NUMBER=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      - run: echo "IOS_BUILD_NUMBER=$(date +%s)" >> "$GITHUB_ENV"
       - uses: maxim-lobanov/setup-xcode@v1
         with: { xcode-version: latest-stable }
       - run: xcodebuild -version && xcrun --sdk iphoneos --show-sdk-version

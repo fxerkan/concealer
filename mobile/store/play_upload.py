@@ -31,19 +31,13 @@ b = svc.edits().bundles().upload(
     media_mime_type="application/octet-stream").execute()
 vc = b["versionCode"]
 print("uploaded versionCode", vc)
-# A Draft app only accepts draft releases; a live app accepts completed. Try the
-# stronger status first and fall back so the same script works in both states.
-from googleapiclient.errors import HttpError
-for status in (os.environ.get("PLAY_RELEASE_STATUS", "completed"), "draft"):
-    try:
-        svc.edits().tracks().update(
-            packageName=PKG, editId=edit, track=track,
-            body={"releases": [{"name": os.environ.get("ANDROID_VERSION_NAME", "1.0"),
-                                "versionCodes": [vc], "status": status}]}).execute()
-        svc.edits().commit(packageName=PKG, editId=edit).execute()
-        print(f"committed to '{track}' as {status}")
-        break
-    except HttpError as e:
-        if status == "draft" or b'draft' not in e.content:
-            raise
-        print("  app is in Draft; retrying as draft release")
+# While the app is still in Draft, Play only accepts 'draft' releases (a 'completed'
+# release is rejected — sometimes with a misleading "Target SDK too low" message).
+# Set PLAY_RELEASE_STATUS=completed once the app is published to actually roll out.
+status = os.environ.get("PLAY_RELEASE_STATUS", "draft")
+svc.edits().tracks().update(
+    packageName=PKG, editId=edit, track=track,
+    body={"releases": [{"name": os.environ.get("ANDROID_VERSION_NAME", "1.0"),
+                        "versionCodes": [vc], "status": status}]}).execute()
+svc.edits().commit(packageName=PKG, editId=edit).execute()
+print(f"committed to '{track}' as {status}")
