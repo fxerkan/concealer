@@ -1,7 +1,13 @@
 # concealer — publishing runbook
 
 App id: **com.fxerkan.concealer** · Apple Team **96RZX28T7X** · support **concealer@fxerkan.com**
-Version 0.9.28 (Android versionCode 1).
+Store release **1.0** (iOS build 1 / Android versionCode 1). App Store Connect app id `6816103801`
+("Concealer AI Secret Manager" — the plain name was taken).
+
+## Credentials (reuse the zikirci/Dhikrer store toolchain — in the vault, `*/zikirci/prod`)
+- **APPLE_ASC_API_KEY** — App Store Connect API key (`_ISSUER_ID` / `_KEY_ID` / `_P8_PRIVATE_KEY`) for `-allowProvisioningUpdates` + `altool` upload.
+- **APPLE_DIST_CERT** / **APPLE_DIST_P12_PASSWORD** — distribution identity (note: the stored `_CERT_PEM` is 1 byte short and won't rebuild a p12; the login-keychain identity works, so upload via **Xcode Organizer**, which signs interactively).
+- **GOOGLE_PLAY_SERVICE_ACCOUNT** (`_JSON_KEY`) — Play Android Publisher API. Upload script: `mobile/store/play_upload.py` (needs `google-auth`+`google-api-python-client`, already installed). Works only once the app exists in the *same* Play account and the service-account email has app access.
 
 ## Artifacts (built by this repo)
 - **Android AAB (signed, upload-ready):** `mobile/android/app/build/outputs/bundle/release/app-release.aab`
