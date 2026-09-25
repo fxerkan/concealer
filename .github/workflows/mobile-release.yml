@@ -1,0 +1,124 @@
+name: Mobile Release
+
+# Build, sign and upload the mobile app to the stores.
+# Trigger manually (Actions → Mobile Release → Run) or by pushing a `mobile-v*` tag.
+# Reuses the same scripts as local publishing: mobile/store/{play_upload.py,
+# ios_resign_upload.sh,asc_metadata.py}. Secrets are documented in mobile/store/CI_SECRETS.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      android_track:
+        description: "Play track"
+        type: choice
+        default: internal
+        options: [internal, alpha, beta, production]
+      push_ios_listing:
+        description: "Push App Store text + screenshots"
+        type: boolean
+        default: false
+  push:
+    tags: ["mobile-v*"]
+
+concurrency:
+  group: mobile-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # monotonic build numbers so re-runs never collide with an existing upload
+  ANDROID_VERSION_CODE: ${{ 100 + github.run_number }}
+  IOS_BUILD_NUMBER: ${{ 100 + github.run_number }}
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: mobile } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm ci
+      - run: npx cap copy android            # sync www/ into the native project
+      - name: Restore signing keystore
+        working-directory: mobile/android
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PW: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          mkdir -p signing
+          echo "$KEYSTORE_B64" | base64 -d > signing/concealer-upload.jks
+          cat > signing/keystore.properties <<EOF
+          storeFile=signing/concealer-upload.jks
+          storePassword=$STORE_PW
+          keyAlias=concealer
+          keyPassword=$KEY_PW
+          EOF
+      - name: Build signed AAB
+        working-directory: mobile/android
+        run: ./gradlew bundleRelease --no-daemon
+      - name: Upload to Play
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_KEY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_KEY }}
+          ANDROID_VERSION_NAME: "1.0"
+        run: |
+          python3 -m pip install --quiet google-api-python-client google-auth
+          cd "$GITHUB_WORKSPACE"
+          python3 mobile/store/play_upload.py "${{ inputs.android_track || 'internal' }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: mobile/android/app/build/outputs/bundle/release/app-release.aab
+
+  ios:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Sync web assets
+        working-directory: mobile
+        run: |
+          npm ci
+          npx cap copy ios
+      - name: CocoaPods
+        working-directory: mobile/ios/App
+        run: pod install
+      - name: Archive (unsigned; re-signed to distribution next)
+        working-directory: mobile
+        run: |
+          xcodebuild -workspace ios/App/App.xcworkspace -scheme App \
+            -configuration Release -archivePath build/App.xcarchive \
+            -destination "generic/platform=iOS" \
+            CURRENT_PROJECT_VERSION="$IOS_BUILD_NUMBER" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive
+      - name: Restore provisioning profile
+        env:
+          PROFILE_B64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          mkdir -p _credentials
+          echo "$PROFILE_B64" | base64 -d > _credentials/Concealer_App_Store_Profile.mobileprovision
+      - name: Re-sign + upload to App Store Connect
+        env:
+          APPLE_DIST_CERT_PRIVATE_KEY_PEM: ${{ secrets.APPLE_DIST_CERT_PRIVATE_KEY_PEM }}
+          APPLE_ASC_API_KEY_KEY_ID: ${{ secrets.APPLE_ASC_API_KEY_KEY_ID }}
+          APPLE_ASC_API_KEY_ISSUER_ID: ${{ secrets.APPLE_ASC_API_KEY_ISSUER_ID }}
+          APPLE_ASC_API_KEY_P8_PRIVATE_KEY: ${{ secrets.APPLE_ASC_API_KEY_P8_PRIVATE_KEY }}
+        run: bash mobile/store/ios_resign_upload.sh
+      - name: Push App Store listing
+        if: ${{ inputs.push_ios_listing }}
+        env:
+          APPLE_ASC_API_KEY_KEY_ID: ${{ secrets.APPLE_ASC_API_KEY_KEY_ID }}
+          APPLE_ASC_API_KEY_ISSUER_ID: ${{ secrets.APPLE_ASC_API_KEY_ISSUER_ID }}
+          APPLE_ASC_API_KEY_P8_PRIVATE_KEY: ${{ secrets.APPLE_ASC_API_KEY_P8_PRIVATE_KEY }}
+        run: |
+          python3 -m pip install --quiet requests cryptography
+          mkdir -p /tmp/iosshots; i=0
+          for f in $(ls mobile/store/screenshots/ios/*.jpeg | sort); do
+            i=$((i+1)); sips -s format png -z 2688 1242 "$f" --out "/tmp/iosshots/$(printf '%02d' $i).png" >/dev/null
+          done
+          python3 mobile/store/asc_metadata.py

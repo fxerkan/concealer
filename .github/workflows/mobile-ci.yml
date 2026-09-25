@@ -1,0 +1,30 @@
+name: Mobile CI
+
+# Fast build sanity for mobile changes: web assets sync + a debug Android build.
+# No secrets, no signing, no iOS runner (kept off PRs to save macOS minutes —
+# the full signed iOS build runs in Mobile Release).
+
+on:
+  pull_request:
+    paths: ["mobile/**", ".github/workflows/mobile-ci.yml"]
+  push:
+    branches: [main]
+    paths: ["mobile/**"]
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: mobile } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm ci
+      - run: npx cap copy android
+      - name: Debug build (unsigned)
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug --no-daemon
