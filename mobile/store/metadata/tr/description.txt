@@ -1,0 +1,20 @@
+concealer, AI-coding çağının yerel secret yöneticisi.
+
+API anahtarların, token'ların, veritabanı parolaların ve .env değerlerin kendi makinende şifreli bir kasada durur — asla bulutta değil. concealer mobil, o kasayı cebine taşır.
+
+ÖNCE ÇEVRİMDIŞI
+Telefonda master parolanla kasanı açarsın, bağlantı olmasa bile. Her şey çevrimdışı çalışır.
+
+KENDİ WI-FI'İN ÜZERİNDEN ÇİFT YÖNLÜ SENKRONİZASYON
+Telefonun bilgisayarınla aynı Wi-Fi'deyken ikisi çift yönlü senkronize olur. Bir secret'ı istediğin yerde ekle ya da değiştir, her yerde görünür. Telefonun bilgisayarını yerel ağda otomatik bulur — IP yazmak yok.
+
+UÇTAN UCA ŞİFRELİ
+Değerler master parolanla şifrelenir, hiçbir zaman düz metin olarak gitmez. İki cihaz aynı secret'ı değiştirdiğinde çözümü sen seçersin — seninkini tut, host'unkini tut ya da birleştir.
+
+GELİŞTİRİCİLER İÇİN
+Tipli secret'lar (api_key, database, oauth, ssh_key, wifi ve daha fazlası), tenant / proje / ortam / repo ile kapsamlama, etiketler, arama, sıralama ve filtreleme. Gizli bir değeri dokunarak göster ya da kopyala, tıpkı bir parola yöneticisi gibi.
+
+YALNIZCA SENİN
+Hesap yok. Takip yok. Sunucu yok. Kasa yalnızca senin cihazlarında yaşar, başka hiçbir yerde.
+
+concealer secret'larını ait oldukları yerde tutar: seninle.

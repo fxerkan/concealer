@@ -1,0 +1,20 @@
+concealer is the local-only secret manager for the AI-coding era.
+
+Your API keys, tokens, database passwords and .env values live in an encrypted vault on your own machine — never in the cloud. concealer for mobile puts that vault in your pocket.
+
+OFFLINE-FIRST
+Open your vault on your phone with your master password, even with no connection. Everything works offline.
+
+TWO-WAY SYNC OVER YOUR OWN WI-FI
+When your phone is on the same Wi-Fi as your computer, they sync both ways. Add or change a secret anywhere and it shows up everywhere. Your phone finds your computer on the local network automatically — no IP typing.
+
+END-TO-END ENCRYPTED
+Values are encrypted with your master password and never travel in plaintext. When two devices change the same secret, you decide how to resolve it — keep yours, keep the host's, or merge.
+
+BUILT FOR DEVELOPERS
+Typed secrets (api_key, database, oauth, ssh_key, wifi and more), scoping by tenant / project / environment / repo, tags, search, sort and filter. Reveal a hidden value or copy it with a tap, just like a password manager.
+
+YOURS ONLY
+No account. No tracking. No servers. The vault lives on your devices and nowhere else.
+
+concealer keeps your secrets where they belong: with you.

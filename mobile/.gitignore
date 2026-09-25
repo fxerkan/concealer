@@ -1,0 +1,12 @@
+node_modules/
+# xcodebuild derivedDataPath outputs (kept out of git)
+build/
+build-sim/
+.DS_Store
+*.log
+# The Capacitor native projects (ios/, android/) ARE committed — they hold real customizations
+# (DiscoveryPlugin, Info.plist ATS, AndroidManifest, adaptive icons). Their own ios/.gitignore and
+# android/.gitignore handle build artifacts, Pods, and DerivedData.
+# www/age.js is committed on purpose (vendored, pre-bundled).
+# .demo-vault / disposable test vaults are never committed:
+.demo-vault/

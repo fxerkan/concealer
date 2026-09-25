@@ -1,0 +1,1 @@
+secret,api key,parola,geliştirici,kasa,çevrimdışı,yerel,token,gizlilik,vault

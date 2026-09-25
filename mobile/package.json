@@ -1,0 +1,26 @@
+{
+  "name": "concealer-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "concealer mobile app (iOS + Android) — offline vault open with the master password + bidirectional sync with the host.",
+  "scripts": {
+    "bundle:age": "esbuild age-encryption --bundle --format=esm --minify --outfile=www/age.js",
+    "add:ios": "cap add ios",
+    "add:android": "cap add android",
+    "sync": "cap sync",
+    "open:ios": "cap open ios",
+    "open:android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/app": "^6.0.3",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/ios": "^6.0.0",
+    "capacitor-zeroconf": "^3.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0",
+    "age-encryption": "^0.3.1",
+    "esbuild": "^0.23.0"
+  }
+}

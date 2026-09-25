@@ -1,0 +1,9 @@
+{
+  "appId": "com.fxerkan.concealer",
+  "appName": "concealer",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}

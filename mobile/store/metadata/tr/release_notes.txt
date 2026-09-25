@@ -1,0 +1,1 @@
+İlk sürüm: çevrimdışı kasa, telefonda secret ekle/düzenle/sil ve yerel Wi-Fi üzerinden bilgisayarınla çift yönlü senkronizasyon.

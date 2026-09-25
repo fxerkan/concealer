@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>concealer</title>
+<style>
+/* Covert (Dark) — near-black + red signal. red = redaction / classified marker. Mirrors the web/TUI identity. */
+:root{--bg:#0a0b0d;--panel:#101216;--panel2:#161a20;--line:#1c1f26;--line2:#2a2f38;
+  --fg:#e8e8e6;--mut:#8a909b;--ac:#ff4d4d;--ac2:#ff7a7a;--ok:#7ee787;--bad:#ff6b6b;--ink:#0a0b0d;
+  --glow:rgba(255,77,77,.22);--r:12px}
+/* Matrix — near-black + neon-green signal (mirrors the web/TUI matrix theme) */
+:root[data-theme="matrix"]{--bg:#000600;--panel:#02120a;--panel2:#041c0f;--line:#0a3a1e;--line2:#0f5c2e;
+  --fg:#39ff6a;--mut:#1f9c4d;--ac:#39ff14;--ac2:#9dff5a;--ok:#39ff14;--bad:#ff4141;--ink:#000600;
+  --glow:rgba(57,255,20,.28)}
+:root[data-theme="matrix"] body{text-shadow:0 0 2px rgba(57,255,20,.25)}
+.logo .mid{fill:var(--ac)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  margin:0;padding:0;overflow:hidden}   /* the whole page never scrolls; each view scrolls only its own content area */
+/* brand: the "er" suffix = red redaction bar (house rule + the 'conceal' action) */
+.brand{font-weight:700;letter-spacing:-.2px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.brand .ac{display:inline-block;color:var(--ink);background:var(--ac);border-radius:4px;padding:0 .12em;box-shadow:0 2px 8px var(--glow)}
+/* login: the one authored moment — the red bar redacts over the letters on open (same as the web UI) */
+.login .logo{vertical-align:-6px;margin-right:5px}
+.login h1{font-size:30px;margin:0 0 12px;font-weight:700;letter-spacing:-.2px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.login h1 .ac{transform-origin:left center;animation:redact .55s cubic-bezier(.2,.85,.25,1) .15s both}
+@keyframes redact{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@media(prefers-reduced-motion:reduce){.login h1 .ac{animation:none}}
+.cli{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--mut);margin:0 0 22px}
+.cli b{color:var(--ac);font-weight:600}.cli .m{color:var(--fg)}
+.foot{margin-top:26px;text-align:center;color:var(--mut);font-size:12px}.foot a{color:var(--mut)}
+.pwrow{position:relative}.pwrow input{padding-right:44px}
+.pwrow .eye{position:absolute;right:4px;top:6px;background:0;border:0;color:var(--mut);font-size:18px;padding:6px 8px}
+.view{display:none;flex-direction:column;height:100dvh}.view.on{display:flex}
+header{display:flex;align-items:center;gap:8px;padding:calc(12px + env(safe-area-inset-top)) 12px 12px;border-bottom:1px solid var(--line);flex:0 0 auto;background:var(--bg);z-index:5}
+header .sp{flex:1}
+header .brand{white-space:nowrap;font-size:15px}
+.icona{white-space:nowrap}
+.icona{background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:8px 12px;font-size:14px}
+.icona:active{background:var(--panel)}
+.pad{padding:18px 16px;overflow:auto;flex:1}
+.center{justify-content:center;align-items:stretch;max-width:460px;margin:0 auto;width:100%}
+h1{font-size:22px;margin:0 0 4px}.sub{color:var(--mut);margin:0 0 22px;font-size:14px}
+label{display:block;color:var(--mut);font-size:12px;margin:12px 2px 5px;text-transform:uppercase;letter-spacing:.5px}
+input,select,textarea{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--fg);
+  border-radius:10px;padding:12px 13px;font-size:16px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
+.btn{display:block;width:100%;background:var(--ac);color:var(--ink);border:0;border-radius:10px;padding:14px;font-size:16px;
+  font-weight:700;margin-top:18px}.btn:active{background:var(--ac2)}
+.btn.sec{background:var(--panel2);color:var(--fg);border:1px solid var(--line);font-weight:600}
+.btn.danger{background:var(--bad);color:#fff}
+.msg{margin-top:14px;padding:11px 13px;border-radius:10px;font-size:14px;display:none}
+.msg.err{display:block;background:rgba(255,92,108,.12);color:var(--bad);border:1px solid rgba(255,92,108,.35)}
+.msg.ok{display:block;background:rgba(62,207,142,.12);color:var(--ok);border:1px solid rgba(62,207,142,.35)}
+.search{margin:0 0 12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;margin-bottom:10px}
+.card:active{background:var(--panel2)}
+.card .nm{font-weight:700}.card .sc{color:var(--mut);font-size:12.5px;margin-top:2px}
+.tag{display:inline-block;background:#12252b;border:1px solid #1c3a44;color:#7fdbe6;
+  border-radius:999px;padding:1px 9px;font-size:11px;margin:6px 5px 0 0}
+/* type pills — same palette as the web UI */
+.type-badge{display:inline-block;font-size:11px;padding:3px 9px;border-radius:6px;font-weight:600;background:#242a33;color:#c6ccd6;font-family:ui-monospace,Menlo,monospace}
+.t-api_key,.t-oauth,.t-jwt,.t-access_token{background:#132534;color:#8fd0ff}
+.t-database{background:#241d33;color:#c3a6ff}
+.t-website,.t-login{background:#12301f;color:#86e6a8}
+.t-custom,.t-membership{background:#2e2612;color:#ffcf7a}
+.t-wifi{background:#2a1b2e;color:#f0a6d6}
+.t-ssh_key,.t-server{background:#1a2432;color:#9ec5ff}
+.t-secure_note{background:#22262e;color:#c6ccd6}
+.crow{display:flex;align-items:center;gap:8px}
+.crow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sortbar{display:flex;gap:8px;margin:0 0 12px}.sortbar select{flex:1;font-size:13px;padding:9px 10px}
+/* login layout: brand stays FIXED at the top (never scrolls under the Dynamic Island); body centers/scrolls */
+.login .lhead{flex:0 0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px 6px;position:relative}
+.login .slogan{color:var(--mut);font-size:13px;line-height:1.4;margin:8px 2px 0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.login .lbody{flex:1;overflow:auto;padding:8px 16px 16px;max-width:460px;width:100%;margin:0 auto}
+#v-unlock .lbody{display:flex;flex-direction:column;justify-content:center}
+.login .lfoot{flex:0 0 auto;text-align:center;color:var(--mut);font-size:12px;padding:12px}.login .lfoot .ac{color:var(--ac)}
+.lback{position:absolute;right:14px;top:14px}
+.empty{color:var(--mut);text-align:center;margin-top:60px}
+.fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;
+  background:var(--ac);color:var(--ink);border:0;font-size:30px;line-height:56px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.frow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.frow input{flex:1}.frow .k{flex:0 0 38%}
+.linkx{color:var(--ac2);background:0;border:0;font-size:14px;padding:6px 2px}
+.kv{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:8px}
+.kv .kk{color:var(--mut);font-size:12px}.kv .vv{font-family:ui-monospace,Menlo,monospace;word-break:break-all;margin-top:3px}
+.rowb{display:flex;gap:8px}.rowb .btn{margin-top:10px}
+.small{color:var(--mut);font-size:12px;text-align:center;margin-top:16px}
+.lockt{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--mut)}
+.settingsbtn{display:flex;align-items:center;padding:7px 9px;color:var(--fg)}
+.listfoot{padding:11px 16px calc(11px + env(safe-area-inset-bottom));border-top:1px solid var(--line);
+  color:var(--mut);font-size:12px;text-align:center;background:var(--bg)}
+.srvhead{display:flex;align-items:center;justify-content:space-between}
+.srv{cursor:pointer}.srv.on{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}.srv .sc{font-family:ui-monospace,Menlo,monospace}
+.badge{font-size:11px;color:var(--mut)}
+/* detail (read-only) field rows — reveal + copy, like the browser extension */
+.drow{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-bottom:8px}
+.drow .dk{flex:0 0 34%;color:var(--mut);font-size:12px;word-break:break-word}
+.drow .dv{flex:1;min-width:0;font-family:ui-monospace,Menlo,monospace;font-size:14px;word-break:break-all}
+.drow .dv.mask{letter-spacing:1px}
+.drow .ic{flex:0 0 auto;background:0;border:0;color:var(--mut);padding:6px;display:flex;align-items:center}
+.drow .ic:active{color:var(--ac)}
+.copied{color:var(--ok)!important}
+.dnotes{white-space:pre-wrap;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-top:8px;font-size:14px}
+/* fixed Save/Delete bar (never scrolls) */
+.editbar{flex:0 0 auto;display:flex;gap:12px;align-items:center;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--bg)}
+.editbar .savebtn{flex:1;margin-top:0}
+.delbtn{flex:0 0 auto;width:52px;height:52px;border-radius:12px;background:var(--panel2);border:1px solid var(--bad);color:var(--bad);display:flex;align-items:center;justify-content:center}
+.delbtn:active{background:rgba(255,107,108,.14)}
+/* edit field value (masked) */
+.frow .v.sec{letter-spacing:1px}
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:20;padding:24px}
+.modalbox{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;max-width:360px;width:100%}
+.modalt{font-weight:700;font-size:17px;margin-bottom:6px}.modald{color:var(--mut);font-size:14px;margin-bottom:16px;word-break:break-word}
+.modalbox .rowb .btn{margin-top:0;flex:1}
+</style>
+</head>
+<body>
+
+<!-- SETUP: first run, no local bundle -->
+<section id="v-setup" class="view login">
+  <div class="lhead">
+    <button class="icona lback" id="s-back" style="display:none">‹ Back</button>
+    <h1 class="brand"><svg class="logo" viewBox="0 0 512 512" width="30" height="30"><rect x="128" y="176" width="176" height="38" rx="19" fill="#8a909b"/><rect x="128" y="232" width="256" height="52" rx="26" class="mid"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#8a909b"/></svg>conceal<span class="ac">er</span></h1>
+    <p class="slogan">The local‑only AI Secret Manager for the AI‑coding era</p>
+  </div>
+  <div class="pad lbody">
+    <div class="srvhead"><label style="margin:0">Servers on your network</label><button class="linkx" id="s-rescan">Rescan</button></div>
+    <div id="s-servers"></div>
+    <label>Host address (manual)</label>
+    <input id="s-host" inputmode="url" autocapitalize="off" autocomplete="off" placeholder="http://192.168.1.20:8788">
+    <label>Master password</label>
+    <div class="pwrow"><input id="s-pw" type="password" placeholder="Master password"><button class="eye" onclick="togglePw('s-pw',this)"></button></div>
+    <button class="btn" id="s-go">Connect</button>
+    <div id="s-msg" class="msg"></div>
+    <p class="small">The host must be running the <b>concealer service</b> (or <b>concealer lan</b>). Values are end‑to‑end encrypted with your master password; they never travel in plaintext.</p>
+  </div>
+  <div class="lfoot">conceal<span class="ac">er</span> · v0.9.28</div>
+</section>
+
+<!-- UNLOCK: local bundle exists, offline capable -->
+<section id="v-unlock" class="view login">
+  <div class="lhead">
+    <h1 class="brand"><svg class="logo" viewBox="0 0 512 512" width="30" height="30"><rect x="128" y="176" width="176" height="38" rx="19" fill="#8a909b"/><rect x="128" y="232" width="256" height="52" rx="26" class="mid"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#8a909b"/></svg>conceal<span class="ac">er</span></h1>
+    <p class="slogan">The local‑only AI Secret Manager for the AI‑coding era</p>
+  </div>
+  <div class="pad lbody">
+    <div class="midform">
+      <label>Master password</label>
+      <div class="pwrow"><input id="u-pw" type="password" placeholder="Master password"><button class="eye" onclick="togglePw('u-pw',this)"></button></div>
+      <button class="btn" id="u-go">Unlock</button>
+      <div id="u-msg" class="msg"></div>
+      <button class="btn sec" id="u-reset">Use a different host…</button>
+    </div>
+  </div>
+  <div class="lfoot">conceal<span class="ac">er</span> · v0.9.28</div>
+</section>
+
+<!-- VAULT: list -->
+<section id="v-list" class="view">
+  <header>
+    <span class="brand"><svg class="logo" viewBox="0 0 512 512" width="22" height="22" style="vertical-align:-4px;margin-right:3px"><rect x="128" y="176" width="176" height="38" rx="19" fill="#8a909b"/><rect x="128" y="232" width="256" height="52" rx="26" class="mid"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#8a909b"/></svg>conceal<span class="ac">er</span></span>
+    <span class="sp"></span>
+    <span class="lockt" id="l-timer" title="auto-lock"></span>
+    <button class="icona settingsbtn" id="l-settings" aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+  </header>
+  <div class="pad">
+    <input id="l-q" class="search" placeholder="Search name, scope, tag, notes…" autocapitalize="off">
+    <div class="sortbar">
+      <select id="l-filter"><option value="">All types</option></select>
+      <select id="l-sort"><option value="name">Sort: Name</option><option value="type">Sort: Type</option><option value="updated">Sort: Updated</option></select>
+    </div>
+    <div id="l-rows"></div>
+    <div id="l-empty" class="empty" style="display:none">No secrets yet.<br>Tap + to add one.</div>
+    <div id="l-msg" class="msg"></div>
+  </div>
+  <div class="listfoot" id="l-foot"></div>
+  <button class="fab" id="l-add">+</button>
+</section>
+
+<!-- SETTINGS -->
+<section id="v-settings" class="view">
+  <header>
+    <button class="icona" id="set-back">‹ Back</button>
+    <span class="sp"></span>
+    <span class="brand">Settings</span>
+  </header>
+  <div class="pad">
+    <button class="btn" id="set-sync">Sync now</button>
+    <div id="set-msg" class="msg"></div>
+    <label>Theme</label>
+    <select id="set-theme"><option value="dark">Dark (red)</option><option value="matrix">Matrix (green)</option></select>
+    <label>Auto‑lock</label>
+    <select id="set-idle"><option value="60">After 1 minute</option><option value="300">After 5 minutes</option><option value="900">After 15 minutes</option><option value="0">Never</option></select>
+    <label>Host</label>
+    <div class="kv"><div class="vv" id="set-host">—</div></div>
+    <button class="btn sec" id="set-changehost">Change host…</button>
+    <button class="btn danger" id="set-lock">Lock vault</button>
+    <label>About</label>
+    <button class="btn sec" id="set-rate">★ Rate concealer</button>
+    <button class="btn sec" id="set-support">Support &amp; feedback</button>
+    <div class="foot">conceal<span class="ac">er</span> · v0.9.28</div>
+  </div>
+</section>
+
+<!-- DETAIL: read-only, reveal + copy each field (tap a secret to view; Edit to change) -->
+<section id="v-detail" class="view">
+  <header>
+    <button class="icona" id="d-back">‹ Back</button>
+    <span class="sp"></span>
+    <button class="icona" id="d-edit">Edit</button>
+  </header>
+  <div class="pad">
+    <div class="crow" style="margin-bottom:5px"><span class="nm" id="d-name" style="font-size:19px"></span><span class="type-badge" id="d-type"></span></div>
+    <div class="sc" id="d-scope" style="margin-bottom:16px"></div>
+    <div id="d-fields"></div>
+    <div id="d-tags"></div>
+    <div id="d-extra"></div>
+  </div>
+</section>
+
+<!-- EDIT -->
+<section id="v-edit" class="view">
+  <header>
+    <button class="icona" id="e-back">‹ Back</button>
+    <span class="sp"></span>
+    <span class="brand" id="e-title">Secret</span>
+  </header>
+  <div class="pad">
+    <label>Name</label><input id="e-name" autocapitalize="off">
+    <label>Type</label>
+    <select id="e-type">
+      <option>api_key</option><option>database</option><option>website</option><option>login</option>
+      <option>oauth</option><option>jwt</option><option>ssh_key</option><option>wifi</option><option>custom</option>
+    </select>
+    <div class="frow" style="margin-top:12px;gap:8px">
+      <div style="flex:1"><label>Project</label><input id="e-project" autocapitalize="off"></div>
+      <div style="flex:1"><label>Environment</label><input id="e-environment" autocapitalize="off"></div>
+    </div>
+    <div class="frow" style="gap:8px">
+      <div style="flex:1"><label>Tenant</label><input id="e-tenant" autocapitalize="off"></div>
+      <div style="flex:1"><label>Repo</label><input id="e-repo" autocapitalize="off"></div>
+    </div>
+    <label>Fields</label>
+    <div id="e-fields"></div>
+    <button class="linkx" id="e-addfield">+ add field</button>
+    <label>Tags (comma‑separated)</label><input id="e-tags" autocapitalize="off">
+    <label>URL</label><input id="e-url" inputmode="url" autocapitalize="off">
+    <label>Notes</label><textarea id="e-notes" rows="2"></textarea>
+    <div id="e-msg" class="msg"></div>
+  </div>
+  <div class="editbar">
+    <button class="delbtn" id="e-del" title="Delete" style="display:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
+    <button class="btn savebtn" id="e-save">Save</button>
+  </div>
+</section>
+
+<!-- DELETE CONFIRM -->
+<div id="modal" class="modal" style="display:none">
+  <div class="modalbox">
+    <div class="modalt">Delete this secret?</div>
+    <div class="modald" id="modal-text"></div>
+    <div class="rowb"><button class="btn sec" id="modal-no">Cancel</button><button class="btn danger" id="modal-yes">Delete</button></div>
+  </div>
+</div>
+
+<!-- CONFLICT RESOLUTION -->
+<section id="v-conflict" class="view">
+  <header>
+    <button class="icona" id="c-cancel">‹ Cancel</button>
+    <span class="sp"></span>
+    <span class="brand">Resolve</span>
+  </header>
+  <div class="pad">
+    <p class="sub" id="c-intro"></p>
+    <label>Resolution</label>
+    <select id="c-strategy">
+      <option value="mine">Keep mine — mobile overwrites host</option>
+      <option value="host">Keep host</option>
+      <option value="merge">Merge fields — newer value wins</option>
+      <option value="both">Keep both — duplicate the mobile copy</option>
+      <option value="skip">Don't change — skip, sync nothing</option>
+    </select>
+    <div id="c-list" style="margin-top:14px"></div>
+    <button class="btn" id="c-apply">Apply &amp; sync</button>
+    <div id="c-msg" class="msg"></div>
+  </div>
+</section>
+
+<script type="module">
+import { Decrypter, Encrypter } from "./age.js";
+import { DIMS, scopeStr, live, nowIso, newId, canon, nameKey, newer, dedupeById, analyze, resolveOne, resolveAll } from "./sync.js";
+
+const $ = id => document.getElementById(id);
+const EYE = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const EYEOFF = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+window.togglePw = (id, btn) => { const el = $(id); const show = el.type === "password"; el.type = show ? "text" : "password"; btn.innerHTML = show ? EYEOFF : EYE; };
+document.querySelectorAll(".eye").forEach(b => b.innerHTML = EYE);
+const COPY = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+const CHECK = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+// which fields hold secret values (masked by default) — field_meta override, else a name heuristic matching the host
+const SECRET_RE = /(pass|secret|token|key|pat|private|credential|value|apikey|access|seed|salt|pin|cvv)/i;
+function isSecretField(rec, fname){
+  const m = rec.field_meta && rec.field_meta[fname];
+  if(m && m.secret === false) return false;
+  if(m && m.secret === true) return true;
+  return SECRET_RE.test(fname);
+}
+async function copyText(val, btn){
+  try{
+    if(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Clipboard) await window.Capacitor.Plugins.Clipboard.write({string:val});
+    else await navigator.clipboard.writeText(val);
+    if(btn){ const o=btn.innerHTML; btn.innerHTML=CHECK; btn.classList.add("copied"); setTimeout(()=>{btn.innerHTML=o;btn.classList.remove("copied");},1200); }
+  }catch(e){}
+}
+const views = ["setup","unlock","list","edit","detail","conflict","settings"];
+function show(v){ views.forEach(x=>$("v-"+x).classList.toggle("on", x===v)); }
+function flash(el, text, kind){ el.className="msg "+(kind||"err"); el.textContent=text; if(!text) el.className="msg"; }
+function errText(err){
+  const m = (err && err.message) || String(err);
+  if(m==="bad_pw") return "Wrong master password.";
+  if(m==="corrupt") return "Couldn't read the server response.";
+  if(/cleartext/i.test(m)) return "The app couldn't reach that address over plain HTTP.";
+  if(/failed to fetch|network|timed out|timeout|connect|refused|502|HTTP 0/i.test(m))
+    return "Couldn't reach the host — check the address and that you're on the same Wi‑Fi.";
+  return m;
+}
+
+// host now_iso() format exactly: YYYY-MM-DDTHH:MM:SS+00:00 (no millis) so LWW string compare == chronological
+const b64enc = u8 => { let s=""; for(const b of u8) s+=String.fromCharCode(b); return btoa(s); };
+const b64dec = b64 => { const s=atob(b64); const u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u; };
+// DIMS, scopeStr, live, nowIso, newId, canon, nameKey, newer, dedupeById, analyze, resolveOne → imported from ./sync.js
+
+const LS = { get:k=>localStorage.getItem("cer."+k), set:(k,v)=>localStorage.setItem("cer."+k,v), del:k=>localStorage.removeItem("cer."+k) };
+const S = { host:LS.get("host")||"", pw:"", secrets:[], editing:null, pairId:LS.get("pairId")||"" };
+
+// ---- crypto ----
+async function encryptBundle(secrets, pw){
+  const e = new Encrypter(); e.setPassphrase(pw);
+  return await e.encrypt(new TextEncoder().encode(JSON.stringify({secrets, exported:nowIso()})));
+}
+async function decryptBundle(bytes, pw){
+  const d = new Decrypter(); d.addPassphrase(pw);
+  const plain = await d.decrypt(bytes, "uint8array");
+  return JSON.parse(new TextDecoder().decode(plain)).secrets || [];
+}
+async function persist(){ const bytes = await encryptBundle(S.secrets, S.pw); LS.set("bundle", b64enc(bytes)); }
+
+// ---- host API (native CapacitorHttp bypasses CORS; fetch fallback for a dev browser) ----
+const CapHttp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp;
+async function api(path, body){
+  const url = S.host.replace(/\/$/,"") + path;
+  if (CapHttp){
+    const r = await CapHttp.post({ url, headers:{"Content-Type":"application/json"}, data: body });
+    const data = typeof r.data==="string" ? JSON.parse(r.data||"{}") : r.data;
+    if (r.status<200 || r.status>=300) throw new Error((data&&data.error)||("HTTP "+r.status));
+    return data;
+  }
+  const r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+  const j = await r.json().catch(()=>({}));
+  if (!r.ok) throw new Error(j.error||("HTTP "+r.status));
+  return j;
+}
+// push local set, adopt the host's LWW-merged result, and snapshot it as the new 3-way base
+async function sync(){
+  const j = await api("/api/sync", { pw:S.pw, b64:b64enc(await encryptBundle(S.secrets, S.pw)) });
+  S.secrets = await decryptBundle(b64dec(j.b64), S.pw);
+  await persist(); await saveBase(); LS.set("lastSync", nowIso());
+  return j.applied;
+}
+// pull the host's current full set WITHOUT pushing our changes (empty-delta sync = no-op merge on the host)
+async function pullHost(){
+  const j = await api("/api/sync", { pw:S.pw, b64:b64enc(await encryptBundle([], S.pw)) });
+  return await decryptBundle(b64dec(j.b64), S.pw);
+}
+// base = the last-synced snapshot; the common ancestor for 3-way conflict detection
+async function saveBase(){ LS.set("base", b64enc(await encryptBundle(S.secrets, S.pw))); }
+async function loadBase(){ const b=LS.get("base"); if(!b) return []; try{ return await decryptBundle(b64dec(b), S.pw); }catch{ return []; } }
+
+// ---- setup: LAN discovery + manual entry ----
+// Android uses a native NsdManager plugin (reliable mDNS); iOS uses the ZeroConf plugin (NSNetService).
+const _Plugins = (window.Capacitor && window.Capacitor.Plugins) || {};
+const NativeDisc = _Plugins.ConcealerDiscovery;   // Android
+const Zeroconf = _Plugins.ZeroConf;               // iOS
+const canDiscover = !!(NativeDisc || Zeroconf);
+const MDNS = { type: "_concealer._tcp.", domain: "local." };
+// a host advertises on every interface — skip link-local (169.254.x)/loopback and prefer a real LAN address
+function pickIp(addrs){
+  const a = (addrs||[]).filter(ip => /^\d+\.\d+\.\d+\.\d+$/.test(ip) && !ip.startsWith("169.254.") && !ip.startsWith("127."));
+  return a.find(ip => /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip)) || a[0] || (addrs||[])[0];
+}
+let discovered = {}, scanning = false, scanTimer = null, nativeSub = null;
+function onFound(action, ip, port, id, label){
+  const key = id || (ip ? ip+":"+port : label);
+  if(action === "removed"){ delete discovered[key]; renderServers(); return; }
+  if(!ip) return;
+  discovered[key] = { label: label||ip, host:`http://${ip}:${port}`, id: key }; renderServers();
+}
+function stopScan(){
+  scanning=false; if(scanTimer){ clearTimeout(scanTimer); scanTimer=null; }
+  try{ if(NativeDisc) NativeDisc.unwatch(); else if(Zeroconf) Zeroconf.unwatch(MDNS); }catch{}
+  $("s-rescan").textContent="Rescan";
+}
+async function scanServers(){
+  if(!canDiscover){ $("s-rescan").textContent="Rescan"; renderServers(); return; }
+  stopScan(); discovered = {}; scanning = true; $("s-rescan").textContent="Stop"; renderServers();
+  try{
+    if(NativeDisc){
+      if(!nativeSub) nativeSub = await NativeDisc.addListener("discover", (e) => {
+        if(!e || !e.action) return;
+        const txt = e.txt || {}; onFound(e.action, pickIp(e.ip ? [e.ip] : []), e.port, txt.id, txt.label);
+      });
+      await NativeDisc.watch();
+    } else {
+      await Zeroconf.watch(MDNS, (r) => {
+        if(!r || !r.action || !r.service) return;
+        const s=r.service; onFound(r.action, pickIp(s.ipv4Addresses), s.port,
+          s.txtRecord&&s.txtRecord.id, (s.txtRecord&&s.txtRecord.label)||s.name);
+      });
+    }
+  }catch(e){ stopScan(); renderServers(); return; }
+  scanTimer = setTimeout(()=>{ stopScan(); renderServers(); }, 6000);   // auto-stop; results stay shown
+}
+function renderServers(){
+  const box=$("s-servers"), items=Object.values(discovered);
+  if(items.length){
+    box.innerHTML = items.map((s,i)=>{ const on=S.pairId===s.id?" on":"";
+      return `<div class="card srv${on}" data-i="${i}"><div class="nm">${esc(s.label)}</div><div class="sc">${esc(s.host)}</div></div>`; }).join("");
+    [...box.querySelectorAll(".srv")].forEach(c=>c.onclick=()=>{ const s=items[+c.dataset.i]; $("s-host").value=s.host; S.pairId=s.id; renderServers(); });
+  } else {
+    box.innerHTML = `<div class="small" style="margin-top:6px">${!canDiscover
+      ? "Auto‑discovery runs in the app only — enter the host manually below."
+      : scanning ? "Scanning your Wi‑Fi…"
+      : "No servers found. Ensure the host runs the concealer service (or <b>concealer lan</b>) and this device is on the same Wi‑Fi — or enter the address below."}</div>`;
+  }
+}
+$("s-rescan").onclick = () => scanning ? stopScan() : scanServers();
+
+// ---- setup ----
+$("s-go").onclick = async () => {
+  const host=$("s-host").value.trim(), pw=$("s-pw").value;
+  if(!host||!pw){ flash($("s-msg"),"Host and master password are required."); return; }
+  S.host=host; S.pw=pw; S.secrets=[]; flash($("s-msg"),"Connecting…","ok");
+  try{ const n=await sync(); LS.set("host",host); if(S.pairId) LS.set("pairId",S.pairId); flash($("s-msg"),""); openList(); }
+  catch(err){ flash($("s-msg"), errText(err)); }
+};
+
+// ---- unlock (offline) ----
+$("u-go").onclick = async () => {
+  const pw=$("u-pw").value; if(!pw){ flash($("u-msg"),"Enter your master password."); return; }
+  try{ S.secrets = await decryptBundle(b64dec(LS.get("bundle")), pw); S.pw=pw; flash($("u-msg"),""); openList(); }
+  catch{ flash($("u-msg"),"Wrong master password. If this device is paired to a different vault, tap ‘Use a different host’ to re‑import."); }
+};
+// setup screen reached from inside the app (non-destructive): show a Back button, keep the stored vault
+function showSetup(fromApp){ $("s-back").style.display = (fromApp && LS.get("bundle")) ? "block" : "none"; $("s-host").value=S.host||""; show("setup"); scanServers(); }
+$("s-back").onclick = () => { stopScan(); (S.pw && S.secrets.length) ? (renderList(), show("list")) : show("unlock"); };
+$("u-reset").onclick = () => showSetup(true);
+
+// ---- list ----
+const scopeFmt = e => DIMS.map(k=>e[k]||"*").join(" / ");
+function openList(){ stopScan(); $("u-pw").value=""; $("s-pw").value=""; startLock(); refreshFilters(); renderList(); show("list"); }
+function refreshFilters(){    // populate the type filter with the types actually present
+  const types=[...new Set(live(S.secrets).map(e=>e.type||"api_key"))].sort();
+  const sel=$("l-filter"), cur=sel.value;
+  sel.innerHTML=`<option value="">All types</option>`+types.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");
+  sel.value=types.includes(cur)?cur:"";
+}
+$("l-q").oninput = renderList; $("l-filter").onchange = renderList; $("l-sort").onchange = renderList;
+function renderList(){
+  const q=$("l-q").value.toLowerCase().trim(), ft=$("l-filter").value, sort=$("l-sort").value;
+  let rows = live(S.secrets);
+  if(ft) rows = rows.filter(e => (e.type||"api_key")===ft);
+  if(q) rows = rows.filter(e => (e.name+" "+scopeStr(e)+" "+(e.tags||[]).join(" ")+" "+(e.notes||"")).toLowerCase().includes(q));
+  rows.sort((a,b)=> sort==="type" ? (a.type||"").localeCompare(b.type||"")||(a.name||"").localeCompare(b.name||"")
+    : sort==="updated" ? (b.updated||"").localeCompare(a.updated||"")
+    : (a.name||"").localeCompare(b.name||""));
+  const ls = LS.get("lastSync");
+  $("l-foot").textContent = live(S.secrets).length + " secrets" + (ls? " · synced "+ls.slice(11,16) : " · not synced");
+  $("l-empty").style.display = rows.length? "none":"block";
+  $("l-rows").innerHTML = rows.map((e)=>{
+    const i = S.secrets.indexOf(e), ty=e.type||"api_key";
+    const tags=(e.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
+    const upd = e.updated ? " · "+e.updated.slice(0,10) : "";
+    return `<div class="card" data-i="${i}">
+      <div class="crow"><span class="nm">${esc(e.name||"(unnamed)")}</span><span class="type-badge t-${esc(ty)}">${esc(ty)}</span></div>
+      <div class="sc">${esc(scopeFmt(e))}${upd}</div>${tags}</div>`;
+  }).join("");
+  [...$("l-rows").children].forEach(c=> c.onclick=()=>openDetail(+c.dataset.i));
+}
+$("l-add").onclick = () => openEdit(-1);
+$("l-settings").onclick = openSettings;
+let pendingSync = null;
+async function doSync(msgEl){
+  if(!S.host){ flash(msgEl,"No host set — open Settings → Change host."); return; }
+  flash(msgEl,"Syncing…","ok");
+  try{
+    const [host, base] = [await pullHost(), await loadBase()];
+    const {merged, conflicts} = analyze(base, S.secrets, host);
+    if(conflicts.length === 0){
+      S.secrets = dedupeById(merged); const n = await sync(); renderList();
+      flash(msgEl,"Synced. "+n+" change(s) applied by host.","ok"); setTimeout(()=>flash(msgEl,""),2500);
+    } else {
+      pendingSync = {merged, conflicts}; showConflicts(conflicts);
+    }
+  } catch(err){ flash(msgEl, errText(err)); }
+}
+
+// ---- conflict resolution ----
+const fieldsPreview = e => e.deleted ? "(deleted)" : (esc(Object.keys(e.fields||{}).join(", ")) || "—");
+function showConflicts(conflicts){
+  $("c-intro").textContent = conflicts.length+" secret(s) changed on both this phone and the host. Pick how to resolve, then sync.";
+  $("c-list").innerHTML = conflicts.map(c=>{
+    const nm=esc(c.l.name||c.h.name), kind=c.dup?"same name, different record":"edited on both";
+    return `<div class="kv"><div class="kk">${nm} · ${kind}</div>
+      <div class="vv">mobile: ${fieldsPreview(c.l)}<br>host: ${fieldsPreview(c.h)}</div></div>`;
+  }).join("");
+  flash($("c-msg"),""); show("conflict");
+}
+$("c-cancel").onclick = () => { pendingSync=null; openList(); };
+$("c-apply").onclick = async () => {
+  const strat = $("c-strategy").value, {merged, conflicts} = pendingSync || {};
+  if(!pendingSync) return;
+  if(strat === "skip"){ pendingSync=null; openList();
+    flash($("l-msg"),"Left unchanged — "+conflicts.length+" conflict(s) skipped, nothing synced.","ok"); return; }
+  flash($("c-msg"),"Resolving…","ok");
+  try{
+    const out=[];
+    for(const m of merged){ if(m && m.__conflict!=null) out.push(...resolveOne(conflicts[m.__conflict], strat)); else out.push(m); }
+    S.secrets = dedupeById(out); const n = await sync(); pendingSync=null; openList(); renderList();
+    flash($("l-msg"),"Resolved & synced. "+n+" change(s) applied by host.","ok"); setTimeout(()=>flash($("l-msg"),""),2500);
+  } catch(err){ flash($("c-msg"),"Failed: "+err.message); }
+};
+
+// ---- auto-lock (client idle timer, mirrors the web UI) ----
+const idleSecs = () => { const v = parseInt(LS.get("idle")); return isNaN(v) ? 300 : v; };
+let lockAt = 0, lockIv = null;
+// The countdown starts at unlock and runs continuously — it is NEVER reset by user activity.
+function startLock(){
+  stopLock();
+  if(idleSecs() <= 0){ $("l-timer").textContent=""; return; }
+  lockAt = Date.now() + idleSecs()*1000;
+  tickLock(); lockIv = setInterval(tickLock, 1000);
+}
+function tickLock(){
+  if(idleSecs() <= 0){ $("l-timer").textContent=""; return; }
+  const left = Math.max(0, Math.round((lockAt - Date.now())/1000));
+  $("l-timer").textContent = String(Math.floor(left/60)).padStart(2,"0")+":"+String(left%60).padStart(2,"0");
+  if(left <= 0) lock();
+}
+function stopLock(){ if(lockIv){ clearInterval(lockIv); lockIv=null; } $("l-timer").textContent=""; }
+function lock(){ stopLock(); S.pw=""; S.secrets=[]; boot(); }
+// lockAt is absolute wall-clock time, so backgrounding doesn't restart it — on return we just re-tick
+// (and lock immediately if the deadline passed while the app was in the background).
+document.addEventListener("visibilitychange", () => { if(!document.hidden && lockIv) tickLock(); });
+
+// ---- settings ----
+function openSettings(){
+  $("set-theme").value = LS.get("theme")==="matrix" ? "matrix" : "dark";
+  $("set-idle").value = String(idleSecs());
+  $("set-host").textContent = S.host || "—";
+  flash($("set-msg"),""); show("settings");
+}
+$("set-back").onclick = () => { renderList(); show("list"); };
+$("set-sync").onclick = () => doSync($("set-msg"));
+$("set-theme").onchange = () => setTheme($("set-theme").value);
+$("set-idle").onchange = () => { LS.set("idle", $("set-idle").value); startLock(); };
+$("set-lock").onclick = lock;
+$("set-changehost").onclick = () => showSetup(true);
+// Rate on the appropriate store + Support (opens externally). App Store numeric id is filled in after first publish.
+const APPLE_APP_ID = "";   // e.g. "6480000000" once live on the App Store
+const platform = () => (window.Capacitor && Capacitor.getPlatform && Capacitor.getPlatform()) || "web";
+function openExternal(url){ try{ window.open(url, "_system"); }catch(e){ location.href = url; } }
+$("set-rate").onclick = () => {
+  if(platform()==="android") openExternal("https://play.google.com/store/apps/details?id=com.fxerkan.concealer");
+  else if(platform()==="ios") openExternal(APPLE_APP_ID ? `https://apps.apple.com/app/id${APPLE_APP_ID}?action=write-review` : "https://concealer.fxerkan.com");
+  else openExternal("https://concealer.fxerkan.com");
+};
+$("set-support").onclick = () => openExternal("mailto:concealer@fxerkan.com?subject=" + encodeURIComponent("concealer mobile — feedback"));
+
+// ---- detail (read-only: reveal + copy) ----
+$("d-back").onclick = openList;
+$("d-edit").onclick = () => openEdit(S.viewing);
+function openDetail(i){
+  S.viewing = i; const e = S.secrets[i]; if(!e) return openList();
+  $("d-name").textContent = e.name || "(unnamed)";
+  const ty = e.type||"api_key"; const tb=$("d-type"); tb.textContent=ty; tb.className="type-badge t-"+ty;
+  $("d-scope").textContent = scopeFmt(e) + (e.updated? " · "+e.updated.slice(0,10):"");
+  const fb=$("d-fields"); fb.innerHTML="";
+  Object.entries(e.fields||{}).forEach(([k,v])=>{
+    const sec = isSecretField(e, k);
+    const row=document.createElement("div"); row.className="drow";
+    row.innerHTML=`<div class="dk">${esc(k)}</div><div class="dv${sec?' mask':''}">${sec?'••••••••':esc(v)}</div>`
+      + (sec?`<button class="ic reveal">${EYE}</button>`:``)
+      + `<button class="ic copy">${COPY}</button>`;
+    const dv=row.querySelector(".dv");
+    if(sec) row.querySelector(".reveal").onclick=(ev)=>{ ev.stopPropagation();
+      const shown = dv.dataset.shown==="1"; dv.textContent = shown?'••••••••':v; dv.classList.toggle("mask",shown);
+      dv.dataset.shown = shown?"0":"1"; ev.currentTarget.innerHTML = shown?EYE:EYEOFF; };
+    row.querySelector(".copy").onclick=(ev)=>{ ev.stopPropagation(); copyText(v, ev.currentTarget); };
+    fb.appendChild(row);
+  });
+  $("d-tags").innerHTML = (e.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
+  let extra=""; if(e.url) extra+=`<div class="drow"><div class="dk">url</div><div class="dv">${esc(e.url)}</div><button class="ic copy2">${COPY}</button></div>`;
+  $("d-extra").innerHTML = extra + (e.notes?`<label>Notes</label><div class="dnotes">${esc(e.notes)}</div>`:"");
+  if(e.url) $("d-extra").querySelector(".copy2").onclick=(ev)=>copyText(e.url, ev.currentTarget);
+  show("detail");
+}
+
+// ---- edit ----
+function fieldRow(k,v,sec){
+  const d=document.createElement("div"); d.className="frow";
+  const rev = sec ? `<button class="linkx reveal" aria-label="reveal">${EYE}</button>` : "";
+  d.innerHTML=`<input class="k" placeholder="field" value="${esc(k)}"><input class="v${sec?' sec':''}" type="${sec?'password':'text'}" placeholder="value" value="${esc(v)}">${rev}<button class="linkx x" aria-label="remove"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>`;
+  const vi=d.querySelector(".v");
+  if(sec) d.querySelector(".reveal").onclick=(ev)=>{ const p=vi.type==="password"; vi.type=p?"text":"password"; ev.currentTarget.innerHTML=p?EYEOFF:EYE; };
+  d.querySelector(".x").onclick=()=>d.remove();
+  return d;
+}
+$("e-addfield").onclick = () => $("e-fields").appendChild(fieldRow("","",false));
+$("e-back").onclick = () => (S.editing>=0 ? openDetail(S.editing) : openList());
+function openEdit(i){
+  S.editing = i;
+  const e = i>=0 ? S.secrets[i] : {name:"",type:"api_key",tags:[],url:"",notes:"",fields:{value:""}};
+  $("e-title").textContent = i>=0? "Edit" : "New secret";
+  $("e-name").value=e.name||""; $("e-type").value=e.type||"api_key";
+  DIMS.forEach(k=> $("e-"+k).value = e[k]||"");
+  $("e-tags").value=(e.tags||[]).join(", "); $("e-url").value=e.url||""; $("e-notes").value=e.notes||"";
+  const f=$("e-fields"); f.innerHTML="";
+  const entries=Object.entries(e.fields||{}); if(!entries.length) entries.push(["value",""]);
+  entries.forEach(([k,v])=> f.appendChild(fieldRow(k,v, isSecretField(e,k))));
+  $("e-del").style.display = i>=0? "block":"none";
+  flash($("e-msg"),""); show("edit");
+}
+$("e-save").onclick = async () => {
+  const name=$("e-name").value.trim(); if(!name){ flash($("e-msg"),"Name is required."); return; }
+  const fields={}; [...$("e-fields").children].forEach(r=>{
+    const k=r.querySelector(".k").value.trim(); const v=r.querySelector(".v").value;
+    if(k) fields[k]=v;
+  });
+  const tags=$("e-tags").value.split(",").map(t=>t.trim()).filter(Boolean);
+  const i=S.editing;
+  let e = i>=0 ? S.secrets[i] : {id:newId(), created:nowIso()};
+  e.name=name; e.type=$("e-type").value; DIMS.forEach(k=> e[k]=$("e-"+k).value.trim());
+  e.fields=fields; e.tags=tags; e.url=$("e-url").value.trim(); e.notes=$("e-notes").value;
+  e.field_meta=e.field_meta||{}; e.collection=e.collection||""; e.rotation=e.rotation||{}; e.env_alias=e.env_alias||"";
+  e.deleted=""; e.updated=nowIso();
+  if(i<0) S.secrets.push(e);
+  await persist(); openList();
+};
+$("e-del").onclick = () => {
+  if(S.editing<0) return;
+  $("modal-text").textContent = "“"+(S.secrets[S.editing].name||"this secret")+"” will be removed on this device and everywhere on the next sync.";
+  $("modal").style.display = "flex";
+};
+$("modal-no").onclick = () => { $("modal").style.display = "none"; };
+$("modal-yes").onclick = async () => {
+  $("modal").style.display = "none";
+  const e=S.secrets[S.editing]; e.fields={}; e.field_meta={}; e.deleted=nowIso(); e.updated=e.deleted;  // tombstone
+  await persist(); openList();
+};
+
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+// ---- theme (red default / matrix green) — mirrors the web/TUI ----
+function setTheme(name){
+  if(name==="matrix") document.documentElement.setAttribute("data-theme","matrix");
+  else document.documentElement.removeAttribute("data-theme");
+  LS.set("theme", name);
+}
+setTheme(LS.get("theme") || "dark");   // apply persisted choice on load
+
+// ---- boot ----
+function boot(){
+  if(LS.get("bundle")){ show("unlock"); }
+  else { showSetup(false); }
+}
+boot();
+
+// ---- Android hardware/gesture back: navigate to the previous screen instead of closing the app ----
+function curView(){ return views.find(v => $("v-"+v).classList.contains("on")); }
+function goBack(){
+  if($("modal").style.display === "flex"){ $("modal").style.display="none"; return; }
+  switch(curView()){
+    case "detail":  openList(); break;
+    case "edit":    (S.editing>=0 ? openDetail(S.editing) : openList()); break;
+    case "settings":renderList(); show("list"); break;
+    case "conflict":pendingSync=null; openList(); break;
+    case "setup":   if(LS.get("bundle")){ stopScan(); (S.pw&&S.secrets.length) ? (renderList(),show("list")) : show("unlock"); }
+                    else if(_Plugins.App) _Plugins.App.minimizeApp(); break;
+    default:        if(_Plugins.App) _Plugins.App.minimizeApp();   // list/unlock = root → go to home, don't kill the app
+  }
+}
+if(_Plugins.App && _Plugins.App.addListener) _Plugins.App.addListener("backButton", goBack);
+
+// ---- edge-swipe navigation (iOS-style): swipe from the left edge → back, from the right edge → forward ----
+let fwdStack = [];   // views we backed out of, so a right-edge swipe can return to them
+let tsx=0, tsy=0, tst=0;
+document.addEventListener("touchstart", e => { const t=e.touches[0]; tsx=t.clientX; tsy=t.clientY; tst=Date.now(); }, {passive:true});
+document.addEventListener("touchend", e => {
+  const t=e.changedTouches[0], dx=t.clientX-tsx, dy=t.clientY-tsy, dt=Date.now()-tst, W=window.innerWidth;
+  if(Math.abs(dy) > 60 || dt > 700) return;
+  if(tsx < 28 && dx > 80){ const from=curView(); goBack(); if(curView()!==from) fwdStack.push(from); }   // left edge → back
+  else if(tsx > W-28 && dx < -80 && fwdStack.length){ show(fwdStack.pop()); }                            // right edge → forward
+}, {passive:true});
+</script>
+</body>
+</html>

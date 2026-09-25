@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <rect width="1024" height="500" fill="#0a0b0d"/>
+  <!-- logo bars -->
+  <g transform="translate(96,150)">
+    <rect x="0" y="0" width="120" height="26" rx="13" fill="#8a909b"/>
+    <rect x="0" y="40" width="176" height="34" rx="17" fill="#ff4d4d"/>
+    <rect x="0" y="88" width="92" height="26" rx="13" fill="#8a909b"/>
+  </g>
+  <!-- wordmark -->
+  <text x="320" y="235" font-family="'SF Mono','DejaVu Sans Mono',monospace" font-size="86" font-weight="700" fill="#e8e8e6">conceal</text>
+  <rect x="690" y="168" width="118" height="86" rx="10" fill="#ff4d4d"/>
+  <text x="703" y="235" font-family="'SF Mono','DejaVu Sans Mono',monospace" font-size="86" font-weight="700" fill="#0a0b0d">er</text>
+  <!-- tagline -->
+  <text x="98" y="330" font-family="'SF Mono','DejaVu Sans Mono',monospace" font-size="30" fill="#8a909b">The local-only AI Secret Manager</text>
+  <text x="98" y="372" font-family="'SF Mono','DejaVu Sans Mono',monospace" font-size="30" fill="#8a909b">for the AI-coding era</text>
+  <text x="98" y="452" font-family="'SF Mono','DejaVu Sans Mono',monospace" font-size="22" fill="#5b6472">Offline · End-to-end encrypted · No cloud</text>
+</svg>

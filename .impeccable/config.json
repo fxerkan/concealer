@@ -53,6 +53,24 @@
         ],
         "createdAt": "2026-08-26T08:49:11.248Z",
         "reason": "pre-existing user-requested brand halo on the 'er' redaction box; only recolored amber→red, not newly added"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "mobile/www/index.html"
+        ],
+        "createdAt": "2026-09-24T19:47:09.689Z",
+        "reason": "user confirmed: brand badge glow ported verbatim from webui.html to match the web/TUI red identity"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "www/index.html"
+        ],
+        "createdAt": "2026-09-24T20:05:10.869Z",
+        "reason": "user confirmed: brand badge glow ported verbatim from webui.html to match the web/TUI red identity"
       }
     ]
   }
