@@ -6,6 +6,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.28] — 2026-09-23
+
+### Added
+- **Auto-start service** — `concealer service install|uninstall|status` runs the `lan` bridge
+  automatically at login as a per-user background service (macOS launchd, Linux systemd `--user`,
+  Windows Scheduled Task), so phones can always reach and **auto-discover** the vault with no
+  manual `concealer lan`. Prefers the globally installed `concealer` so it opens the real vault.
+- **LAN discovery** — `lan` now advertises the vault over mDNS/Bonjour (`_concealer._tcp`, via
+  `dns-sd`/`avahi-publish-service`, best-effort) with a **stable vault id** so a phone can pick
+  *the vault* by identity rather than by ip/host/port (handles DHCP changes and multiple vaults
+  on one network). New unauthenticated `GET /api/serverinfo` returns `{id, name, version}` (no
+  secret) for labeling discovered servers and validating a manually entered address. The id is
+  minted once and stored in `keys/serverinfo.json` (git-ignored).
+- **Mobile app (iOS + Android)** — a new `mobile/` Capacitor app that opens the vault
+  **offline** with the master password, imports the whole vault from the host on first
+  connect, lets you add/edit/delete secrets on the phone offline, and syncs bidirectionally
+  when online. All crypto runs on‑device via the `age-encryption` JS library (same age
+  passphrase format as concealer bundles — no sops/age binary on the phone). At rest the
+  phone stores only the master‑password‑encrypted bundle. See `mobile/README.md`.
+- **Bidirectional device sync** — foundation for the mobile app. A new authenticated
+  `POST /api/sync` endpoint exchanges an encrypted vault bundle both ways in one call:
+  the peer uploads its bundle (encrypted with the master password), the host does a
+  last-write-wins merge (newer `updated` timestamp wins), saves, and returns the full
+  merged set (bundle) so the peer converges to the same state. Secret values never cross
+  the wire in plaintext — the sync payload uses the same portable bundle encryption as
+  export. Requires the master password (human-owner operation), audited as `sync`.
+- **Deletion sync via tombstones** — deletes are now soft: a deleted record keeps its id,
+  name and scope (all secret values dropped) and is marked with a `deleted` timestamp so
+  the deletion can propagate to other devices. Tombstones never appear in lists, search,
+  get, the web UI, MCP enumeration, or human backups/exports — only in device sync.
+
+### Fixed
+- **`rm --name X` could delete the wrong record(s)** on a vault with two or more live
+  records. The scope selector was rebuilt inside a matching loop and the builder mutates
+  its argument list, so after the first row the selector became empty and matched every
+  remaining record (e.g. `rm --name gamma` reporting "2 records matched"). The selector is
+  now computed once.
+
 ## [0.9.27] — 2026-09-23
 
 ### Added

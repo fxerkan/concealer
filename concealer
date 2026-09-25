@@ -12,7 +12,7 @@ Audit: keys/audit.log (JSONL, HMAC-chained, tamper-evident). Keeps only key
 NAMES and actions, never secret VALUES.
 """
 import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse, urllib.request, html, getpass, time, webbrowser
-import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil, fnmatch, gc, zlib
+import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil, fnmatch, gc, zlib, socket
 from datetime import datetime, timezone, timedelta
 
 if sys.platform.startswith("win"):
@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "0.9.27"   # advances through 0.x; 1.0 = reserved for the full live/release version
+VERSION = "0.9.28"   # advances through 0.x; 1.0 = reserved for the full live/release version
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -45,6 +45,7 @@ AGENTS   = os.path.join(HOME, "keys", "agents.json")  # unlock token hashes + to
 CONFIG   = os.path.join(HOME, "keys", "config.json")
 RATESTATE= os.path.join(HOME, "keys", "ratestate.json")  # per-agent disclosure window (not the value, just name+ts)
 BACKUPCFG= os.path.join(HOME, "keys", "backup.json")     # auto-backup config + age-recipient-wrapped backup password (NO plaintext password)
+SERVERINFO=os.path.join(HOME, "keys", "serverinfo.json") # stable per-vault identity for device discovery (id+label; NO secret)
 SOPSCFG  = os.path.join(HOME, ".sops.yaml")
 WEBUI    = os.path.join(BASE, "webui.html")
 def _read_webui():
@@ -86,6 +87,22 @@ def save_cfg(cfg):
     with open(CONFIG, "w") as f: json.dump(cfg, f)
     os.chmod(CONFIG, 0o600)
 CFG = load_cfg()
+
+def server_info():
+    """Stable per-vault identity for device discovery: {id, label}. `id` is minted once and persists, so it
+    identifies THIS vault across hostname/ip/port changes and lets multiple vaults on one LAN stay distinct.
+    Contains NO secret — safe to expose over /api/serverinfo and advertise via mDNS."""
+    try:
+        info = json.load(open(SERVERINFO))
+        if info.get("id"): return info
+    except Exception: pass
+    info = {"id": _secrets.token_hex(8), "label": socket.gethostname().split(".")[0]}
+    try:
+        os.makedirs(os.path.dirname(SERVERINFO), exist_ok=True)
+        with open(SERVERINFO, "w") as f: json.dump(info, f)
+        os.chmod(SERVERINFO, 0o600)
+    except OSError: pass
+    return info
 def _cfg_persist():   # called from settings POSTs: persist idle/confirm_ops/limits/policies/hibp
     save_cfg({k: CFG[k] for k in ("idle", "confirm_ops", "limits", "policies", "hibp_key", "audit_anchor") if k in CFG})
 
@@ -269,16 +286,22 @@ def norm(e):
     e.setdefault("rotation", {})     # {"every_days":int,"last":iso,"mode":"generate"|"manual"} — empty = no policy
     e.setdefault("env_alias", "")    # optional identifier base for env injection ("" = derive from name)
     e.setdefault("created", now_iso()); e.setdefault("updated", e["created"])
+    e.setdefault("deleted", "")      # tombstone timestamp ("" = live); kept for cross-device deletion sync
     return e
 
 def secs(d): return d["secrets"]
-def by_id(d, sid): return next((e for e in secs(d) if e["id"] == sid), None)
+def live(d): return [e for e in secs(d) if not e.get("deleted")]   # non-tombstone records (user-facing views)
+def by_id(d, sid): return next((e for e in secs(d) if e["id"] == sid), None)   # includes tombstones — sync needs them
+def tombstone(d, e):
+    """Soft-delete: keep id + name + scope + updated so the deletion can sync, but drop all secret values."""
+    e["fields"] = {}; e["field_meta"] = {}; e["deleted"] = now_iso(); e["updated"] = e["deleted"]
 def matches(e, sel): return all(str(e.get(k, "")) in v.split(",") for k, v in sel.items())  # v = single or comma-separated multi-select
 def label(e): return "/".join(e.get(k, "") or "*" for k in DIMS)
 
 def filt(d, sel=None, tag=None, term=None, typ=None, coll=None):
     out = []
     for e in secs(d):
+        if e.get("deleted"): continue   # tombstones never appear in user-facing lists/search/get
         if sel and not matches(e, sel): continue
         if tag and not any(tg in e["tags"] for tg in tag.split(",")): continue   # multi tag: match if any one matches
         if typ and e["type"] not in typ.split(","): continue
@@ -1076,10 +1099,9 @@ def merge_secrets(d, incoming, mode="overwrite"):
             secs(d).append(e); n_new += 1
     return n_new, n_upd, n_skip
 
-def export_bundle(pw):
-    """Decrypt the vault to JSON and encrypt with the master password via 'age -p'; returns portable age bytes (callers wrap them into a .cerbak)."""
-    d = load()
-    plain = json.dumps({"secrets": secs(d), "exported": now_iso()}).encode()
+def _encrypt_bundle(pw, secrets_list):
+    """age -p encrypt a {"secrets": [...]} JSON blob; returns portable age bytes. Values never touch the wire in plaintext."""
+    plain = json.dumps({"secrets": secrets_list, "exported": now_iso()}).encode()
     # ponytail: age wants a file argument → plaintext briefly in temp (0600), removed in finally
     tin = tempfile.NamedTemporaryFile(delete=False); tout = tin.name + ".age"
     try:
@@ -1092,22 +1114,58 @@ def export_bundle(pw):
             try: os.remove(p)
             except OSError: pass
 
-def import_bundle(pw, blob, mode="overwrite"):
-    """Decrypt an 'age -p'-encrypted bundle and merge into the vault. pw = the bundle's (source machine) password.
-    mode: conflict resolution (overwrite|skip|duplicate) → passed to merge_secrets."""
+def _decrypt_bundle(pw, blob):
+    """De-obfuscate + age -p decrypt a bundle; returns the parsed dict ({"secrets": [...]})."""
     blob = _cer_unwrap(blob)                # de-obfuscate .cerbak; raw age bundles pass through
     tin = tempfile.NamedTemporaryFile(delete=False, suffix=".age"); tout = tin.name + ".json"
     try:
         tin.write(blob); tin.close()
         rc, err = _age_pw(["-d", "-o", tout, tin.name], pw)
         if rc: raise RuntimeError("wrong password or corrupt bundle")
-        data = json.loads(open(tout, errors="ignore").read())
-        d = load(); nn, nu, ns = merge_secrets(d, data.get("secrets", []), mode); save(d)
-        return nn, nu, ns
+        return json.loads(open(tout, errors="ignore").read())
     finally:
         for p in (tin.name, tout):
             try: os.remove(p)
             except OSError: pass
+
+def export_bundle(pw):
+    """Portable human backup: live records only (tombstones are sync-only), encrypted with the master password via 'age -p'."""
+    return _encrypt_bundle(pw, live(load()))
+
+def import_bundle(pw, blob, mode="overwrite"):
+    """Decrypt an 'age -p'-encrypted bundle and merge into the vault. pw = the bundle's (source machine) password.
+    mode: conflict resolution (overwrite|skip|duplicate) → passed to merge_secrets."""
+    data = _decrypt_bundle(pw, blob)
+    d = load(); nn, nu, ns = merge_secrets(d, data.get("secrets", []), mode); save(d)
+    return nn, nu, ns
+
+def sync_merge(d, incoming):
+    """Bidirectional last-write-wins device sync. Match by id (fallback name+scope); adopt whichever record has the
+    newer `updated` timestamp, tombstones included (a deletion is just a record whose newer version is deleted).
+    now_iso() strings are fixed-width UTC → lexicographic compare == chronological. Returns count applied.
+    ponytail: tombstones are kept forever (no purge) — a personal vault's deletions are few; add TTL purge if it grows."""
+    applied = 0
+    for raw in incoming:
+        e = norm(dict(raw)); cur = by_id(d, e["id"])
+        if not cur:   # a different device may have minted a different id for the same logical secret
+            ident = {dim: e.get(dim, "") for dim in DIMS}; ident["name"] = e["name"]
+            cur = next((x for x in secs(d) if matches(x, ident)), None)
+        if cur:
+            if e["updated"] > cur["updated"]:
+                for k in ["name", "type"] + DIMS + ["tags", "url", "notes", "fields", "field_meta",
+                          "collection", "rotation", "env_alias", "created", "updated", "deleted"]:
+                    if k in e: cur[k] = e[k]
+                applied += 1
+        else:
+            secs(d).append(e); applied += 1
+    return applied
+
+def sync_bundle(pw, blob):
+    """Device sync: decrypt the peer's bundle (incl. tombstones), LWW-merge into the vault, save, and return a fresh
+    bundle of the FULL merged set (incl. tombstones) so the peer can converge to the same state. Returns (applied, out_blob)."""
+    data = _decrypt_bundle(pw, blob)
+    d = load(); applied = sync_merge(d, data.get("secrets", [])); save(d)
+    return applied, _encrypt_bundle(pw, secs(d))   # full set incl tombstones — the peer needs deletions too
 
 # ---------------- backup (.cerbak) ----------------
 # .cerbak = the whole vault encrypted with age -p using the BACKUP PASSWORD (different from master, required).
@@ -2326,7 +2384,7 @@ def _tui_main(scr, data):
         if not e: return
         if not confirm(L("Delete '%s'  (%s) ?", e["name"], label(e))): st["msg"] = L("delete cancelled"); return
         tgt = by_id(st["d"], e["id"])
-        if tgt: secs(st["d"]).remove(tgt); save(st["d"]); audit("delete", key=e["name"], source="tui")
+        if tgt: tombstone(st["d"], tgt); save(st["d"]); audit("delete", key=e["name"], source="tui")
         reload_(L("deleted: %s", e["name"]))
 
     def rotate_flow():
@@ -2740,6 +2798,7 @@ def _mkhelp():
         R("tui", "interactive terminal UI (arrow keys, search, add/del/reveal)"),
         R("web [port]", "serve the web UI + JSON API (default 8787)"),
         R("lan [lan_port [web_port]]", "reach the web UI from a phone on the same LAN (default 8788->8787)"),
+        R("service install|uninstall|status", "run 'lan' automatically at login (launchd/systemd/Task) — phones auto-discover it"),
         R("mcp", "MCP stdio server (for agents; needs CONCEALER_TOKEN)"),
         R("chrome-extension", "register the Chrome extension's native host (one-time OS setup)"),
         R("version [--check] | help", "version (--check: look for a newer release) / this help"),
@@ -3083,7 +3142,7 @@ def cli(argv):
         if "name" not in sel: sys.exit("--name required")
         if not a: sys.exit("value required (for api_key) or field=val pairs")
         d = load(); ident = {dim: sel.get(dim, "") for dim in DIMS}; ident["name"] = sel["name"]
-        hit = next((e for e in secs(d) if matches(e, ident)), None)
+        hit = next((e for e in live(d) if matches(e, ident)), None)   # a tombstone with the same name never blocks re-create
         fields = {}
         if "=" in a[0]:
             for kv in a:
@@ -3131,9 +3190,10 @@ def cli(argv):
         save(d)
         audit("rotate", key=hits[0]["name"], source="cli"); print(f"rotate: {hits[0]['name']} -> {mask(val)}")
     elif cmd == "rm":
-        d = load(); hits = [e for e in secs(d) if matches(e, _sel(a))]
+        sel = _sel(a)   # evaluate once — _sel mutates `a`, so calling it inside the comprehension would empty the selector after the first row
+        d = load(); hits = [e for e in live(d) if matches(e, sel)]
         if len(hits) != 1: sys.exit(f"{len(hits)} records matched, narrow it down.")
-        secs(d).remove(hits[0]); save(d)
+        tombstone(d, hits[0]); save(d)
         audit("delete", key=hits[0]["name"], source="cli"); print(f"rm: {hits[0]['name']}")
     elif cmd in ("mv", "cp"):   # move to collection (mv: update the field) / copy (cp: clone + new id)
         to = _flag(a, "--to-collection"); newname = _flag(a, "--as")
@@ -3283,6 +3343,7 @@ def cli(argv):
         print(out or "(no match)")
     elif cmd == "web": _chrome_selfheal(); serve_web(int(a[0]) if a else 8787)
     elif cmd == "lan": serve_lan(int(a[0]) if a else 8788, int(a[1]) if len(a) > 1 else 8787)
+    elif cmd == "service": service_cmd(a)
     elif cmd == "mcp": mcp_stdio()
     elif cmd in ("chrome-extension", "chrome-ext"): install_chrome_extension(a)
     else:
@@ -3372,9 +3433,128 @@ def serve_lan(lan_port, web_port):
 
     host = socket.gethostname().split(".")[0]
     srv = http.server.ThreadingHTTPServer(("0.0.0.0", lan_port), LanProxy)
-    print(f"concealer lan: http://{host}.local:{lan_port}  (same LAN only, unlock with master pw, Ctrl+C to stop)")
+    si = server_info()
+    adv = _advertise_mdns(si.get("label", host), lan_port, si["id"])   # best-effort: phones auto-discover this vault
+    if adv:
+        import atexit, signal
+        atexit.register(lambda: adv.terminate())                      # don't orphan the mDNS responder on exit/crash
+        signal.signal(signal.SIGTERM, lambda *a: (adv.terminate(), sys.exit(0)))
+    disc = "discoverable" if adv else "manual entry"
+    print(f"concealer lan: http://{host}.local:{lan_port}  (same LAN only, {disc}, unlock with master pw, Ctrl+C to stop)")
     try: srv.serve_forever()
     except KeyboardInterrupt: pass
+    finally:
+        if adv:
+            try: adv.terminate()
+            except Exception: pass
+
+def _advertise_mdns(label, port, vault_id):
+    """Best-effort mDNS/Bonjour advertisement of _concealer._tcp via the OS responder (dns-sd on macOS/Windows,
+    avahi-publish-service on Linux). TXT carries the stable vault id + label so a phone can pick THE vault by id,
+    not by ip/port. Returns the Popen (kept alive for the server's lifetime) or None if no responder is present."""
+    name = f"concealer ({label})"
+    kw = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    if os.name != "nt": kw["start_new_session"] = True
+    try:
+        if shutil.which("dns-sd"):
+            return subprocess.Popen(["dns-sd", "-R", name, "_concealer._tcp", "local", str(port),
+                                     f"id={vault_id}", f"label={label}"], **kw)
+        if shutil.which("avahi-publish-service"):
+            return subprocess.Popen(["avahi-publish-service", name, "_concealer._tcp", str(port),
+                                     f"id={vault_id}", f"label={label}"], **kw)
+    except Exception: pass
+    return None
+
+# ---------------- auto-start service (no manual `concealer lan`) ----------------
+SERVICE_LABEL = "com.fxerkan.concealer.lan"
+
+def _service_exe():
+    """The concealer to run as the service — prefer an installed concealer/cer on PATH (the user's global vault),
+    else this script. Mirrors _lan_backend_cmd so the service opens the real vault, not a repo checkout."""
+    real = os.path.realpath(__file__)
+    for name in ("concealer", "cer"):
+        p = shutil.which(name)
+        try:
+            if p and os.path.realpath(p) != real: return [p]
+        except OSError: pass
+    return [sys.executable, _stable_self()]
+
+def service_cmd(a):
+    """install|uninstall|status — run `concealer lan` automatically as a per-user background service so phones
+    can always reach the vault (and auto-discover it) without anyone running `concealer lan` by hand."""
+    sub = (a[0].lower() if a else "status")
+    exe = _service_exe()
+    if sys.platform == "darwin": _service_launchd(sub, exe)
+    elif sys.platform.startswith("linux"): _service_systemd(sub, exe)
+    elif os.name == "nt": _service_windows(sub, exe)
+    else: sys.exit("service auto-start isn't supported here; run `concealer lan` from your own init system.")
+
+def _service_launchd(sub, exe):
+    d = os.path.expanduser("~/Library/LaunchAgents"); plist = os.path.join(d, SERVICE_LABEL + ".plist")
+    if sub in ("install", "start", "enable"):
+        args = "".join(f"<string>{html.escape(x)}</string>" for x in exe + ["lan"])
+        # launchd runs with a minimal PATH — embed the install-time PATH so sops/age/dns-sd are found
+        envitems = [("PATH", os.environ.get("PATH") or "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin")]
+        if os.environ.get("CONCEALER_HOME"): envitems.append(("CONCEALER_HOME", HOME))
+        env = "<key>EnvironmentVariables</key><dict>" + "".join(
+            f"<key>{k}</key><string>{html.escape(v)}</string>" for k, v in envitems) + "</dict>"
+        os.makedirs(d, exist_ok=True)
+        open(plist, "w").write('<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+            f'<plist version="1.0"><dict><key>Label</key><string>{SERVICE_LABEL}</string>'
+            f'<key>ProgramArguments</key><array>{args}</array>'
+            f'<key>RunAtLoad</key><true/><key>KeepAlive</key><true/>{env}</dict></plist>\n')
+        os.chmod(plist, 0o644)
+        subprocess.run(["launchctl", "unload", plist], capture_output=True)
+        r = subprocess.run(["launchctl", "load", "-w", plist], capture_output=True, text=True)
+        if r.returncode: sys.exit(scrub(r.stderr.strip() or "launchctl load failed"))
+        print(f"service installed — `concealer lan` runs at login and auto-discovers this vault (launchd: {SERVICE_LABEL}).")
+    elif sub in ("uninstall", "stop", "disable", "remove"):
+        subprocess.run(["launchctl", "unload", "-w", plist], capture_output=True)
+        try: os.remove(plist)
+        except OSError: pass
+        print("service removed.")
+    else:
+        on = SERVICE_LABEL in subprocess.run(["launchctl", "list"], capture_output=True, text=True).stdout
+        print(f"service: {'running' if on else 'not installed'} (launchd: {SERVICE_LABEL})")
+
+def _service_systemd(sub, exe):
+    d = os.path.expanduser("~/.config/systemd/user"); unit = os.path.join(d, "concealer-lan.service")
+    if sub in ("install", "start", "enable"):
+        execstart = " ".join(shlex.quote(x) for x in exe + ["lan"])
+        envline = f"Environment=PATH={os.environ.get('PATH') or '/usr/local/bin:/usr/bin:/bin'}\n"
+        if os.environ.get("CONCEALER_HOME"): envline += f"Environment=CONCEALER_HOME={shlex.quote(HOME)}\n"
+        os.makedirs(d, exist_ok=True)
+        open(unit, "w").write("[Unit]\nDescription=concealer LAN bridge (device sync)\nAfter=network-online.target\n\n"
+            f"[Service]\nExecStart={execstart}\n{envline}Restart=always\n\n[Install]\nWantedBy=default.target\n")
+        subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+        r = subprocess.run(["systemctl", "--user", "enable", "--now", "concealer-lan"], capture_output=True, text=True)
+        if r.returncode: sys.exit(scrub(r.stderr.strip() or "systemctl enable failed (need `loginctl enable-linger`?)"))
+        print("service installed — `concealer lan` runs at login (systemd --user: concealer-lan).")
+    elif sub in ("uninstall", "stop", "disable", "remove"):
+        subprocess.run(["systemctl", "--user", "disable", "--now", "concealer-lan"], capture_output=True)
+        try: os.remove(unit)
+        except OSError: pass
+        subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+        print("service removed.")
+    else:
+        st = subprocess.run(["systemctl", "--user", "is-active", "concealer-lan"], capture_output=True, text=True).stdout.strip()
+        print(f"service: {st or 'not installed'} (systemd --user: concealer-lan)")
+
+def _service_windows(sub, exe):
+    tn = "concealer-lan"; tr = " ".join(f'"{x}"' if " " in x else x for x in exe + ["lan"])
+    if sub in ("install", "start", "enable"):
+        r = subprocess.run(["schtasks", "/create", "/tn", tn, "/tr", tr, "/sc", "onlogon", "/rl", "limited", "/f"],
+                           capture_output=True, text=True)
+        if r.returncode: sys.exit(scrub(r.stderr.strip() or "schtasks create failed"))
+        subprocess.run(["schtasks", "/run", "/tn", tn], capture_output=True)
+        print(f"service installed — `concealer lan` runs at logon (Scheduled Task: {tn}).")
+    elif sub in ("uninstall", "stop", "disable", "remove"):
+        subprocess.run(["schtasks", "/delete", "/tn", tn, "/f"], capture_output=True)
+        print("service removed.")
+    else:
+        ok = subprocess.run(["schtasks", "/query", "/tn", tn], capture_output=True).returncode == 0
+        print(f"service: {'installed' if ok else 'not installed'} (Scheduled Task: {tn})")
 
 # ---------------- Web (SPA + JSON API) ----------------
 _SESSIONS = {}   # token -> last_activity_epoch
@@ -3590,6 +3770,9 @@ def serve_web(port):
             if path == "/api/session":
                 tok = self._tok(); up = bool(tok and valid(tok))
                 return self._json({"unlocked": up, "idle": CFG["idle"], "remaining": remaining(tok or ""), "version": VERSION})
+            if path == "/api/serverinfo":          # unauthenticated identity for device discovery — id/label/version only, NO secret
+                si = server_info()
+                return self._json({"ok": True, "id": si["id"], "name": si.get("label", ""), "version": VERSION})
             if path == "/api/types":
                 return self._json({t: [{"name": f, "secret": k == "secret"} for f, k in fs] for t, fs in TYPES.items()})
             if path == "/api/autofill/status":     # agent polls its own job (status string only, never a value)
@@ -3635,7 +3818,7 @@ def serve_web(port):
                 return self._json(out)
             if path.startswith("/api/secret/"):
                 sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
-                if not e: return self._json({"error": "not found"}, 404)
+                if not e or e.get("deleted"): return self._json({"error": "not found"}, 404)
                 reveal = q.get("reveal") == "1"
                 if reveal:
                     audit("reveal", key=e["name"], source="web", detail=q.get("intent", "view"))
@@ -3737,6 +3920,19 @@ def serve_web(port):
                 if tok:
                     _lock_clear(tok); audit("lock", source="web")
                 return self._json({"ok": True})
+            if path == "/api/sync":        # device sync: master-pw authenticated + self-unlocking (stateless — no prior web unlock needed).
+                b = self._body()           # peer sends its age -p bundle (incl tombstones); gets the merged full set back.
+                if not verify_master(b.get("pw", "")):
+                    audit("sync_fail", source="web"); return self._json({"error": "bad_pw"}, 403)
+                if not _KEY_CACHE:         # self-unlock the vault key from the master pw so a headless host needs no prior web unlock
+                    kt = key_from_master(b.get("pw", ""))
+                    if kt: _KEY_CACHE = kt
+                try: blob = base64.b64decode(b.get("b64", ""))
+                except Exception: return self._json({"error": "corrupt"}, 400)
+                try: applied, out = sync_bundle(b.get("pw", ""), blob)
+                except Exception as ex: return self._json({"error": scrub(ex)}, 400)
+                audit("sync", source="web", detail=f"applied={applied}")
+                return self._json({"ok": True, "applied": applied, "b64": base64.b64encode(out).decode()})
             if path == "/api/autofill/request":    # AGENT-authed: the agent may only ASK for a fill
                 ag = self._af_agent()
                 if not ag: return self._json({"error": "agent token required"}, 403)
@@ -3964,7 +4160,7 @@ def serve_web(port):
                 if not e: return self._json({"error": "not found"}, 404)
                 if "delete" in CFG["confirm_ops"] and not verify_master(self._body().get("pw", "")):
                     return self._json({"error": "bad_pw"}, 403)
-                secs(d).remove(e); save(d)
+                tombstone(d, e); save(d)
                 audit("delete", key=e["name"], source="web", detail=label(e))
                 return self._json({"ok": True})
             self._json({"error": "not found"}, 404)
