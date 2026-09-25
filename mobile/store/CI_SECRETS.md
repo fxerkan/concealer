@@ -27,6 +27,15 @@ concealer run_with_secrets --names APPLE_DIST_CERT,APPLE_ASC_API_KEY \
 (Move `APPLE_DIST_CERT` / `APPLE_ASC_API_KEY` into `*/concealer/prod` and change the scope
 above if you don't want to depend on the zikirci scope.)
 
+## Notes / gotchas (learned validating the pipeline)
+
+- **Play app in Draft → draft releases only.** `play_upload.py` defaults `PLAY_RELEASE_STATUS=draft`; a `completed` release on a Draft app is rejected (sometimes with a misleading *"Target SDK too low"*). Set `PLAY_RELEASE_STATUS=completed` once the app is published to actually roll out.
+- **iOS needs the current SDK.** App Store rejects builds from old Xcode ("built with iOS 17.5 SDK…"); the iOS job runs on `macos-15` + `setup-xcode` `latest-stable`.
+- **Android SDK on the runner:** use the preinstalled cmdline-tools + `yes | sdkmanager --licenses` (the `setup-android` action trips on the runner's preview-SDK license).
+- **`cap sync`, not `cap copy`**, for Android — the cordova plugin gradle files are generated + gitignored.
+- **`-legacy` p12** only exists on OpenSSL 3 (brew); macOS/CI LibreSSL omits it — `ios_resign_upload.sh` detects this.
+- **versionCode/build number = epoch seconds** so they always exceed prior uploads.
+
 ## Triggering
 
 - **Manual:** Actions → *Mobile Release* → Run workflow → pick the Play track / whether to push the iOS listing.

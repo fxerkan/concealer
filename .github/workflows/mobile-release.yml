@@ -60,13 +60,13 @@ jobs:
           EOF
       - name: Build signed AAB
         working-directory: mobile/android
-        # force SDK levels so the Capacitor library modules can't fall back to their
-        # built-in default (34) if rootProject.ext isn't visible on the CI runner
+        # -P flags pin the SDK levels belt-and-suspenders so the Capacitor library
+        # modules can never fall back to their built-in default (34)
         run: ./gradlew bundleRelease --no-daemon -PcompileSdkVersion=35 -PtargetSdkVersion=35 -PminSdkVersion=22
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: aab-debuginspect
+          name: app-release-aab
           path: mobile/android/app/build/outputs/bundle/release/app-release.aab
       - name: Upload to Play
         env:
