@@ -1,0 +1,49 @@
+---
+permalink: /rate/
+sitemap: false
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Rate concealer</title>
+<style>
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:#0a0b0d;color:#e8e8e6;font:16px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;text-align:center;padding:24px}
+  .b{max-width:420px}
+  a{display:inline-block;margin-top:14px;background:#ff4d4d;color:#0a0b0d;font-weight:700;
+    text-decoration:none;border-radius:10px;padding:12px 20px}
+  .m{color:#8a909b;font-size:13px;margin-top:16px}
+</style>
+</head>
+<body>
+<div class="b">
+  <div>Opening the store…</div>
+  <a id="go" href="#">Rate concealer</a>
+  <div class="m">If it doesn't open automatically, tap the button above.</div>
+</div>
+<script>
+// --- Store links live HERE (edit on the website; no app release needed) ---
+// Fill APPLE once the app is live on the App Store, e.g. "https://apps.apple.com/app/id6480000000?action=write-review".
+var STORE = {
+  ios:     "",   // App Store review URL (set after first publish)
+  android: "https://play.google.com/store/apps/details?id=com.fxerkan.concealer",
+  fallback:"https://concealer.fxerkan.com"
+};
+function param(n){ return new URLSearchParams(location.search).get(n); }
+function detect(){
+  var p = (param("p")||"").toLowerCase();
+  if(p==="ios"||p==="android") return p;
+  var ua = navigator.userAgent||"";
+  if(/iphone|ipad|ipod/i.test(ua)) return "ios";
+  if(/android/i.test(ua)) return "android";
+  return "web";
+}
+var dest = STORE[detect()] || STORE.fallback;
+document.getElementById("go").href = dest;
+location.replace(dest);
+</script>
+</body>
+</html>

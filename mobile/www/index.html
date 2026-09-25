@@ -195,7 +195,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
     <label>Theme</label>
     <select id="set-theme"><option value="dark">Dark (red)</option><option value="matrix">Matrix (green)</option></select>
     <label>Auto‑lock</label>
-    <select id="set-idle"><option value="60">After 1 minute</option><option value="300">After 5 minutes</option><option value="900">After 15 minutes</option><option value="0">Never</option></select>
+    <select id="set-idle"><option value="60">After 1 minute</option><option value="120">After 2 minutes</option><option value="300">After 5 minutes</option><option value="600">After 10 minutes</option><option value="0">Never</option></select>
     <label>Host</label>
     <div class="kv"><div class="vv" id="set-host">—</div></div>
     <button class="btn sec" id="set-changehost">Change host…</button>
@@ -233,10 +233,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
   <div class="pad">
     <label>Name</label><input id="e-name" autocapitalize="off">
     <label>Type</label>
-    <select id="e-type">
-      <option>api_key</option><option>database</option><option>website</option><option>login</option>
-      <option>oauth</option><option>jwt</option><option>ssh_key</option><option>wifi</option><option>custom</option>
-    </select>
+    <select id="e-type"><!-- populated from TYPES at load --></select>
     <div class="frow" style="margin-top:12px;gap:8px">
       <div style="flex:1"><label>Project</label><input id="e-project" autocapitalize="off"></div>
       <div style="flex:1"><label>Environment</label><input id="e-environment" autocapitalize="off"></div>
@@ -302,13 +299,32 @@ window.togglePw = (id, btn) => { const el = $(id); const show = el.type === "pas
 document.querySelectorAll(".eye").forEach(b => b.innerHTML = EYE);
 const COPY = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
 const CHECK = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-// which fields hold secret values (masked by default) — field_meta override, else a name heuristic matching the host
+// type templates — mirror the host's TYPES: {type:[[field, isSecret], ...]}. Used for the type list,
+// auto-created fields on a new secret, and per-field masking.
+const TYPES = {"api_key":[["value",true]],"access_token":[["token",true],["refresh_token",true],["expires",false],["scopes",false]],"oauth":[["client_id",false],["client_secret",true],["auth_url",false],["token_url",false],["scopes",false]],"jwt":[["token",true],["issuer",false],["audience",false],["expires",false]],"ssh_key":[["private_key",true],["public_key",false],["passphrase",true],["host",false],["user",false]],"certificate":[["certificate",false],["private_key",true],["chain",false],["expires",false]],"database":[["host",false],["port",false],["database",false],["schema",false],["username",false],["password",true],["auth_type",false],["jdbc_url",true]],"server":[["host",false],["port",false],["username",false],["password",true],["ssh_key",true]],"website":[["web_url",false],["username",false],["password",true]],"login":[["web_url",false],["username",false],["password",true],["totp",true]],"pin":[["pin",true],["label",false]],"wifi":[["ssid",false],["password",true],["security",false]],"membership":[["provider",false],["member_id",false],["password",true]],"secure_note":[["note",true]],"custom":[]};
+const TYPE_NAMES = Object.keys(TYPES);
+// which fields hold secret values (masked by default) — field_meta override → type template → name heuristic
 const SECRET_RE = /(pass|secret|token|key|pat|private|credential|value|apikey|access|seed|salt|pin|cvv)/i;
 function isSecretField(rec, fname){
   const m = rec.field_meta && rec.field_meta[fname];
   if(m && m.secret === false) return false;
   if(m && m.secret === true) return true;
+  const tpl = TYPES[rec.type]; if(tpl){ const t = tpl.find(([f]) => f===fname); if(t) return t[1]; }
   return SECRET_RE.test(fname);
+}
+$("e-type").innerHTML = TYPE_NAMES.map(t => `<option>${t}</option>`).join("");   // full type list, from the host
+// when the type changes: if the form is still empty, drop in that type's field template; otherwise add any missing template fields
+function applyTemplate(type){
+  const tpl = TYPES[type] || [], rows = [...$("e-fields").children];
+  const allEmpty = rows.every(r => !r.querySelector(".v").value.trim());
+  if(allEmpty){
+    $("e-fields").innerHTML = "";
+    tpl.forEach(([f,sec]) => $("e-fields").appendChild(fieldRow(f,"",sec)));
+    if(!$("e-fields").children.length) $("e-fields").appendChild(fieldRow("","",false));
+  } else {
+    const have = new Set(rows.map(r => r.querySelector(".k").value.trim()));
+    tpl.forEach(([f,sec]) => { if(!have.has(f)) $("e-fields").appendChild(fieldRow(f,"",sec)); });
+  }
 }
 async function copyText(val, btn){
   try{
@@ -570,15 +586,11 @@ $("set-theme").onchange = () => setTheme($("set-theme").value);
 $("set-idle").onchange = () => { LS.set("idle", $("set-idle").value); startLock(); };
 $("set-lock").onclick = lock;
 $("set-changehost").onclick = () => showSetup(true);
-// Rate on the appropriate store + Support (opens externally). App Store numeric id is filled in after first publish.
-const APPLE_APP_ID = "";   // e.g. "6480000000" once live on the App Store
+// Rate + Support (open externally). The store URLs live on the website's /rate redirect page, so they can be
+// updated (App Store id, Play listing) WITHOUT shipping a new app build — the app only passes the platform hint.
 const platform = () => (window.Capacitor && Capacitor.getPlatform && Capacitor.getPlatform()) || "web";
 function openExternal(url){ try{ window.open(url, "_system"); }catch(e){ location.href = url; } }
-$("set-rate").onclick = () => {
-  if(platform()==="android") openExternal("https://play.google.com/store/apps/details?id=com.fxerkan.concealer");
-  else if(platform()==="ios") openExternal(APPLE_APP_ID ? `https://apps.apple.com/app/id${APPLE_APP_ID}?action=write-review` : "https://concealer.fxerkan.com");
-  else openExternal("https://concealer.fxerkan.com");
-};
+$("set-rate").onclick = () => openExternal("https://concealer.fxerkan.com/rate/?p=" + platform());
 $("set-support").onclick = () => openExternal("mailto:concealer@fxerkan.com?subject=" + encodeURIComponent("concealer mobile — feedback"));
 
 // ---- detail (read-only: reveal + copy) ----
@@ -621,18 +633,20 @@ function fieldRow(k,v,sec){
   return d;
 }
 $("e-addfield").onclick = () => $("e-fields").appendChild(fieldRow("","",false));
+$("e-type").onchange = () => applyTemplate($("e-type").value);
 $("e-back").onclick = () => (S.editing>=0 ? openDetail(S.editing) : openList());
 function openEdit(i){
   S.editing = i;
-  const e = i>=0 ? S.secrets[i] : {name:"",type:"api_key",tags:[],url:"",notes:"",fields:{value:""}};
+  const e = i>=0 ? S.secrets[i] : {name:"",type:"api_key",tags:[],url:"",notes:"",fields:{}};
   $("e-title").textContent = i>=0? "Edit" : "New secret";
   $("e-name").value=e.name||""; $("e-type").value=e.type||"api_key";
   DIMS.forEach(k=> $("e-"+k).value = e[k]||"");
   $("e-tags").value=(e.tags||[]).join(", "); $("e-url").value=e.url||""; $("e-notes").value=e.notes||"";
   const f=$("e-fields"); f.innerHTML="";
-  const entries=Object.entries(e.fields||{}); if(!entries.length) entries.push(["value",""]);
-  entries.forEach(([k,v])=> f.appendChild(fieldRow(k,v, isSecretField(e,k))));
-  $("e-del").style.display = i>=0? "block":"none";
+  const entries=Object.entries(e.fields||{});
+  if(entries.length) entries.forEach(([k,v])=> f.appendChild(fieldRow(k,v, isSecretField(e,k))));
+  else applyTemplate(e.type||"api_key");   // new secret → auto-create the type's field template
+  $("e-del").style.display = i>=0? "flex":"none";
   flash($("e-msg"),""); show("edit");
 }
 $("e-save").onclick = async () => {

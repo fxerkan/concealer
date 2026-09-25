@@ -9,20 +9,20 @@ Apple Team `96RZX28T7X` · support `concealer@fxerkan.com`.
 - `app-icon-1024.png` — store icon (also `../assets/icon.png`).
 - `screenshots/ios/`, `screenshots/android/` — device screenshots.
 
-## Screenshots — required sizes
-Capture on a **real device / simulator** with the app populated (the demo vault is handy: `python3 mobile/serve-demo.py`, host `http://localhost:8088`, password `demo1234`).
+## Screenshots
+Real device screenshots are provided in `screenshots/ios/` (8) and `screenshots/android/` (10):
+login, server discovery/scan, vault list, secret detail + copy, edit, new secret,
+database-type template, settings + change-server, and the matrix theme.
 
-- **iOS (App Store):** 6.7"/6.9" (1290×2796 or 1320×2868) and 6.5" (1242×2688). `xcrun simctl io booted screenshot out.png`.
-- **Android (Play):** phone 1080×1920+ (16:9/9:16). `adb exec-out screencap -p > out.png`.
+To recapture (demo vault is handy: `python3 mobile/serve-demo.py`, host `http://localhost:8088`, password `demo1234`):
+- **iOS (App Store):** upload the 6.7"/6.9" set (1290×2796 or 1320×2868). `xcrun simctl io booted screenshot out.png` or the device screenshots here.
+- **Android (Play):** phone 1080×1920+ (9:16). `adb exec-out screencap -p > out.png`.
 
-Suggested shots (all verified working):
-1. Unlock — brand + slogan, master password.  (`screenshots/ios/01-login.png` included)
-2. Vault list — colored type pills, search, sort/filter.
-3. Secret detail — masked value + reveal/copy.
-4. Edit — masked fields, fixed Save/Delete bar.
-5. Settings — theme, auto-lock, host, Rate/Support.
-6. Discovery — "Servers on your network" auto-find.
-7. (optional) Conflict resolution.
+## Rate button → website redirect
+The app's **Rate** button opens `https://concealer.fxerkan.com/rate/?p=<ios|android>`.
+That page (`docs/rate/index.html` in this repo) reads the platform and redirects to the right store,
+so the store URLs are edited **on the website, with no app release**. Set the iOS App Store URL in
+that page's `STORE.ios` once the app is live (the Play URL is already wired to `com.fxerkan.concealer`).
 
 ## Before submitting
 - **App Store numeric ID:** after the first App Store Connect build, set `APPLE_APP_ID` in `mobile/www/index.html` (the Rate button) and rebuild.
