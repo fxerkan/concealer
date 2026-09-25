@@ -4,7 +4,7 @@ App Store Connect API. Auth uses the ASC API key from the vault (ES256 JWT signe
 directly with `cryptography`, no PyJWT). Run through the vault:
 
   concealer run_with_secrets --names APPLE_ASC_API_KEY \
-    --project zikirci --environment prod --repo zikirci -- \
+    --project concealer --environment prod --repo concealer -- \
     python3 mobile/store/asc_metadata.py
 
 Text is authoritative; screenshots are best-effort (per-image, won't abort text).

@@ -4,7 +4,7 @@ App id: **com.fxerkan.concealer** · Apple Team **96RZX28T7X** · support **conc
 Store release **1.0** (iOS build 1 / Android versionCode 1). App Store Connect app id `6816103801`
 ("Concealer AI Secret Manager" — the plain name was taken).
 
-## Credentials (reuse the zikirci/Dhikrer store toolchain — in the vault, `*/zikirci/prod`)
+## Credentials (reuse the concealer/Dhikrer store toolchain — in the vault, `*/concealer/prod`)
 - **APPLE_ASC_API_KEY** — App Store Connect API key (`_ISSUER_ID` / `_KEY_ID` / `_P8_PRIVATE_KEY`) for `-allowProvisioningUpdates` + `altool` upload.
 - **APPLE_DIST_CERT** / **APPLE_DIST_P12_PASSWORD** — distribution identity (note: the stored `_CERT_PEM` is 1 byte short and won't rebuild a p12; the login-keychain identity works, so upload via **Xcode Organizer**, which signs interactively).
 - **GOOGLE_PLAY_SERVICE_ACCOUNT** (`_JSON_KEY`) — Play Android Publisher API. Upload script: `mobile/store/play_upload.py` (needs `google-auth`+`google-api-python-client`, already installed). Works only once the app exists in the *same* Play account and the service-account email has app access.
@@ -40,7 +40,7 @@ Store release **1.0** (iOS build 1 / Android versionCode 1). App Store Connect a
    Age rating, pricing (free), then **Submit for Review**.
 
 ## Automated status (2026-09-25, release 1.0)
-Driven by the scripts in this folder + the concealer/zikirci vault credentials.
+Driven by the scripts in this folder + the concealer/concealer vault credentials.
 
 **iOS — App Store Connect app `6816103801` ("Concealer AI Secret Manager"):**
 - Build **1.0(1) uploaded, VALID, attached** to version 1.0 (`mobile/store/ios_resign_upload.sh` — the Capacitor archive is dev-signed, so it's re-signed to distribution in a throwaway keychain from the vault key + the profile's cert; no Organizer).

@@ -10,7 +10,7 @@
 #
 # Run through the vault so the private keys never hit disk in the clear:
 #   concealer run_with_secrets --names APPLE_DIST_CERT,APPLE_ASC_API_KEY \
-#     --project zikirci --environment prod --repo zikirci -- \
+#     --project concealer --environment prod --repo concealer -- \
 #     bash mobile/store/ios_resign_upload.sh
 #
 # Needs (in the same Apple account, team 96RZX28T7X):

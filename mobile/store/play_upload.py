@@ -4,7 +4,7 @@
 Run through the vault so the service-account JSON never lands on disk:
 
   concealer run_with_secrets --names GOOGLE_PLAY_SERVICE_ACCOUNT \
-    --project zikirci --environment prod --repo zikirci -- \
+    --project concealer --environment prod --repo concealer -- \
     python3 mobile/store/play_upload.py [track]
 
 track defaults to "production" (the chosen release). Requires the app
