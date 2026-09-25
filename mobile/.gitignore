@@ -10,3 +10,9 @@ build-sim/
 # www/age.js is committed on purpose (vendored, pre-bundled).
 # .demo-vault / disposable test vaults are never committed:
 .demo-vault/
+
+# release signing — NEVER commit (keystore + passwords)
+android/signing/
+*.jks
+*.keystore
+keystore.properties
