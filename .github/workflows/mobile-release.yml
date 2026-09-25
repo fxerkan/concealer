@@ -61,7 +61,14 @@ jobs:
           EOF
       - name: Build signed AAB
         working-directory: mobile/android
-        run: ./gradlew bundleRelease --no-daemon
+        # force SDK levels so the Capacitor library modules can't fall back to their
+        # built-in default (34) if rootProject.ext isn't visible on the CI runner
+        run: ./gradlew bundleRelease --no-daemon -PcompileSdkVersion=35 -PtargetSdkVersion=35 -PminSdkVersion=22
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: aab-debuginspect
+          path: mobile/android/app/build/outputs/bundle/release/app-release.aab
       - name: Upload to Play
         env:
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_KEY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_KEY }}
@@ -70,10 +77,6 @@ jobs:
           python3 -m pip install --quiet google-api-python-client google-auth
           cd "$GITHUB_WORKSPACE"
           python3 mobile/store/play_upload.py "${{ inputs.android_track || 'internal' }}"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: app-release-aab
-          path: mobile/android/app/build/outputs/bundle/release/app-release.aab
 
   ios:
     # App Store requires the current iOS SDK (Xcode 26+); newest image + newest Xcode.
