@@ -39,6 +39,18 @@ Store release **1.0** (iOS build 1 / Android versionCode 1). App Store Connect a
 4. In App Store Connect: fill Description/Keywords (`metadata/*`), upload 6.7" screenshots, set Privacy (No data collected),
    Age rating, pricing (free), then **Submit for Review**.
 
+## Automated status (2026-09-25, release 1.0)
+Driven by the scripts in this folder + the concealer/zikirci vault credentials.
+
+**iOS — App Store Connect app `6816103801` ("Concealer AI Secret Manager"):**
+- Build **1.0(1) uploaded, VALID, attached** to version 1.0 (`mobile/store/ios_resign_upload.sh` — the Capacitor archive is dev-signed, so it's re-signed to distribution in a throwaway keychain from the vault key + the profile's cert; no Organizer).
+- Listing **done** via `asc_metadata.py`: en-US + tr text (description/keywords/URLs/promo) + 8 screenshots each (6.5″).
+- **Left (declarative, you): App Privacy (no data collected), Age rating, Pricing=Free, then Submit for Review.**
+
+**Android — Play app `com.fxerkan.concealer` ("Concealer AI Secret Manager", Draft):**
+- AAB **versionCode 2 / targetSdk 35 uploaded**; listing + icon + feature graphic + 8 screenshots (en-US + tr-TR) live; **internal-track draft release staged** (`play_upload.py` / `asc_metadata.py` sibling calls, concealer SA `sa-concealer-google@concealer.iam.gserviceaccount.com`).
+- Production blocked by **FAILED_PRECONDITION** = console-only setup: **App access, Target audience, Data safety** questionnaires (+ Google's closed-testing-before-production rule for the account). Finish those, then promote the internal build to Production.
+
 ## Notes
 - The debug builds used for testing are NOT the store builds; always ship the signed release AAB / archive above.
 - Bump `versionCode` (Android) and the build number (iOS) for every subsequent upload.
