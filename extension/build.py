@@ -14,7 +14,8 @@ if man.get("version") != ver:
     with open(man_path, "w") as f: json.dump(man, f, indent=2); f.write("\n")
     print("synced manifest.json version →", ver)
 man.pop("key", None)   # CWS assigns the ID; a self-signed key would conflict with the store item
-files = ["popup.html", "popup.css", "popup.js", "icons/icon16.png", "icons/icon48.png", "icons/icon128.png"]
+files = ["popup.html", "popup.css", "popup.js", "sw.js", "content.js",
+         "icons/icon16.png", "icons/icon48.png", "icons/icon128.png"]
 out_dir = os.path.join(os.path.dirname(HERE), "dist"); os.makedirs(out_dir, exist_ok=True)
 out = os.path.join(out_dir, f"concealer-extension-{ver}.zip")
 with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:

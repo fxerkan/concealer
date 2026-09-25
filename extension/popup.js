@@ -134,8 +134,95 @@ async function loadSecrets(){
     const r = await api("/api/secrets");
     if(r.status===401){ await setToken(null); await setDeadline(0); lockUI(); return; }
     ROWS = await r.json();
-    setStatus(""); show("list"); render(""); $("#search").focus();
+    setStatus(""); show("list"); render(""); stopAfLockPoll(); startAfPoll(); refreshFillBtn(); $("#search").focus();
+    chrome.runtime.sendMessage({type:"concealer-poll"}).catch(()=>{});   // token now present → drive on-page banners immediately
   }catch(e){ setStatus("couldn't load secrets", true); }
+}
+
+// ---- Secure Agentic Autofill: pending-request approval, right in the popup ----
+let _afPoll=null;
+function startAfPoll(){ stopAfPoll(); _afPoll=setInterval(renderAutofill, 3000); renderAutofill(); }
+function stopAfPoll(){ if(_afPoll){ clearInterval(_afPoll); _afPoll=null; } }
+async function renderAutofill(){
+  const box=$("#af"); if(!box) return;
+  let pend=[];
+  try{ const r=await api("/api/autofill/pending"); if(!r.ok){ box.hidden=true; box.textContent=""; return; } pend=await r.json(); }
+  catch(e){ return; }
+  if(!Array.isArray(pend)||!pend.length){ box.hidden=true; box.textContent=""; return; }
+  box.textContent=""; box.hidden=false;
+  for(const j of pend){
+    const ok = j.match==="ok";
+    const card=document.createElement("div"); card.className="afcard"+(ok?"":" warn");
+    const h=document.createElement("div"); h.className="afh"; h.textContent="🔐 Sign-in request";
+    const d=document.createElement("div"); d.className="afd";
+    d.append(mk("b",`${j.agent}`), txt(" wants to sign in to "), mk("b",`${j.domain}`));
+    const s=document.createElement("div"); s.className="afs";
+    if(ok){ s.append(txt("Using "), mk("b",j.secret_name), txt(j.username?` (${j.username})`:"")); }
+    else if(j.match==="nomatch"){ s.textContent="⚠ No secret matches this domain."; }
+    else if((j.match||"").startsWith("mismatch:")){ s.textContent="⚠ Domain doesn't match the secret ("+j.match.slice(9)+")."; }
+    const acts=document.createElement("div"); acts.className="afacts";
+    if(ok){
+      acts.append(afBtn("Approve once","primary",()=>afDecide(j.id,"approve","once")),
+                  afBtn("This task","",()=>afDecide(j.id,"approve","task")),
+                  afBtn("Deny","danger",()=>afDecide(j.id,"deny")));
+    } else {
+      acts.append(afBtn("Dismiss","danger",()=>afDecide(j.id,"deny")));
+    }
+    card.append(h,d,s,acts); box.appendChild(card);
+  }
+}
+// Locked-screen hint: even before unlocking, tell the user a request is waiting (uses the
+// locked-safe /notify endpoint — count only, no vault data).
+let _afLockPoll=null;
+function startAfLockPoll(){ stopAfLockPoll(); _afLockPoll=setInterval(afLockedHint,3000); afLockedHint(); }
+function stopAfLockPoll(){ if(_afLockPoll){ clearInterval(_afLockPoll); _afLockPoll=null; } }
+async function afLockedHint(){
+  const box=$("#aflock"); if(!box) return;
+  let n; try{ const r=await fetch(BASE+"/api/autofill/notify"); n=r.ok?await r.json():null; }catch(e){ n=null; }
+  if(!n||!n.count){ box.hidden=true; box.textContent=""; return; }
+  box.hidden=false; box.className="aflock";
+  box.textContent=`🔐 ${n.count} sign-in request${n.count>1?"s":""} waiting — unlock to review.`;
+}
+function mk(tag,t){ const e=document.createElement(tag); e.textContent=t; return e; }
+function txt(t){ return document.createTextNode(t); }
+function afBtn(label,cls,fn){ const b=document.createElement("button"); b.textContent=label; b.className="afbtn "+cls; b.onclick=fn; return b; }
+async function afDecide(job,action,scope){
+  try{
+    if(action==="approve") await api("/api/autofill/approve",{method:"POST",body:JSON.stringify({job,scope})});
+    else await api("/api/autofill/deny",{method:"POST",body:JSON.stringify({job})});
+    toast(action==="deny"?"denied":"approved");
+    chrome.runtime.sendMessage({type:"concealer-poll"}).catch(()=>{});   // nudge the worker to fill now
+  }catch(e){}
+  renderAutofill();
+}
+
+// ---- "Fill this page": user-initiated autofill of the active tab's login form ----
+// The popup is the human owner's surface (like the web UI), so no agent/approval handshake —
+// the user clicked it. We match a website/login secret to the tab's domain, reveal its fields,
+// and hand them to the content script (value goes popup→content script→DOM, never off-box).
+function regDom(h){ const p=(h||"").split(".").filter(Boolean); return p.length>=2?p.slice(-2).join("."):(h||""); }
+function hostOf(u){ try{ return new URL(u).hostname; }catch(e){ return ""; } }
+async function activeTab(){ try{ const [t]=await chrome.tabs.query({active:true,currentWindow:true}); return t; }catch(e){ return null; } }
+async function refreshFillBtn(){
+  const btn=$("#fillpage"); if(!btn) return; btn.hidden=true;
+  const t=await activeTab(); if(!t||!/^https?:/.test(t.url||"")) return;
+  const dom=regDom(hostOf(t.url));
+  const hit=ROWS.find(e=>["website","login"].includes(e.type) && e.fields && e.fields.web_url
+                         && regDom(hostOf(e.fields.web_url))===dom);
+  if(hit){ btn.hidden=false; btn.dataset.id=hit.id; btn.dataset.tab=String(t.id); btn.textContent="⤵ Fill the Secrets — "+hit.name; }
+}
+async function fillThisPage(){
+  const btn=$("#fillpage"); const id=btn.dataset.id, tabId=Number(btn.dataset.tab);
+  btn.disabled=true;
+  try{
+    const r=await api("/api/secret/"+id+"?reveal=1&intent=autofill"); if(!r.ok) throw 0;
+    const e=await r.json(); const f=e.fields||{};
+    const t=await chrome.tabs.get(tabId); const dom=regDom(hostOf(t.url));
+    const res=await chrome.tabs.sendMessage(tabId,{type:"concealer-fill",domain:dom,
+                        username:f.username||"",password:f.password||""});
+    toast(res&&res.ok ? (res.exposed?"filled (⚠ value visible on page)":"filled") : "couldn't fill this page");
+  }catch(e){ toast("fill failed — reload the page and retry"); }
+  finally{ btn.disabled=false; }
 }
 
 function scopeText(e){ return [e.project, e.environment].filter(Boolean).join("/"); }
@@ -233,7 +320,7 @@ async function revealField(e,fname,fvEl,btn){
 }
 
 // ---- lock ----
-function lockUI(){ stopTimer(); ROWS=[]; $("#lock").hidden=true; show("unlock"); $("#pw").value=""; $("#pw").focus(); }
+function lockUI(){ stopTimer(); stopAfPoll(); ROWS=[]; $("#lock").hidden=true; show("unlock"); startAfLockPoll(); $("#pw").value=""; $("#pw").focus(); }
 async function lock(){ try{ await api("/api/lock",{method:"POST"}); }catch(e){} await setToken(null); await setDeadline(0); lockUI(); setStatus(""); }
 async function autoLock(){ try{ await api("/api/lock",{method:"POST"}); }catch(e){} await setToken(null); await setDeadline(0); lockUI(); toast("auto-locked"); }
 
@@ -287,6 +374,7 @@ async function saveSettings(){
 }
 
 // ---- wiring ----
+$("#fillpage").onclick=fillThisPage;
 $("#unlockbtn").onclick=unlock;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") unlock(); });
 $("#search").addEventListener("input",e=>render(e.target.value));

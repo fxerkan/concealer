@@ -50,7 +50,8 @@ button.primary:hover{background:var(--acc2)}
 button.full{width:100%}
 
 section{padding:12px}
-#unlock{display:flex;gap:6px}
+#unlock{display:flex;gap:6px;flex-wrap:wrap}
+#unlock #aflock{flex-basis:100%;width:100%;box-sizing:border-box}
 input,select{width:100%;background:var(--panel);border:1px solid var(--line2);color:var(--txt);
   border-radius:8px;padding:8px 10px;font-size:13px;outline:none}
 input:focus,select:focus{border-color:var(--acc)}
@@ -123,3 +124,24 @@ button.ok{color:var(--ok);border-color:var(--ok)}
 .toast{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);background:var(--panel2);
   border:1px solid var(--acc);border-radius:8px;padding:7px 12px;font-size:12px;max-width:90%;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+
+/* Secure Agentic Autofill — pending approval cards in the popup */
+#af{margin-bottom:10px}
+.afcard{border:1px solid var(--acc);background:var(--panel2);border-radius:10px;padding:10px 11px;margin-bottom:8px}
+.afh{font-weight:700;font-size:13px;margin-bottom:5px}
+.afd,.afs{font-size:12.5px;color:var(--txt);margin-bottom:3px;line-height:1.35}
+.afs{color:var(--mut)}
+.afacts{display:flex;gap:6px;margin-top:8px}
+.afbtn{flex:1;font-size:12px;padding:6px 4px;border-radius:7px}
+.afbtn.primary{background:var(--acc);border-color:var(--acc);color:var(--ink);font-weight:700}
+.afbtn.primary:hover{background:var(--acc2)}
+.afbtn.danger{border-color:var(--bad);color:var(--bad)}
+.afbtn.danger:hover{background:var(--bad);color:var(--ink)}
+
+/* locked-screen "request waiting" banner + mismatch card state */
+.aflock{border:1px solid var(--acc);background:var(--panel2);color:var(--txt);border-radius:9px;
+  padding:9px 11px;margin-bottom:9px;font-size:12.5px;font-weight:600}
+.afcard.warn{border-color:var(--bad)}
+.afcard.warn .afs{color:var(--bad)}
+
+#fillpage{margin-bottom:9px}

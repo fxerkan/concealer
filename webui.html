@@ -714,7 +714,14 @@ let SPAGE=1; let SPAGE_SIZE=parseInt(localStorage.getItem('concealer_psize'))||2
 
 // ---------- i18n ----------
 const I18N={
- tr:{login_sub:"YZ kodlama çağı için yerel gizli bilgi yöneticisi.",master_pw:"Master password",unlock:"Aç",
+ tr:{af_title:"🔐 Otomatik giriş isteği",
+  af_desc:(ag,dom)=>`<b>${ag}</b> adlı ajan, <b>${dom}</b> adresine giriş yapmak istiyor.`,
+  af_using:(name,user)=>`Kullanılacak kayıt: <b>${name}</b>${user?` (kullanıcı: ${user})`:''}`,
+  af_domain_match:"✓ Alan adı kayıtla eşleşiyor",
+  af_note:"Değer yalnızca tarayıcı eklentisine gider; ajana/LLM'e asla gösterilmez.",
+  af_once:"Bir kez izin ver",af_task:"Bu görev boyunca izin ver",af_deny:"Reddet",
+  af_approved:"onaylandı",af_denied:"reddedildi",
+  login_sub:"YZ kodlama çağı için yerel gizli bilgi yöneticisi.",master_pw:"Master password",unlock:"Aç",
   wrong_pw:"Yanlış master password.",locked_wait:s=>`Çok fazla hatalı deneme — ${s} sn bekleyin.`,secrets:"Sırlar",audit_log:"Denetim Kayıtları",lock:"🔒 Kilitle",filters:"Filtreler",search:"ara",
   search_secrets:"🔎 ara: ad, url, etiket, not…",all_types:"tüm tipler",new_secret:"+ Yeni Sır",
   th_name:"Ad",th_type:"Tip",th_scope:"Kapsam (tenant/proje/ortam/repo)",th_tags:"Etiketler",th_updated:"Güncellendi",th_actions:"İşlemler",
@@ -814,7 +821,14 @@ const I18N={
   ch_trend:"Etkinlik Trendi",ch_type:"Tipe göre",ch_platform:"Platform / Etiket",ch_project:"Projeye göre",
   ch_interface:"Arayüz (kaynak)",ch_action:"Eyleme göre",ch_actor:"Aktöre göre",ch_accessed:"En çok erişilen secret",
   ch_tenant:"Tenant'a göre",ch_env:"Ortama göre",ch_repo:"Repo'ya göre"},
- en:{login_sub:"The local-only secret manager for the AI-coding era.",master_pw:"Master password",unlock:"Unlock",
+ en:{af_title:"🔐 Autofill request",
+  af_desc:(ag,dom)=>`Agent <b>${ag}</b> wants to sign in to <b>${dom}</b>.`,
+  af_using:(name,user)=>`Using secret <b>${name}</b>${user?` (user: ${user})`:''}`,
+  af_domain_match:"✓ Domain matches the secret",
+  af_note:"The value goes only to the browser extension — never to the agent/LLM.",
+  af_once:"Approve once",af_task:"Approve for this task",af_deny:"Deny",
+  af_approved:"approved",af_denied:"denied",
+  login_sub:"The local-only secret manager for the AI-coding era.",master_pw:"Master password",unlock:"Unlock",
   wrong_pw:"Wrong master password.",locked_wait:s=>`Too many wrong attempts — wait ${s}s.`,secrets:"Secrets",audit_log:"Audit Logs",lock:"🔒 Lock",filters:"Filters",search:"search",
   search_secrets:"🔎 search: name, url, tag, notes…",all_types:"all types",new_secret:"+ New Secret",
   th_name:"Name",th_type:"Type",th_scope:"Scope (tenant/project/env/repo)",th_tags:"Tags",th_updated:"Updated",th_actions:"Actions",
@@ -1019,7 +1033,7 @@ function lockCountdown(secs){
   if(btn)btn.disabled=true; if(pw)pw.disabled=true; tick(); _lockTimer=setInterval(tick,1000);
 }
 async function lock(){ await fetch('/api/lock',{method:'POST'}); showLogin(); }
-function showLogin(){ clearInterval(idleTimer); closeModal(); $('.menu').classList.remove('open'); $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#pw').focus(); history.replaceState({}, '', location.pathname); }
+function showLogin(){ clearInterval(idleTimer); stopAutofillPoll(); closeModal(); $('.menu').classList.remove('open'); $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#pw').focus(); history.replaceState({}, '', location.pathname); }
 async function showApp(startSecs){
   $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
   TYPES=await (await api('/api/types')).json();
@@ -1034,6 +1048,37 @@ async function showApp(startSecs){
   _navlock=true; showTab('secrets'); _navlock=false;
   history.replaceState({app:1,tab:'secrets'}, '', '?v=secrets');   // uygulamanin taban gecmis girisi
   policyNotifyCheck();   // arka planda: bildirimli policy ihlallerini badge'e say
+  startAutofillPoll();   // arka planda: ajan otomatik-giris isteklerini onay modaliyla goster
+}
+// ---------- Secure Agentic Autofill: approval poller ----------
+// Poll the app for pending agent autofill requests; when one arrives, show an approval
+// modal. Approve (once / for this task) or deny — the value only ever goes to the extension.
+let _afTimer=null, _afShown=null;
+function startAutofillPoll(){ clearInterval(_afTimer); _afTimer=setInterval(afPoll,3000); afPoll(); }
+function stopAutofillPoll(){ clearInterval(_afTimer); _afTimer=null; _afShown=null; }
+async function afPoll(){
+  if(_afShown) return;                       // a request modal is already up
+  let jobs; try{ jobs=await (await api('/api/autofill/pending')).json(); }catch(e){ return; }
+  if(!Array.isArray(jobs)||!jobs.length) return;
+  afShowApproval(jobs[0]);
+}
+function afShowApproval(j){
+  _afShown=j.id;
+  const body=`<div class="field"><p>${t('af_desc',esc(j.agent),esc(j.domain))}</p>
+    <p>${t('af_using',esc(j.secret_name),esc(j.username||''))}</p>
+    <p style="color:var(--ok,#3fb950)">${t('af_domain_match')}</p>
+    <p class="muted" style="font-size:13px">${t('af_note')}</p></div>`;
+  modal(t('af_title'),body,[
+    {x:t('af_once'),p:1,f:()=>afDecide(j.id,'approve','once')},
+    {x:t('af_task'),f:()=>afDecide(j.id,'approve','task')},
+    {x:t('af_deny'),c:'danger',f:()=>afDecide(j.id,'deny')}]);
+}
+async function afDecide(job,action,scope){
+  try{
+    if(action==='approve'){ await api('/api/autofill/approve',{method:'POST',body:JSON.stringify({job,scope})}); toast(t('af_approved')); }
+    else{ await api('/api/autofill/deny',{method:'POST',body:JSON.stringify({job})}); toast(t('af_denied')); }
+  }catch(e){}
+  closeModal(); _afShown=null; afPoll();
 }
 function rebuildSelects(){ /* audit filtreleri artik veri-gudumlu coklu-secim (loadAudit) — onceden doldurma yok */ }
 // hard auto-lock: aktivite sayaci sifirlamaz; unlock'tan itibaren sabit geri sayim
