@@ -35,8 +35,11 @@ jobs:
       - run: echo "ANDROID_VERSION_CODE=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "17" }
-      - uses: android-actions/setup-android@v3
-      - run: yes | sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Ensure Android SDK 35 (preinstalled cmdline-tools)
+        run: |
+          SDKMGR=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort | tail -1)
+          yes | "$SDKMGR" --licenses >/dev/null 2>&1 || true
+          "$SDKMGR" "platforms;android-35" "build-tools;35.0.0"
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
       - run: npm ci

@@ -40,7 +40,10 @@ open(sys.argv[2],'wb').write(p['DeveloperCertificates'][0])
 PY
 printf '%s' "$APPLE_DIST_CERT_PRIVATE_KEY_PEM" | sed 's/\\n/\n/g' > "$W/key.pem"
 openssl x509 -inform DER -in "$W/cert.der" -out "$W/cert.pem"
-openssl pkcs12 -export -legacy -inkey "$W/key.pem" -in "$W/cert.pem" -out "$W/dist.p12" -passout pass:kc -name concealer-dist
+# OpenSSL 3 (brew) needs -legacy so Apple's security(1) can read the p12; LibreSSL
+# (macOS/CI) has no such flag and already writes a legacy-compatible p12.
+LEG=""; openssl pkcs12 -help 2>&1 | grep -q -- '-legacy' && LEG="-legacy"
+openssl pkcs12 -export $LEG -inkey "$W/key.pem" -in "$W/cert.pem" -out "$W/dist.p12" -passout pass:kc -name concealer-dist
 
 security create-keychain -p cerbuild "$KC"
 security unlock-keychain -p cerbuild "$KC"
