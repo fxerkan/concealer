@@ -24,17 +24,15 @@ concurrency:
   group: mobile-release-${{ github.ref }}
   cancel-in-progress: false
 
-env:
-  # monotonic build numbers so re-runs never collide with an existing upload
-  ANDROID_VERSION_CODE: ${{ 100 + github.run_number }}
-  IOS_BUILD_NUMBER: ${{ 100 + github.run_number }}
-
 jobs:
   android:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: mobile } }
     steps:
       - uses: actions/checkout@v4
+      # monotonic build number so re-runs never collide with an existing upload
+      # (Actions expressions have no arithmetic, so compute it in the shell)
+      - run: echo "ANDROID_VERSION_CODE=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "17" }
       - uses: android-actions/setup-android@v3
@@ -78,6 +76,7 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+      - run: echo "IOS_BUILD_NUMBER=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
       - name: Sync web assets
