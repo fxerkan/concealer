@@ -45,3 +45,6 @@ extension/_test.html
 # internal working docs (SEO plan, Medium drafts, diagrams) — never published
 docs/_internal/
 
+
+# Local plaintext credentials (SA keys etc.) — never commit
+_credentials/
