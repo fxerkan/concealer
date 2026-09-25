@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
       - run: npm ci
-      - run: npx cap copy android            # sync www/ into the native project
+      - run: npx cap sync android            # sync www/ into the native project
       - name: Restore signing keystore
         working-directory: mobile/android
         env:

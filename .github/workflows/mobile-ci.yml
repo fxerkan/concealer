@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
       - run: npm ci
-      - run: npx cap copy android
+      - run: npx cap sync android
       - name: Debug build (unsigned)
         working-directory: mobile/android
         run: ./gradlew assembleDebug --no-daemon
