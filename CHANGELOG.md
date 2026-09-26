@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 `0.x.y` and **stays in `0.x` until the first full public release** — there is no
 `1.0` yet. Dates are UTC.
 
+## [0.9.29] — 2026-09-26
+
+### Added
+- **Demo mode** — a friction-free way to explore concealer with sample data, no real vault
+  or host needed. `concealer demo [port]` spins up an isolated throwaway vault (temp dir,
+  master password `demo1234`), seeds six dummy secrets, and serves the web UI with a DEMO
+  banner. The mobile app gains a matching **"Try the demo — no host needed"** button on the
+  setup screen that loads the same sample set offline (a DEMO badge shows in the header; sync
+  is disabled). All demo values are dummy (`DEMO`/`sk_test_…`).
+
 ## [0.9.28] — 2026-09-23
 
 ### Added

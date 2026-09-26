@@ -365,6 +365,12 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
 </head>
 <body>
 
+<!-- DEMO banner (shown only when served by `concealer demo`) -->
+<div id="demoBanner" style="display:none;position:sticky;top:0;z-index:100;background:#e5484d;color:#fff;text-align:center;font:600 13px/1.4 system-ui,-apple-system,sans-serif;padding:7px 12px">
+  DEMO — a throwaway vault with sample data · master password <b>demo1234</b> · your real vault is untouched
+</div>
+<script>if("__DEMO__"==="1"){var _db=document.getElementById("demoBanner");if(_db)_db.style.display="block";}</script>
+
 <!-- LOGIN -->
 <div id="login">
   <div class="loginbg" id="loginbg" aria-hidden="true"></div>

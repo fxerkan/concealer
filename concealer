@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "0.9.28"   # advances through 0.x; 1.0 = reserved for the full live/release version
+VERSION = "0.9.29"   # advances through 0.x; 1.0 = reserved for the full live/release version
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -3342,6 +3342,8 @@ def cli(argv):
         audit("deploy", source="cli", detail=f"{target} {label(scope)}")
         print(out or "(no match)")
     elif cmd == "web": _chrome_selfheal(); serve_web(int(a[0]) if a else 8787)
+    elif cmd == "demo": demo_cmd(a)
+    elif cmd == "_demo-seed": _demo_seed()   # internal: seed sample secrets into the demo vault
     elif cmd == "lan": serve_lan(int(a[0]) if a else 8788, int(a[1]) if len(a) > 1 else 8787)
     elif cmd == "service": service_cmd(a)
     elif cmd == "mcp": mcp_stdio()
@@ -3678,6 +3680,62 @@ def _af_resolve(job, d):
     job["username"] = e["fields"].get("username", "") if e else ""
     return reason
 
+# ---------------- demo mode: a throwaway vault with sample data (mirrors the mobile "Try the demo") ----
+# Same sample set as mobile/www (index.html demoSecrets). All values are dummy (DEMO/test only).
+_DEMO_SECRETS = [
+    {"name": "OpenAI API Key", "type": "api_key", "project": "demo", "repo": "demo", "environment": "prod",
+     "tags": ["ai", "demo"], "fields": {"value": "sk-DEMO-openai-3f9a2b7c4d5e6f7a8b9c0d1e"}},
+    {"name": "GitHub Token", "type": "access_token", "project": "demo", "repo": "demo", "environment": "prod",
+     "tags": ["git", "demo"], "fields": {"token": "ghp_DEMO1234abcd5678efgh9012ijkl3456mnop", "refresh_token": "",
+                                          "scopes": "repo, read:org", "expires": "2027-01-01"}},
+    {"name": "App Database", "type": "database", "project": "demo", "repo": "demo", "environment": "prod",
+     "tags": ["db", "demo"], "fields": {"host": "db.demo.local", "port": "5432", "database": "appdb", "schema": "public",
+                                         "username": "app", "password": "DEMO-pg-pw-9f8e7d", "auth_type": "password",
+                                         "jdbc_url": "jdbc:postgresql://app:DEMO-pg-pw-9f8e7d@db.demo.local:5432/appdb"}},
+    {"name": "AWS Access", "type": "custom", "project": "demo", "repo": "demo", "environment": "prod",
+     "tags": ["cloud", "demo"], "field_meta": {"secret_access_key": {"secret": True}},
+     "fields": {"access_key_id": "AKIADEMO1234567890", "secret_access_key": "DEMO/secretExampleKeyDoNotUse1234567890",
+                "region": "eu-central-1"}},
+    {"name": "Stripe (test)", "type": "api_key", "project": "demo", "repo": "demo", "environment": "prod",
+     "tags": ["payments", "demo"], "fields": {"value": "sk_test_DEMO_51ExampleKeyDoNotUse1234"}},
+    {"name": "Email Login", "type": "login", "project": "demo", "repo": "demo", "environment": "prod",
+     "tags": ["demo"], "fields": {"web_url": "https://mail.demo.example", "username": "demo@example.com",
+                                   "password": "DEMO-mail-pw-2b3c", "totp": "DEMOTOTPSEED234567"}},
+]
+
+def _demo_seed():
+    """Append the sample secrets to the (already-unlocked, via CONCEALER_TOKEN) demo vault."""
+    d = load(); have = {s.get("name") for s in d["secrets"]}; n = 0
+    for rec in _DEMO_SECRETS:
+        if rec["name"] in have: continue
+        e = dict(rec); e.setdefault("tenant", "*"); norm(e); d["secrets"].append(e); n += 1
+    if n: save(d)
+    print(f"seeded {n} demo secret(s)")
+
+def demo_cmd(a):
+    """`concealer demo [port]` — create/serve a throwaway demo vault with sample data. The real
+    vault is never touched: it lives in a temp dir and can be deleted any time. Master pw: demo1234."""
+    import re as _re
+    port = int(a[0]) if a and a[0].isdigit() else 8799
+    home = os.path.join(tempfile.gettempdir(), "concealer-demo")
+    script = os.path.realpath(__file__); py = sys.executable
+    env = {**os.environ, "CONCEALER_HOME": home}
+    if not os.path.exists(os.path.join(home, "secrets.enc.yaml")):
+        os.makedirs(home, exist_ok=True)
+        print("Creating a throwaway demo vault with sample data…")
+        r = subprocess.run([py, script, "init"], input="demo1234\ndemo1234\n", text=True, capture_output=True, env=env)
+        if r.returncode: sys.exit("demo setup failed:\n" + scrub(r.stderr))
+        m = _re.search(r"CONCEALER_TOKEN=([^\s\x1b]+)", r.stdout)
+        s = subprocess.run([py, script, "_demo-seed"], text=True, capture_output=True,
+                           env={**env, "CONCEALER_TOKEN": m.group(1) if m else ""})
+        if s.returncode: sys.exit("demo seed failed:\n" + scrub(s.stderr))
+    print(f"\n  concealer DEMO — throwaway vault with sample data (your real vault is untouched)."
+          f"\n  Open:             http://127.0.0.1:{port}"
+          f"\n  Master password:  demo1234"
+          f"\n  Vault dir:        {home}   (safe to delete)\n")
+    try: subprocess.run([py, script, "web", str(port)], env={**env, "CONCEALER_DEMO": "1"})
+    except KeyboardInterrupt: pass
+
 def serve_web(port):
     import time, threading
     _last = [time.time()]   # wall-clock of the last handled request (idle self-exit watchdog)
@@ -3764,7 +3822,7 @@ def serve_web(port):
                             b"<p style='font:15px system-ui;margin:0 2em'>This server is running from an old, "
                             b"removed install. Quit it and run <code>cer web</code> again.</p>")
                 else:
-                    page = page.replace(b"__IDLE__", str(CFG["idle"]).encode()).replace(b"__VERSION__", VERSION.encode())
+                    page = page.replace(b"__IDLE__", str(CFG["idle"]).encode()).replace(b"__VERSION__", VERSION.encode()).replace(b"__DEMO__", b"1" if os.environ.get("CONCEALER_DEMO") else b"0")
                 self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers(); self.wfile.write(page); return
             if path == "/api/session":

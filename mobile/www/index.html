@@ -136,6 +136,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
     <label>Master password</label>
     <div class="pwrow"><input id="s-pw" type="password" placeholder="Master password"><button class="eye" onclick="togglePw('s-pw',this)"></button></div>
     <button class="btn" id="s-go">Connect</button>
+    <button class="btn sec" id="s-demo" style="margin-top:8px">Try the demo — no host needed</button>
     <div id="s-msg" class="msg"></div>
     <p class="small">The host must be running the <b>concealer service</b> (or <b>concealer lan</b>). Values are end‑to‑end encrypted with your master password; they never travel in plaintext.</p>
   </div>
@@ -164,6 +165,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
 <section id="v-list" class="view">
   <header>
     <span class="brand"><svg class="logo" viewBox="0 0 512 512" width="22" height="22" style="vertical-align:-4px;margin-right:3px"><rect x="128" y="176" width="176" height="38" rx="19" fill="#8a909b"/><rect x="128" y="232" width="256" height="52" rx="26" class="mid"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#8a909b"/></svg>conceal<span class="ac">er</span></span>
+    <span id="demo-badge" style="display:none;background:#e5484d;color:#fff;font:700 10px/1.6 ui-monospace,monospace;padding:2px 6px;border-radius:5px;letter-spacing:.5px;margin-left:6px">DEMO</span>
     <span class="sp"></span>
     <span class="lockt" id="l-timer" title="auto-lock"></span>
     <button class="icona settingsbtn" id="l-settings" aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
@@ -352,7 +354,7 @@ const b64dec = b64 => { const s=atob(b64); const u=new Uint8Array(s.length); for
 // DIMS, scopeStr, live, nowIso, newId, canon, nameKey, newer, dedupeById, analyze, resolveOne → imported from ./sync.js
 
 const LS = { get:k=>localStorage.getItem("cer."+k), set:(k,v)=>localStorage.setItem("cer."+k,v), del:k=>localStorage.removeItem("cer."+k) };
-const S = { host:LS.get("host")||"", pw:"", secrets:[], editing:null, pairId:LS.get("pairId")||"" };
+const S = { host:LS.get("host")||"", pw:"", secrets:[], editing:null, pairId:LS.get("pairId")||"", demo:false };
 
 // ---- crypto ----
 async function encryptBundle(secrets, pw){
@@ -364,7 +366,25 @@ async function decryptBundle(bytes, pw){
   const plain = await d.decrypt(bytes, "uint8array");
   return JSON.parse(new TextDecoder().decode(plain)).secrets || [];
 }
-async function persist(){ const bytes = await encryptBundle(S.secrets, S.pw); LS.set("bundle", b64enc(bytes)); }
+async function persist(){ if(S.demo) return; const bytes = await encryptBundle(S.secrets, S.pw); LS.set("bundle", b64enc(bytes)); }
+
+// ---- demo mode (offline, no host): explore the full app with sample data ----
+// Same sample set as the web UI / CLI `concealer demo`. All values are dummy (DEMO/test only).
+function demoSecrets(){
+  const t = nowIso();
+  const rec = (name,type,fields,extra={}) => Object.assign(
+    {id:newId(),name,type,tenant:"*",project:"demo",environment:"prod",repo:"demo",
+     tags:["demo"],url:"",notes:"",field_meta:{},fields,created:t,updated:t}, extra);
+  return [
+    rec("OpenAI API Key","api_key",{value:"sk-DEMO-openai-3f9a2b7c4d5e6f7a8b9c0d1e"},{tags:["ai","demo"]}),
+    rec("GitHub Token","access_token",{token:"ghp_DEMO1234abcd5678efgh9012ijkl3456mnop",refresh_token:"",scopes:"repo, read:org",expires:"2027-01-01"},{tags:["git","demo"]}),
+    rec("App Database","database",{host:"db.demo.local",port:"5432",database:"appdb",schema:"public",username:"app",password:"DEMO-pg-pw-9f8e7d",auth_type:"password",jdbc_url:"jdbc:postgresql://app:DEMO-pg-pw-9f8e7d@db.demo.local:5432/appdb"},{tags:["db","demo"]}),
+    rec("AWS Access","custom",{access_key_id:"AKIADEMO1234567890",secret_access_key:"DEMO/secretExampleKeyDoNotUse1234567890",region:"eu-central-1"},{tags:["cloud","demo"],field_meta:{secret_access_key:{secret:true}}}),
+    rec("Stripe (test)","api_key",{value:"sk_test_DEMO_51ExampleKeyDoNotUse1234"},{tags:["payments","demo"]}),
+    rec("Email Login","login",{web_url:"https://mail.demo.example",username:"demo@example.com",password:"DEMO-mail-pw-2b3c",totp:"DEMOTOTPSEED234567"},{tags:["demo"]}),
+  ];
+}
+function enterDemo(){ S.demo=true; S.host=""; S.pw="demo"; S.pairId=""; S.secrets=demoSecrets(); stopScan(); flash($("s-msg"),""); openList(); }
 
 // ---- host API (native CapacitorHttp bypasses CORS; fetch fallback for a dev browser) ----
 const CapHttp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp;
@@ -460,15 +480,16 @@ $("s-rescan").onclick = () => scanning ? stopScan() : scanServers();
 $("s-go").onclick = async () => {
   const host=$("s-host").value.trim(), pw=$("s-pw").value;
   if(!host||!pw){ flash($("s-msg"),"Host and master password are required."); return; }
-  S.host=host; S.pw=pw; S.secrets=[]; flash($("s-msg"),"Connecting…","ok");
+  S.demo=false; S.host=host; S.pw=pw; S.secrets=[]; flash($("s-msg"),"Connecting…","ok");
   try{ const n=await sync(); LS.set("host",host); if(S.pairId) LS.set("pairId",S.pairId); flash($("s-msg"),""); openList(); }
   catch(err){ flash($("s-msg"), errText(err)); }
 };
+$("s-demo").onclick = enterDemo;
 
 // ---- unlock (offline) ----
 $("u-go").onclick = async () => {
   const pw=$("u-pw").value; if(!pw){ flash($("u-msg"),"Enter your master password."); return; }
-  try{ S.secrets = await decryptBundle(b64dec(LS.get("bundle")), pw); S.pw=pw; flash($("u-msg"),""); openList(); }
+  try{ S.secrets = await decryptBundle(b64dec(LS.get("bundle")), pw); S.pw=pw; S.demo=false; flash($("u-msg"),""); openList(); }
   catch{ flash($("u-msg"),"Wrong master password. If this device is paired to a different vault, tap ‘Use a different host’ to re‑import."); }
 };
 // setup screen reached from inside the app (non-destructive): show a Back button, keep the stored vault
@@ -478,7 +499,7 @@ $("u-reset").onclick = () => showSetup(true);
 
 // ---- list ----
 const scopeFmt = e => DIMS.map(k=>e[k]||"*").join(" / ");
-function openList(){ stopScan(); $("u-pw").value=""; $("s-pw").value=""; startLock(); refreshFilters(); renderList(); show("list"); }
+function openList(){ stopScan(); $("u-pw").value=""; $("s-pw").value=""; $("demo-badge").style.display = S.demo?"inline-block":"none"; startLock(); refreshFilters(); renderList(); show("list"); }
 function refreshFilters(){    // populate the type filter with the types actually present
   const types=[...new Set(live(S.secrets).map(e=>e.type||"api_key"))].sort();
   const sel=$("l-filter"), cur=sel.value;
@@ -511,6 +532,7 @@ $("l-add").onclick = () => openEdit(-1);
 $("l-settings").onclick = openSettings;
 let pendingSync = null;
 async function doSync(msgEl){
+  if(S.demo){ flash(msgEl,"Sync is off in demo mode. Connect to a host to sync your own vault."); return; }
   if(!S.host){ flash(msgEl,"No host set — open Settings → Change host."); return; }
   flash(msgEl,"Syncing…","ok");
   try{
@@ -568,7 +590,7 @@ function tickLock(){
   if(left <= 0) lock();
 }
 function stopLock(){ if(lockIv){ clearInterval(lockIv); lockIv=null; } $("l-timer").textContent=""; }
-function lock(){ stopLock(); S.pw=""; S.secrets=[]; boot(); }
+function lock(){ stopLock(); S.pw=""; S.secrets=[]; S.demo=false; boot(); }
 // lockAt is absolute wall-clock time, so backgrounding doesn't restart it — on return we just re-tick
 // (and lock immediately if the deadline passed while the app was in the background).
 document.addEventListener("visibilitychange", () => { if(!document.hidden && lockIv) tickLock(); });
