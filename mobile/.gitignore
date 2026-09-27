@@ -16,3 +16,4 @@ android/signing/
 *.jks
 *.keystore
 keystore.properties
+build-device/
