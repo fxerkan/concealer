@@ -17,3 +17,4 @@ android/signing/
 *.keystore
 keystore.properties
 build-device/
+store/*.mov
