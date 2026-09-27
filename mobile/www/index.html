@@ -31,6 +31,9 @@ body{background:var(--bg);color:var(--fg);font:15px/1.45 -apple-system,BlinkMacS
 .cli{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--mut);margin:0 0 22px}
 .cli b{color:var(--ac);font-weight:600}.cli .m{color:var(--fg)}
 .foot{margin-top:26px;text-align:center;color:var(--mut);font-size:12px}.foot a{color:var(--mut)}
+/* house rule: the "er" suffix is always accent-colored, even in footers (outside .brand) */
+.foot .ac,.lfoot .ac{color:var(--ac);font-weight:700}
+.verlink{cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .pwrow{position:relative}.pwrow input{padding-right:44px}
 .pwrow .eye{position:absolute;right:4px;top:6px;background:0;border:0;color:var(--mut);font-size:18px;padding:6px 8px}
 .view{display:none;flex-direction:column;height:100dvh}.view.on{display:flex}
@@ -140,7 +143,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
     <div id="s-msg" class="msg"></div>
     <p class="small">The host must be running the <b>concealer service</b> (or <b>concealer lan</b>). Values are end‑to‑end encrypted with your master password; they never travel in plaintext.</p>
   </div>
-  <div class="lfoot">conceal<span class="ac">er</span> · v0.9.28</div>
+  <div class="lfoot">conceal<span class="ac">er</span> · <span class="verlink" data-ver>v1.0.0</span></div>
 </section>
 
 <!-- UNLOCK: local bundle exists, offline capable -->
@@ -158,7 +161,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
       <button class="btn sec" id="u-reset">Use a different host…</button>
     </div>
   </div>
-  <div class="lfoot">conceal<span class="ac">er</span> · v0.9.28</div>
+  <div class="lfoot">conceal<span class="ac">er</span> · <span class="verlink" data-ver>v1.0.0</span></div>
 </section>
 
 <!-- VAULT: list -->
@@ -174,7 +177,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
     <input id="l-q" class="search" placeholder="Search name, scope, tag, notes…" autocapitalize="off">
     <div class="sortbar">
       <select id="l-filter"><option value="">All types</option></select>
-      <select id="l-sort"><option value="name">Sort: Name</option><option value="type">Sort: Type</option><option value="updated">Sort: Updated</option></select>
+      <select id="l-sort"><option value="updated" selected>Sort: Updated</option><option value="name">Sort: Name</option><option value="type">Sort: Type</option></select>
     </div>
     <div id="l-rows"></div>
     <div id="l-empty" class="empty" style="display:none">No secrets yet.<br>Tap + to add one.</div>
@@ -205,7 +208,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
     <label>About</label>
     <button class="btn sec" id="set-rate">★ Rate concealer</button>
     <button class="btn sec" id="set-support">Support &amp; feedback</button>
-    <div class="foot">conceal<span class="ac">er</span> · v0.9.28</div>
+    <div class="foot">conceal<span class="ac">er</span> · <span class="verlink" data-ver>v1.0.0</span></div>
   </div>
 </section>
 
@@ -515,8 +518,9 @@ function renderList(){
   rows.sort((a,b)=> sort==="type" ? (a.type||"").localeCompare(b.type||"")||(a.name||"").localeCompare(b.name||"")
     : sort==="updated" ? (b.updated||"").localeCompare(a.updated||"")
     : (a.name||"").localeCompare(b.name||""));
-  const ls = LS.get("lastSync");
-  $("l-foot").textContent = live(S.secrets).length + " secrets" + (ls? " · synced "+ls.slice(11,16) : " · not synced");
+  const ls = LS.get("lastSync"), foot = $("l-foot");
+  foot.textContent = live(S.secrets).length + " secrets · " + (ls ? "last sync " + relTime(ls) : "not synced");
+  foot.title = ls ? "last sync " + ls.replace("T"," ").replace("+00:00"," UTC") : "";
   $("l-empty").style.display = rows.length? "none":"block";
   $("l-rows").innerHTML = rows.map((e)=>{
     const i = S.secrets.indexOf(e), ty=e.type||"api_key";
@@ -700,6 +704,19 @@ $("modal-yes").onclick = async () => {
 };
 
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+// human "3 days, 4 hours ago" (mirrors the web UI). Top two non-zero units; minutes only shown under a day.
+function relTime(iso){
+  if(!iso) return "";
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime())/1000);
+  if(s < 60) return "just now";
+  const d=Math.floor(s/86400), h=Math.floor(s%86400/3600), m=Math.floor(s%3600/60), p=[];
+  if(d) p.push(d+" day"+(d>1?"s":""));
+  if(h) p.push(h+" hour"+(h>1?"s":""));
+  if(!d && m) p.push(m+" min"+(m>1?"s":""));
+  return (p.slice(0,2).join(", ")||"just now") + " ago";
+}
+// version label → GitHub project (all footers)
+[...document.querySelectorAll(".verlink")].forEach(el => el.onclick = () => openExternal("https://github.com/fxerkan/concealer"));
 
 // ---- theme (red default / matrix green) — mirrors the web/TUI ----
 function setTheme(name){

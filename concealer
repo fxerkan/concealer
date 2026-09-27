@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "0.9.29"   # advances through 0.x; 1.0 = reserved for the full live/release version
+VERSION = "1.0.0"   # tracks the public mobile-app release; semver from here on
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -1835,7 +1835,7 @@ def harden():
 def env_key(name, field=None):
     """Sanitize a secret (+optional field) name into a valid POSIX env identifier.
     Upper-case; any char outside [A-Z0-9_] -> _; a leading digit gets a _ prefix.
-    Without this, a name like 'grafana-rpifx' emits 'grafana-rpifx_PASSWORD', which
+    Without this, a name like 'grafana-prod' emits 'grafana-prod_PASSWORD', which
     is not a valid shell identifier and cannot be referenced by the child (see §3)."""
     raw = name if field is None else f"{name}_{field}"
     s = re.sub(r"[^A-Za-z0-9_]", "_", raw).upper()
@@ -4281,7 +4281,7 @@ MCP_TOOLS = [
         "collection": {"type": "string", "description": "narrow by collection path (sub-paths included)"}}}},
     {"name": "search_secrets", "description": "Search across name/scope/tag/url/notes (no values returned).",
      "inputSchema": {"type": "object", "properties": {"term": {"type": "string"}}, "required": ["term"]}},
-    {"name": "run_with_secrets", "description": "Run a command with scope-matching secrets injected into env. No values leak; output is masked. Pass 'names' to inject ONLY the secrets you need (least-privilege) instead of the whole scope. All types are injected, including website/login (as NAME_USERNAME, NAME_PASSWORD, NAME_WEB_URL, ...). Env names are sanitized to valid identifiers (upper-case; non-[A-Z0-9_] -> _; e.g. 'grafana-rpifx' password -> GRAFANA_RPIFX_PASSWORD); the exact injected identifiers are listed on an 'injected:' line and in the child's CONCEALER_INJECTED env var.",
+    {"name": "run_with_secrets", "description": "Run a command with scope-matching secrets injected into env. No values leak; output is masked. Pass 'names' to inject ONLY the secrets you need (least-privilege) instead of the whole scope. All types are injected, including website/login (as NAME_USERNAME, NAME_PASSWORD, NAME_WEB_URL, ...). Env names are sanitized to valid identifiers (upper-case; non-[A-Z0-9_] -> _; e.g. 'grafana-prod' password -> GRAFANA_PROD_PASSWORD); the exact injected identifiers are listed on an 'injected:' line and in the child's CONCEALER_INJECTED env var.",
      "inputSchema": {"type": "object", "properties": {"command": {"type": "string"},
         "names": {"type": "array", "items": {"type": "string"}, "description": "restrict injection to these secret names (default: all matching the scope)"},
         **_DIMPROPS}, "required": ["command"]}},

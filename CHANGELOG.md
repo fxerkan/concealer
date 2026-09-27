@@ -2,13 +2,41 @@
 
 All notable changes to `concealer` are documented here.
 
-Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
-`0.x.y` and **stays in `0.x` until the first full public release** — there is no
-`1.0` yet. Dates are UTC.
+Format follows [Keep a Changelog](https://keepachangelog.com/). concealer reached
+its first public release at **`1.0.0`** (alongside the mobile app) and follows
+[semver](https://semver.org/) from there; the desktop tool and mobile app share
+the same version line. Dates are UTC.
+
+## [1.0.0] — 2026-09-27
+
+First public release. The desktop tool and the iOS/Android mobile app ship on the
+same `1.0.0` version line.
+
+### Added
+
+- **Mobile app (iOS + Android)** — a Capacitor companion app that **opens the vault
+  offline** with your master password, works standalone, and **syncs bidirectionally**
+  with the host (`POST /api/sync`, timestamp last‑write‑wins with deletion tombstones).
+  All crypto runs on‑device (`age-encryption`); only master‑password‑encrypted bundles
+  cross the wire. Includes an offline **demo mode** (no host needed).
+- **Automated AI‑agent registration** — `concealer agent install [--all]` detects the AI
+  agents on your machine (Claude Code, Cursor, Windsurf, Gemini CLI, Claude Desktop, Codex),
+  registers a per‑agent token, writes the MCP config non‑destructively, and installs the
+  concealer skill where supported.
+- **Auto‑start service** — `concealer service install|uninstall|status` runs the `lan`
+  bridge at login as a per‑user background service (macOS launchd, Linux systemd `--user`,
+  Windows Scheduled Task) so phones can always reach and auto‑discover the vault.
+- **LAN discovery** — `concealer lan` advertises the vault over mDNS/Bonjour
+  (`_concealer._tcp`) with a **stable vault id**, so a phone picks *the vault* by identity
+  rather than by ip/host/port (survives DHCP changes and multiple vaults).
+- **Chrome extension** — copy secrets per‑field straight from the toolbar; talks only to the
+  local `127.0.0.1` server via a built‑in native host (`concealer native-host`), starts the
+  web server on demand and self‑exits after idle.
 
 ## [0.9.29] — 2026-09-26
 
 ### Added
+
 - **Demo mode** — a friction-free way to explore concealer with sample data, no real vault
   or host needed. `concealer demo [port]` spins up an isolated throwaway vault (temp dir,
   master password `demo1234`), seeds six dummy secrets, and serves the web UI with a DEMO
@@ -19,6 +47,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.28] — 2026-09-23
 
 ### Added
+
 - **Auto-start service** — `concealer service install|uninstall|status` runs the `lan` bridge
   automatically at login as a per-user background service (macOS launchd, Linux systemd `--user`,
   Windows Scheduled Task), so phones can always reach and **auto-discover** the vault with no
@@ -48,6 +77,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   get, the web UI, MCP enumeration, or human backups/exports — only in device sync.
 
 ### Fixed
+
 - **`rm --name X` could delete the wrong record(s)** on a vault with two or more live
   records. The scope selector was rebuilt inside a matching loop and the builder mutates
   its argument list, so after the first row the selector became empty and matched every
@@ -57,6 +87,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.27] — 2026-09-23
 
 ### Added
+
 - **`concealer agent install [--all|--mcp-only|--skill-only] [ids]`** — auto-detects the
   AI agents installed on this machine (Claude Code, Cursor, Windsurf, Gemini CLI, Claude
   Desktop, Codex), lets you pick which to set up interactively (or by id / `--all`), then
@@ -69,6 +100,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.26] — 2026-09-21
 
 ### Added
+
 - **`concealer lan [lan_port [web_port]]`** — reach the web UI from a phone (or any
   device) on the **same local network**. `web` binds loopback only and rejects
   non-loopback Host/Origin (anti-DNS-rebinding), so it is unreachable from a phone by
@@ -82,6 +114,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.25] — 2026-09-15
 
 ### Changed
+
 - **Default CLI unlock-token lifetime is now 1h** (was 8h), overridable with
   `CONCEALER_TOKEN_TTL` (seconds). Shorter default = smaller window if a shell holding the
   token is exposed. `unlock` now also exports `CONCEALER_TOKEN_EXP` (expiry epoch) so a
@@ -89,6 +122,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   already rejected after expiry — a child process cannot unset a var in its parent shell).
 
 ### Security
+
 - **The TUI now always requires the master password.** It previously honored a
   `CONCEALER_TOKEN` in the environment and would open — and reveal secrets — with no
   prompt, so any shell holding an unlock token could browse the vault. The TUI now ignores
@@ -96,21 +130,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   per-session unlock. (Token-driven `get`/`list`/MCP are unchanged.)
 
 ### Fixed
+
 - **`run_with_secrets` / `run` now inject *usable* env vars for secrets whose name isn't a
-  valid shell identifier.** A secret named `grafana-rpifx` previously emitted
-  `grafana-rpifx_PASSWORD` — not referenceable by the child (`$grafana-rpifx_PASSWORD`
+  valid shell identifier.** A secret named `grafana-prod` previously emitted
+  `grafana-prod_PASSWORD` — not referenceable by the child (`$grafana-prod_PASSWORD`
   doesn't parse, `compgen -e` won't list it), so `website`/`login` and other hyphenated
   secrets looked "not injected". Names are now sanitized to valid identifiers
-  (`grafana-rpifx` → `GRAFANA_RPIFX_PASSWORD`). Colliding names fail loudly instead of
+  (`grafana-prod` → `GRAFANA_PROD_PASSWORD`). Colliding names fail loudly instead of
   silently clobbering.
 
 ### Added
+
 - **`CONCEALER_INJECTED`** — injected into the child env as a comma-separated list of the
   injected identifier names (names only, never values), and shown on an `injected:` line
   in the `run_with_secrets` MCP result, so a script/agent can discover what was injected
   without guessing.
-- **`env_alias`** on a record — pin a stable env-injection base (e.g. `grafana-rpifx` →
-  `GRAFANA`) for scripts that reference fixed variable names. Settable via `set_secret`.
+- **`env_alias`** on a record — pin a stable env-injection base for scripts that reference fixed variable names. Settable via `set_secret`.
 - **Secure Agentic Autofill (fill-without-reveal).** A new MCP tool `request_web_login`
   lets a browser-driving agent sign in to a site with a stored `website`/`login` secret
   **without the value ever entering the agent/LLM context**. The agent only asks; a human
@@ -127,6 +162,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.24] — 2026-09-09
 
 ### Fixed
+
 - **Web UI showed a blank “webui.html not found” page after an in-place upgrade.** A `concealer web`
   server started before the upgrade keeps running from its versioned install dir, which the package
   manager deletes — so it can no longer read its own `webui.html`. The server now falls back to the
@@ -135,6 +171,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   from before this version must still be quit once — this heals the *next* upgrade.)
 
 ### Changed
+
 - **Chrome extension no longer stalls on open with a large vault.** The popup rendered a DOM row for
   every secret at once, which felt like a hang. It now renders the first 50 matches and shows
   “showing 50 of N — type to filter”; the search box still filters the whole vault instantly.
@@ -142,6 +179,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.23] — 2026-09-08
 
 ### Fixed
+
 - **Settings page lost the auto-backup config (and HIBP key status) on every refresh.**
   The i18n pass set `textContent` on every `[data-i18n]` element, which wiped the dynamic
   `<span>` children living inside labelled nodes (`#hibp_set`, `#bk_pw_set`, `#pol_badge`).
@@ -151,6 +189,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   elements, preserving those spans.
 
 ### Added
+
 - The **Settings page footer** now shows the brand + version + GitHub link, matching the login screen.
 - Clicking the **concealer logo/name** (top-left) returns to the Secrets home view.
 - **Landing page:** the “concealer” wordmark is marked `translate="no"` so a browser’s built-in
@@ -158,6 +197,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   The brand stays “concealer” in every language.
 
 ### Fixed
+
 - **Chrome extension stuck on the old version / "webui.html not found" after an upgrade.**
   A `concealer web` server started before the upgrade keeps running from the now-deleted
   install directory, so it can no longer find its own `webui.html`. The extension's native
@@ -169,6 +209,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   showing a blank page.
 
 ### Added
+
 - The extension shows a **version-mismatch banner** when its version differs from the running
   app, with a reminder to update concealer (brew/scoop/pip) and reload the extension.
 - `concealer version --check` — opt-in, on-demand check for a newer release. concealer makes
@@ -177,6 +218,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.21] — 2026-09-08
 
 ### Fixed
+
 - **Chrome extension stopped working after upgrading concealer** ("Couldn't reach the
   concealer server (Native host has exited.)"). The registered native-host launcher
   recorded the *resolved* script path, which package managers place under a versioned
@@ -194,6 +236,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.20] — 2026-09-08
 
 ### Fixed
+
 - **Import in the web UI did nothing when clicked.** The file was base64-encoded
   with `btoa(String.fromCharCode(...new Uint8Array(buf)))`, which blows the JS call
   stack for any file over ~100 KB — a real `.cerbak` is far bigger, so the reader
@@ -215,6 +258,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   a copy of the animation.
 
 ### Changed
+
 - **No user-facing surface names the underlying crypto tools any more.** The CLI banner,
   `--help` header, TUI splash, `init`/`harden` output, dependency-missing message, web UI
   warnings and every error string now say "vault key" / "encryption engine" instead of
@@ -230,6 +274,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.19] — 2026-09-02
 
 ### Changed
+
 - **Secrets table columns no longer auto-flood.** Custom-field columns now use an
   allowlist (`sc_col_shown`, default = base columns only), so newly-appearing
   field columns stay hidden until the user opts them in — instead of dozens of
@@ -252,6 +297,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   auto-sizes columns to their content (was fixed-width), so TIME no longer word-wraps.
 
 ### Security
+
 - **Secret field values are fully masked (`••••••••`) in the secrets list**, instead
   of the partial `sk-D…xy` mask that leaked the first/last characters. The partial
   mask still appears in detail/risk views where identifying the value is the point.
@@ -259,6 +305,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.18] — 2026-09-01
 
 ### Security
+
 - **Hardened the web UI against XSS (OWASP audit F1/F5).** A secret's `url` field is now passed through a
   scheme allow-list (`safeUrl` → only `http`/`https`/`mailto`) before it can become a clickable link, so a
   stored `javascript:`/`data:` URI (e.g. planted via the MCP `set_secret` `url` arg) can no longer execute
@@ -282,6 +329,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.17] — 2026-08-30
 
 ### Added
+
 - **Login brute-force throttle** — after 5 consecutive wrong master passwords the web login locks
   for 5 minutes (per client IP, in-memory); the UI shows a live countdown and disables the field.
   Audited as `unlock_blocked`.
@@ -289,6 +337,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   weeks / months) instead of raw hours; **Destination folder** gets a native **Browse** picker.
 
 ### Changed
+
 - **Filters panels start collapsed** on every page (Secrets / Audit / Stats) — open them explicitly.
 - **Stats charts** — Platform/Tags and Interface (source) bars now use the same accent color as the
   other charts (no rainbow palette).
@@ -300,6 +349,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.16] — 2026-08-27
 
 ### Added
+
 - **Chrome extension** (`extension/`) — open the vault and copy secret values from the toolbar,
   without typing `cer web`. The popup starts `concealer web` **on demand** via a native-messaging
   host **built into concealer** (macOS/Linux/Windows) and the server **self-exits after 15 min
@@ -317,6 +367,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   - **Settings → Developer** shows this build's extension ID + the `--add-id` command to authorize it.
 
 ### Changed
+
 - **Web server: header-token auth for the extension.** `/api/*` now accepts `X-Concealer-Token`
   in addition to the SPA's HttpOnly cookie (which can't ride cross-origin fetches from an
   extension page). `/api/unlock` returns the token in the body **only** when the caller sends
@@ -330,6 +381,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.15] — 2026-08-27
 
 ### Added
+
 - **Least-privilege injection** — `run_with_secrets` (MCP) and `concealer run` (CLI) accept a
   name filter so a command gets **only the secrets it names**, not every secret in the scope.
   MCP: `names: ["A", "B"]`. CLI: `concealer run --project p --name A <cmd>`. Default is unchanged
@@ -343,6 +395,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.14] — 2026-08-27
 
 ### Changed
+
 - **PyPI page: dropped the redundant top logo** — the hero banner already shows the logo, so the
   extra logo above it is gone.
 - **Scoop bucket published** (`fxerkan/scoop-bucket`): `scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket && scoop install concealer`. The in-repo `packaging/scoop/concealer.json` tracks the live PyPI wheel url/hash.
@@ -350,6 +403,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.13] — 2026-08-27
 
 ### Changed
+
 - **PyPI page polish** (metadata is fixed at upload time, so this needed a new release): the
   package `description` is now the tagline *"The local-only secret manager for the AI-coding era"*
   (with the docs link); **Project links** point Homepage → the docs site and Documentation →
@@ -359,6 +413,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.12] — 2026-08-26
 
 ### Added
+
 - **Native Windows support** (no WSL required). `age` reads the console rather than stdin, which the
   Unix build drives with `expect`; Windows has neither `expect` nor `/dev/tty`, so a new Windows-only
   helper (`concealer_win.py`) gives `age` a real ConPTY via **pywinpty** and types the passphrase into
@@ -387,6 +442,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.11] — 2026-08-26
 
 ### Changed
+
 - **On lock, drop the in-memory key and run `gc.collect()`** (idle auto-lock and `POST /api/lock`
   both go through a shared `_lock_clear()`). This reclaims freed key/secret copies sooner.
 - **Documented the in-memory-secrets ceiling honestly** (`docs/security.md`, `docs/web-ui.md`, TR
@@ -398,11 +454,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.10] — 2026-08-26
 
 ### Changed
+
 - **Backup files now use the `.cerbak` extension** (was `.cer`). Manual downloads, auto-backups,
   rotation, and the web/CLI wording all emit `.cerbak`. Existing `.cer` backups still restore
   (import is extension-agnostic) and are still recognized by rotation, so nothing breaks.
 
 ### Added
+
 - **Restore conflict handling.** `import` / restore now takes a conflict mode chosen up front:
   `overwrite` (default — update the matching record, prior behavior), `skip` (leave existing
   records untouched), or `duplicate` (always add incoming records as fresh copies with new ids).
@@ -412,6 +470,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.9] — 2026-08-26
 
 ### Changed
+
 - **Per-field secret toggle for custom secrets in the web editor.** Each custom field row
   now has a 🔒/🔓 flag: flagged fields are masked (password + reveal), un-flagged fields show
   their value in plaintext in both the edit and view screens. Defaults from the field-name
@@ -419,6 +478,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   `REGION=eu-central-1` no longer render as `••••••`.
 
 ### Fixed
+
 - **Exposure record-picker header now stays pinned.** The table lives in its own scroll
   container, but the page-level `#view-leaks thead th` rule pinned headers at
   `top:calc(--hh + --sh)` (the app header/subbar offset), so inside the container the header
@@ -431,6 +491,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.8] — 2026-08-26
 
 ### Changed
+
 - **Online leak check: record picker is now a table, not a dropdown.** The secret picker
   is a Secrets-grid-style table (checkbox · Name · Type · Collection · Scope · Tags ·
   Updated) with a left multi-select column and **Select all / Clear** at the top (plus a
@@ -445,6 +506,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.7] — 2026-08-26
 
 ### Fixed
+
 - **Online leak check now targets exact records, not names.** The secret picker keyed on
   **name**, so two records sharing a name across different scopes/collections/tags/repos
   collapsed into one option — picking it silently checked *all* of them. The picker now
@@ -453,6 +515,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   (`exposure_scan(ids=…)`) that checks only those records.
 
 ### Added
+
 - **Target-narrowing filters before picking.** A row of multi-select dropdowns
   (tenant / project / environment / repo / collection / tag) above the secret picker
   narrows which records are listed; an empty picker selection then means "all records in
@@ -463,6 +526,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.6] — 2026-08-26
 
 ### Changed
+
 - **Exposure tab now drives off the vault, not free text.** The **Online leak check** picks
   the secrets to check from a filterable/multi-select dropdown (the shared `msel` component)
   of secret names — empty selection = all. The **Email breach check** picks from a dropdown
@@ -478,6 +542,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.5] — 2026-08-26
 
 ### Added
+
 - **Risks → "Exposure" tab — online leak research + git/log scanning.** A new tab that
   answers "is this secret leaked / reused anywhere" **without ever sending the secret
   value online**:
@@ -504,6 +569,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 - **Scan folder button** now keeps its 🔎 icon (was overwritten by the i18n label).
 
 ### Security
+
 - The online leak check is **opt-in** (only runs when you click Scan / run `expose`) and
   transmits only a SHA-1 prefix — a deliberate k-anonymity design so a full secret value
   is never exposed to a third party. CWE-798 (hard-coded credentials) and related CWEs are
@@ -512,6 +578,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.4] — 2026-08-26
 
 ### Added
+
 - **Environment / global variable scan.** `env_scan()` inspects the local machine's live
   environment (`os.environ`) plus shell profile files (`~/.bashrc`, `~/.zshrc`, `~/.zshenv`,
   `~/.profile`, `~/.config/fish/config.fish`, `/etc/environment`, …) for secret-looking
@@ -537,6 +604,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   semantics) as the built-in agent-access policy.
 
 ### Fixed
+
 - **Web UI: browser Back/Forward no longer exits the app.** The SPA now keeps its active
   tab in history (`?v=<tab>` via `pushState`); Back/Forward moves between the last visited
   tabs instead of leaving the page, and Back on an open dialog just closes it. Restoring a
@@ -546,6 +614,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.3] — 2026-08-26
 
 ### Added
+
 - **Risks page — "Overview" tab.** A per-secret risk dashboard fed by a new read-only
   `GET /api/health` endpoint (`health_scan()`). Groups secrets into: ❌ expired,
   ⏰ expiring soon (≤30 days), 🔄 rotation overdue, ⚠️ high-risk reuse, and 🔥 most-used.
@@ -560,6 +629,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
 ## [0.9.2] — 2026-08-26
 
 ### Security
+
 - **`run_with_secrets` (MCP inject) is now rate-gated.** Injection passes `rate_gate`
   in a new all-or-nothing `atomic` mode: the distinct secret names a scope would inject
   count against the agent's rolling `window_quota` (already-disclosed names re-inject
@@ -571,6 +641,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/); versioning is
   leaks), so the log shows *what ran*, not just which secret names were injected.
 
 ### Fixed
+
 - **Audit Logs table:** sticky column headers now stay pinned on scroll (previously only
   the Secrets table had sticky headers). Column widths no longer break when a KEY cell is
   very long — the audit grid uses `table-layout:fixed` with sensible default widths and
