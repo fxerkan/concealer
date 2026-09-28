@@ -3,7 +3,6 @@ package org.concealer.mobile;
 import android.content.Context;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
-import android.net.wifi.WifiManager;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -25,7 +24,6 @@ public class DiscoveryPlugin extends Plugin {
     private static final String SERVICE_TYPE = "_concealer._tcp.";
     private NsdManager nsd;
     private NsdManager.DiscoveryListener discoveryListener;
-    private WifiManager.MulticastLock lock;
 
     // NsdManager (pre-Android 12) allows only one active resolve at a time — serialize them.
     private final Queue<NsdServiceInfo> resolveQueue = new ArrayDeque<>();
@@ -35,10 +33,8 @@ public class DiscoveryPlugin extends Plugin {
     public void watch(PluginCall call) {
         Context ctx = getContext();
         if (nsd == null) nsd = (NsdManager) ctx.getSystemService(Context.NSD_SERVICE);
-        try {
-            WifiManager wifi = (WifiManager) ctx.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-            if (wifi != null) { lock = wifi.createMulticastLock("concealer-nsd"); lock.setReferenceCounted(false); lock.acquire(); }
-        } catch (Exception ignored) {}
+        // NsdManager handles mDNS multicast itself — no app-held MulticastLock needed
+        // (least-privilege: keeps the app to INTERNET only, no Wi-Fi/multicast permissions).
         stop();
         discoveryListener = new NsdManager.DiscoveryListener() {
             @Override public void onStartDiscoveryFailed(String t, int e) {}
@@ -96,7 +92,5 @@ public class DiscoveryPlugin extends Plugin {
             discoveryListener = null;
         }
         resolveQueue.clear(); resolving = false;
-        if (lock != null && lock.isHeld()) { try { lock.release(); } catch (Exception ignored) {} }
-        lock = null;
     }
 }
