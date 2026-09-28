@@ -17,7 +17,7 @@ ordinal: 4000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Allow an explicit per-secret env_alias so the owner can pin e.g. grafana-rpifx -> GRAFANA for stable scripts. Honored by env_key()/inject_env when present.
+Allow an explicit per-secret env_alias so the owner can pin e.g. grafana-prod -> GRAFANA for stable scripts. Honored by env_key()/inject_env when present.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

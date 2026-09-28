@@ -24,14 +24,14 @@ Two independent features, different risk/effort profiles:
 - **Feature B — Reliable programmatic delivery of website secrets.** `run_with_secrets`
   **already injects** website/login secrets as env vars — but a **name-sanitization
   bug** (§3) makes them unreferenceable when the secret name contains characters that
-  are invalid in POSIX env identifiers (e.g. `grafana-rpifx` → `grafana-rpifx_PASSWORD`).
+  are invalid in POSIX env identifiers (e.g. `grafana-prod` → `grafana-prod_PASSWORD`).
   Fix that, add a discoverable name-mapping, and optionally add a **session-broker**
   tool (concealer performs the login and hands back a session token/cookie) for the
   exact case that started this: "agent needs an authenticated session to a web app".
 
 **Why this matters (the triggering incident):** an agent needed to log into a
 Grafana behind Cloudflare Access. It could not: (1) `run_with_secrets` *seemed* to not
-inject the `grafana-rpifx` website secret (actually the hyphenated env name bug), and
+inject the `grafana-prod` website secret (actually the hyphenated env name bug), and
 (2) even with the value, typing a password into a web form via browser automation is
 prohibited by the agent's safety rules. Feature A solves (2) properly; Feature B fixes (1).
 
@@ -114,7 +114,7 @@ with `X-Concealer-Token`. Manifest permissions: `nativeMessaging`, `storage`,
 of type `database` you get `pg_HOST`, `pg_PASSWORD`, … For `website` you'd get
 `NAME_WEB_URL`, `NAME_USERNAME`, `NAME_PASSWORD`.
 
-The failure with `grafana-rpifx` was the **env-var name**:
+The failure with `grafana-prod` was the **env-var name**:
 
 ```python
 # concealer:1636-1637
@@ -122,13 +122,13 @@ for fn, fv in e["fields"].items():
     kv[f"{name}_{fn.upper()}"] = str(fv)     # name is used verbatim
 ```
 
-→ produces `grafana-rpifx_WEB_URL`, `grafana-rpifx_USERNAME`, `grafana-rpifx_PASSWORD`.
+→ produces `grafana-prod_WEB_URL`, `grafana-prod_USERNAME`, `grafana-prod_PASSWORD`.
 
 Hyphen (`-`) is **not a valid POSIX shell identifier char**. Consequences observed:
 - `compgen -e` / `printenv | sed` **do not list** these names (not valid identifiers),
   so probing "what got injected" showed nothing → looked like "website not injected".
-- `${!varname}` indirection and `$grafana-rpifx_PASSWORD` cannot reference them.
-- Only awkward forms like `env | grep '^grafana-rpifx_'` or `python -c 'os.environ[...]'`
+- `${!varname}` indirection and `$grafana-prod_PASSWORD` cannot reference them.
+- Only awkward forms like `env | grep '^grafana-prod_'` or `python -c 'os.environ[...]'`
   can read them — which no caller expects.
 
 So the injector silently produces **unusable** env vars for any secret whose *name*
@@ -189,7 +189,7 @@ long-term integration; the MCP tool is the concealer-native fallback that works 
 Reuse & extend:
 - **Approval surface:** the concealer **web UI** (already the unlock/settings surface)
   shows a modal "Agent `claude-code` wants to sign in to `grafana.fxerkan.com` using
-  `grafana-rpifx` (user: …). [Approve once] [Approve for this task] [Deny]". Desktop
+  `grafana-prod` (user: …). [Approve once] [Approve for this task] [Deny]". Desktop
   notification optional (macOS `osascript`/`terminal-notifier`).
 - **Domain match (anti-phishing):** compare the *tab's registrable domain* (agent-
   supplied, then re-verified by the extension from `location.origin`, which the agent
@@ -297,18 +297,18 @@ Problem: §3. Fix the naming in `inject_env` (`concealer:1634-1637`).
 Design:
 - Sanitize each emitted env name to a valid identifier: uppercase; replace any char
   not in `[A-Z0-9_]` with `_`; if it starts with a digit, prefix `_`.
-  `grafana-rpifx` + `password` → `GRAFANA_RPIFX_PASSWORD`.
+  `grafana-prod` + `password` → `GRAFANA_PROD_PASSWORD`.
 - **Collision safety:** two different names could sanitize to the same identifier
   (`a-b` and `a.b`). Detect collisions within a single injection and either suffix a
   short hash or fail loudly listing the conflict. (Rare; but must not silently clobber.)
 - **Discoverability:** because the emitted name no longer equals the secret name, the
   agent can't guess it. Mitigate by **printing the mapping** (names only, never values)
-  to the child via a well-known env var, e.g. `CONCEALER_INJECTED=GRAFANA_RPIFX_USERNAME,
-  GRAFANA_RPIFX_PASSWORD,GRAFANA_RPIFX_WEB_URL` and/or returning the injected identifier
+  to the child via a well-known env var, e.g. `CONCEALER_INJECTED=GRAFANA_PROD_USERNAME,
+  GRAFANA_PROD_PASSWORD,GRAFANA_PROD_WEB_URL` and/or returning the injected identifier
   list in the `run_with_secrets` tool result (already returns a `[scope]` header — add
   an "injected: …" line). This is safe (identifiers, not values) and removes all guessing.
 - Optionally support an explicit **alias** per secret (`field_meta`/record `env_alias`)
-  so the owner can pin `grafana-rpifx` → `GRAFANA` for stable scripts.
+  so the owner can pin `grafana-prod` → `GRAFANA` for stable scripts.
 - **api_key** bare-name path (`kv[name]=…`) has the same bug for hyphenated api_key
   names — sanitize there too.
 - Backward-compat: this changes emitted names. Gate behind a minor version note; the

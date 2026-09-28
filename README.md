@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/fxerkan/concealer/main/docs/assets/hero.png" alt="concealer — The local-only secret manager for the AI-coding era" width="820">
+  <img src="https://raw.githubusercontent.com/fxerkan/concealer/main/docs/assets/concealer-cover-2.jpeg" alt="concealer — The local-only AI Secret Manager for the AI-coding era" width="820">
 </p>
 
 # conceal**er**
@@ -12,15 +12,13 @@
   <a href="https://fxerkan.github.io/concealer/"><img src="https://img.shields.io/badge/docs-fxerkan.github.io-ff4d4d?style=for-the-badge&labelColor=0a0b0d" alt="Docs"></a>
 </p>
 
-> **The local-only secret manager for the AI-coding era.**
-> Encrypted with [SOPS](https://github.com/getsops/sops) + [age](https://github.com/FiloSottile/age).
-> No cloud, no telemetry, no account. CLI · Web UI · MCP · TUI.
+> **The local-only AI Secret Manager for the AI-coding era.**
+> No cloud, no telemetry, no account.
+> CLI · Web UI · MCP · TUI · Chrome Extension · Mobile App.
 
 <p align="center">
   <b><a href="https://fxerkan.github.io/concealer/">📖 Documentation</a> · <a href="https://github.com/fxerkan/concealer/issues/new">🐛 Report a bug</a> · ⭐ <a href="https://github.com/fxerkan/concealer/stargazers">Star this repo</a> if it helps you!</b>
 </p>
-
-<sub>see [CHANGELOG](https://github.com/fxerkan/concealer/blob/main/CHANGELOG.md)</sub>
 
 `concealer` is a thin, auditable wrapper around two battle‑tested tools — it does **not** implement its own cryptography. Everything is encrypted by `sops`/`age`; concealer only adds the UX: typed secrets, scoping, tags, a professional web UI, tamper‑evident audit logs, and an MCP server so AI agents can *use* secrets without ever *seeing* them.
 
@@ -29,7 +27,6 @@
 <p align="center">
   <img src="https://raw.githubusercontent.com/fxerkan/concealer/main/docs/assets/demo-ha-token.gif" alt="Claude Code injecting a Home Assistant token via concealer MCP — the value is redacted from its context" width="820">
 </p>
-
 
 ---
 
@@ -63,10 +60,10 @@ If you've ever pasted a secret into a chat window and immediately regretted it �
 
 concealer is **not** a crypto project. It delegates 100% of encryption to:
 
-| Tool | Repo | Role in concealer |
-|------|------|-------------------|
-| **SOPS** | https://github.com/getsops/sops | Encrypts/decrypts the vault (`secrets.enc.yaml`). Per‑value AES‑256‑GCM, git‑friendly. |
-| **age** | https://github.com/FiloSottile/age | The encryption backend (X25519). The private key is itself passphrase‑wrapped (scrypt) for a portable backup. |
+| Tool           | Repo                               | Role in concealer                                                                                              |
+| -------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **SOPS** | https://github.com/getsops/sops    | Encrypts/decrypts the vault (`secrets.enc.yaml`). Per‑value AES‑256‑GCM, git‑friendly.                   |
+| **age**  | https://github.com/FiloSottile/age | The encryption backend (X25519). The private key is itself passphrase‑wrapped (scrypt) for a portable backup. |
 
 Why this stack: SOPS is a CNCF project used by thousands of teams; age is a modern, audited, boring‑on‑purpose encryption tool by Filippo Valsorda. Reusing them means the security‑critical code is the part that has already been reviewed by the world — concealer is just glue. This is deliberate: **the laziest secure design is the one where you write the least security code.**
 
@@ -139,6 +136,7 @@ Requires Python 3 (stdlib only — no `pip install`), plus `sops`, `age`, and `e
 ## Usage
 
 ### CLI
+
 ```bash
 concealer set --name OPENAI_API_KEY --project proj-a --env prod 'sk-...' --tags ai
 concealer set --name MAIN_DB --type database --tenant acme --project billing --env prod \
@@ -154,6 +152,7 @@ concealer audit verify                                         # chain + tail-an
 ```
 
 ### Unlock, tokens & recovery
+
 ```bash
 eval "$(concealer unlock)"          # human: master password → CONCEALER_TOKEN (TTL, ~8h) in your shell
 
@@ -166,31 +165,34 @@ concealer passwd                    # change master password — needs current p
 concealer recover                   # forgot the master password? recover with a recovery code
 concealer recovery                  # regenerate the recovery-code set (needs master password)
 ```
+
 The **token value** is only ever in your environment (`CONCEALER_TOKEN`); the vault stores just its hash and a token‑wrapped key. Revoke a token and that copy is dead.
 
 ### Scopes & inheritance
+
 Every secret carries `tenant / project / environment / repo`. Empty = wildcard (a default). On `run`, the **most‑specific** match wins: `acme/proj-a/prod` overrides `proj-a` overrides `global`. Unspecified dimensions on `run` are auto‑detected from the current git repo.
 
 ### Secret types
+
 Each type has its own **type‑aware form** so you only enter the fields that make sense, and secret‑ish fields (`password`/`value`/`token`/`pin`/…) are stored masked and revealed only on demand (audited). Any field name works too via `custom`.
 
-| Type | Fields |
-|------|--------|
-| `api_key` | `value` |
-| `access_token` | token, refresh_token, expires, scopes |
-| `oauth` | client_id, client_secret, auth_url, token_url, scopes |
-| `jwt` | token, issuer, audience, expires |
-| `ssh_key` | private_key, public_key, passphrase, host, user |
-| `certificate` | certificate, private_key, chain, expires |
-| `database` | host, port, database, schema, username, password, auth_type, jdbc_url |
-| `server` | host, port, username, password, ssh_key |
-| `website` | web_url, username, password |
-| `login` | web_url, username, password, totp |
-| `pin` | pin, label (phone / door PINs) |
-| `wifi` | ssid, password, security |
-| `membership` | provider, member_id, password |
-| `secure_note` | note |
-| `custom` | any key/value you define |
+| Type             | Fields                                                                |
+| ---------------- | --------------------------------------------------------------------- |
+| `api_key`      | `value`                                                             |
+| `access_token` | token, refresh_token, expires, scopes                                 |
+| `oauth`        | client_id, client_secret, auth_url, token_url, scopes                 |
+| `jwt`          | token, issuer, audience, expires                                      |
+| `ssh_key`      | private_key, public_key, passphrase, host, user                       |
+| `certificate`  | certificate, private_key, chain, expires                              |
+| `database`     | host, port, database, schema, username, password, auth_type, jdbc_url |
+| `server`       | host, port, username, password, ssh_key                               |
+| `website`      | web_url, username, password                                           |
+| `login`        | web_url, username, password, totp                                     |
+| `pin`          | pin, label (phone / door PINs)                                        |
+| `wifi`         | ssid, password, security                                              |
+| `membership`   | provider, member_id, password                                         |
+| `secure_note`  | note                                                                  |
+| `custom`       | any key/value you define                                              |
 
 > **No PII by design.** There are deliberately **no** credit‑card / passport / national‑ID types — this vault is for machine & account credentials, not identity documents.
 
@@ -205,10 +207,10 @@ Each type renders exactly the inputs it needs — an API key is a single value, 
   <br><sub>Type‑aware entry: cloud tokens · database connections · website logins · free‑form custom fields. Secret fields are masked; plain fields (host, url, username) stay readable and become optional table columns.</sub>
 </p>
 
-
-
 ### Web UI — `concealer web` - `cer web`
+
 Opens **http://127.0.0.1:8787** (localhost only). Features:
+
 - **TR / EN** interface toggle (top‑right)
 - Full **CRUD** with type‑aware forms · responsive (phone/tablet) layout
 - Search + **searchable, multi‑select** type/tenant/project/environment/repo/**tags** filters
@@ -242,6 +244,7 @@ cer chrome-extension     # one-time: register the native helper (macOS/Linux/Win
 ```
 
 Then click the toolbar icon → unlock → copy. Highlights:
+
 - **Per‑field copy** — multi‑field secrets expand into child rows; copy or reveal exactly the field you need.
 - **On‑demand** — starts `concealer web` when you open the popup and **self‑exits after 15 min idle** (nothing lingers).
 - **Auto‑lock** countdown, **🎲 password generator**, **search**, and three **themes** (Dark · White · Matrix).
@@ -257,6 +260,7 @@ The native host is **built into concealer** (`concealer native-host`) — no sep
 **[Add to Chrome →](https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj)** on the Chrome Web Store.
 
 ### MCP (AI agents) — `concealer mcp` - `cer mcp`
+
 Register once, available in every session. On a hardened (key‑at‑rest) vault the
 MCP server unlocks with a token, so **give it an agent token instead of your
 password** — it never prompts and you can revoke it anytime.
@@ -265,21 +269,25 @@ password** — it never prompts and you can revoke it anytime.
 on your machine (Claude Code, Cursor, Windsurf, Gemini CLI, Claude Desktop, Codex), lets
 you pick which to wire up, then registers a per‑agent token, writes the MCP config, and
 installs the concealer skill where supported. Config merges are non‑destructive:
+
 ```bash
 concealer agent install            # interactive: pick from detected agents
 concealer agent install --all      # set up every detected agent
 ```
 
 Or do it manually for a single agent:
+
 ```bash
 concealer agent register claude                 # prints a CONCEALER_TOKEN for this agent
 claude mcp add --scope user concealer \
   --env CONCEALER_TOKEN=<token-from-above> \
   -- /path/to/concealer/concealer mcp
 ```
+
 Without a valid token the server **fails closed** — no secret ever leaks. Revoke with `concealer agent revoke claude`.
 
 Tools exposed to the agent:
+
 - `list_secrets` / `search_secrets` — names, types, scopes, tags (**never values**)
 - `run_with_secrets` — runs a command with secrets injected into env; **values are redacted** from the returned output
 
@@ -291,6 +299,60 @@ The agent can use a DB password to run a query, but the password never appears i
   <img src="https://raw.githubusercontent.com/fxerkan/concealer/main/docs/assets/mcp-secret-list.gif" alt="Claude Code listing concealer secrets over MCP — names and scopes only, never values" width="820">
 </p>
 
+---
+
+## Mobile app (iOS + Android)
+
+A companion app that carries your vault in your pocket — **offline‑first**, no cloud account.
+
+- **Opens the vault offline** with your master password — no host connection needed.
+- **Imports the whole vault** from the host on first connect, then works standalone.
+- **Add / edit / delete** secrets on the phone, offline.
+- **Bidirectional sync** with the host when online — timestamp‑based last‑write‑wins, deletions
+  propagate. Only master‑password‑encrypted bundles cross the wire; plaintext values never do.
+- **Try the demo — no host needed**: a one‑tap offline sample set to explore the app.
+
+All cryptography runs **on‑device** (the same age passphrase format the desktop uses) — there is
+no `sops`/`age` binary on the phone. At rest the phone stores only the encrypted bundle; decrypted
+secrets live in memory while unlocked. Sync is the human‑owner path: `POST /api/sync` requires the
+master password on every call (never an agent token). Build & run details → [`mobile/README.md`](mobile/README.md).
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/fxerkan/concealer/main/mobile/store/screenshots/ios/01-login.jpeg" alt="concealer mobile — offline unlock with the master password" width="200">
+  <img src="https://raw.githubusercontent.com/fxerkan/concealer/main/mobile/store/screenshots/ios/03-sectets.jpeg" alt="concealer mobile — searchable, scoped secrets list on the phone" width="200">
+  <img src="https://raw.githubusercontent.com/fxerkan/concealer/main/mobile/store/screenshots/ios/04-secret-copy.jpeg" alt="concealer mobile — reveal and copy a secret field" width="200">
+  <img src="https://raw.githubusercontent.com/fxerkan/concealer/main/mobile/store/screenshots/ios/07-secret-database.jpeg" alt="concealer mobile — type-aware database secret form" width="200">
+  <br><sub><b>Mobile app</b> — offline unlock · scoped secrets list · per‑field reveal/copy · type‑aware forms. Same crypto and data model as the desktop, in your pocket.</sub>
+</p>
+
+## Reach your phone — LAN bridge, discovery & auto‑start
+
+The plain web server is loopback‑only. To let a phone on the same Wi‑Fi reach the vault, run the
+LAN bridge — which also **advertises itself over mDNS/Bonjour** (`_concealer._tcp`) with a stable
+vault id, so the app finds *your vault* by identity even across DHCP changes:
+
+```bash
+concealer lan                       # phone -> http://<host>.local:8788  (same Wi-Fi only)
+```
+
+Don't want to start it by hand each time? Install it as a background service that runs at login and
+keeps the phone‑reachable, auto‑discoverable bridge up:
+
+```bash
+concealer service install           # macOS launchd · Linux systemd --user · Windows Scheduled Task
+concealer service status            # is it running?
+concealer service uninstall         # remove it
+```
+
+On the phone, tap **Scan for host** to discover the advertised vault on your Wi‑Fi — or point it at
+an explicit address in Settings. Once paired it re‑finds *your vault* by identity, even if the host's
+IP changes:
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/fxerkan/concealer/main/mobile/store/screenshots/ios/02-scan-server.jpeg" alt="concealer mobile — scanning the LAN to discover the advertised vault" width="220">
+  <img src="https://raw.githubusercontent.com/fxerkan/concealer/main/mobile/store/screenshots/android/08-settngs-change-server.png" alt="concealer mobile — set or change the host address in Settings" width="220">
+  <br><sub><b>Discovery & pairing</b> — auto‑scan the LAN for the mDNS‑advertised vault, or set the host manually; the app tracks the vault by stable id.</sub>
+</p>
 
 ---
 
@@ -302,6 +364,7 @@ The agent can use a DB password to run a query, but the password never appears i
 eval "$(concealer unlock)"        # asks the master password on the new machine, mints a fresh token
 concealer list                    # works — machine-independent
 ```
+
 The vault is bound to a **password** (or a recovery code), not to this machine's hardware. Tokens are per‑machine on purpose: a copied folder is inert until someone types the master password.
 
 ---
@@ -317,17 +380,21 @@ The vault is bound to a **password** (or a recovery code), not to this machine's
 - **Nothing in `keys/`, `secrets.enc.yaml`, or `.sops.yaml` is committed** — see `.gitignore`. This repo ships the *tool*, never a vault.
 
 ## Change the master password
+
 ```bash
 concealer passwd     # asks the CURRENT password + a RECOVERY CODE (consumed), then sets the new one
 ```
+
 Requiring a recovery code means whoever learns your master password still can't take the vault over without one of the codes you stored elsewhere. Out of codes? `concealer recovery` mints a fresh set.
 
 ## Forgot the master password?
+
 ```bash
 concealer recover    # asks for a recovery code, restores access, sets a new master password
 ```
 
 ## License
+
 MIT.
 
 ## Thanks
@@ -337,8 +404,7 @@ MIT.
 * SOPS
 * age
 * secretctl
-  
----
 
+---
 
 Developed by [FXerkan](https://fxerkan.com) - Code more, worry less.

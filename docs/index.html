@@ -157,6 +157,20 @@ html[data-theme="light"] .install{background:linear-gradient(180deg,#1b1e24 0%,#
 .btn.primary:hover{background:var(--acc2)}
 .btn.ghost{background:transparent;color:var(--txt)}
 .btn.ghost:hover{border-color:var(--acc)}
+/* highlighted "Star on GitHub" — gold glow + pulsing star to nudge stars */
+.btn.star{background:var(--panel2);color:var(--txt);border-color:#e3b341}
+.btn.star:hover{border-color:#f2cc60;box-shadow:0 10px 30px rgba(227,179,65,.28)}
+.btn.star .starico{color:#e3b341;font-size:16px;animation:starpulse 2.4s ease-in-out infinite}
+@keyframes starpulse{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.25);opacity:1}}
+@media(prefers-reduced-motion:reduce){.btn.star .starico{animation:none}}
+/* mobile-app store badges (shown in the hero "Mobile App" tab) */
+.storebtns{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.storebtn{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--line2);background:var(--panel2);
+  color:var(--txt);border-radius:11px;padding:9px 16px;font-weight:600;font-size:14px;line-height:1.15;text-align:left}
+.storebtn:hover{border-color:var(--acc)}
+.storebtn .g{font-size:22px;line-height:1}
+.storebtn small{display:block;color:var(--mut);font-size:10.5px;font-weight:600;letter-spacing:.3px;text-transform:uppercase}
+.storebtn b{font-size:15px;font-weight:700}
 
 /* ===== redaction animation background (from the app's login screen) ===== */
 .loginbg{position:absolute;inset:0;overflow:hidden;z-index:1;pointer-events:none;user-select:none;
@@ -292,13 +306,14 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <span class="pill" data-i18n="pill_local">🔒 Local-only</span>
       <span class="pill" data-i18n="pill_ai">🤖 AI-safe by design</span>
       <span class="pill" data-i18n="pill_oss">⭐ Open source (MIT)</span>
-      <span class="pill">🧩 CLI · Web · TUI · MCP · Extension</span>
+      <span class="pill">🧩 CLI · Web · TUI · MCP · Extension · 📱 Mobile</span>
     </div>
     <div class="installwrap">
       <div class="ostabs" id="ostabs">
         <button data-os="unix">macOS / Linux</button>
         <button data-os="win">Windows</button>
         <button data-os="ext">🧩 Chrome Extension</button>
+        <button data-os="mobile">📱 Mobile App</button>
       </div>
       <div id="install" class="install">
         <span class="p" id="installp">$</span>
@@ -308,8 +323,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
     </div>
     <div class="ctarow">
       <a class="btn primary" href="/getting-started.html" data-i18n="cta_start">Get started →</a>
-      <a class="btn ghost" href="/chrome-extension.html">🧩 <span data-i18n="cta_ext">Chrome Extension</span></a>
-      <a class="btn ghost" href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener">★ <span data-i18n="cta_star">Star on GitHub</span></a>
+      <a class="btn star" href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener"><span class="starico">★</span> <span data-i18n="cta_star">Star on GitHub</span></a>
     </div>
   </div>
 </div>
@@ -655,17 +669,25 @@ document.querySelectorAll('[data-copy]').forEach(btn=>{
 
 /* ===== hero OS one-liner tabs ===== */
 const CWS_URL='https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj';
+const IOS_URL='https://apps.apple.com/app/id6816103801';
+const PLAY_URL='https://play.google.com/store/apps/details?id=com.fxerkan.concealer';
 const CMDS={unix:['$','brew install fxerkan/tap/concealer'],
             win:['>','scoop bucket add fxerkan https://github.com/fxerkan/scoop-bucket\nscoop install concealer']};
 function setOS(os){
   var p=document.getElementById('installp'),cmd=document.getElementById('installcmd'),copy=document.getElementById('copybtn');
+  var l=(localStorage.getItem('concealer_lang')||'en');
   if(os==='ext'){ // ext isn't a shell command — link straight to the Chrome Web Store
     p.style.display='none';copy.style.display='none';
-    var l=(localStorage.getItem('concealer_lang')||'en');
     cmd.innerHTML='<a href="'+CWS_URL+'" style="color:var(--ac)">➕ '+(l==='tr'?"Chrome'a Ekle":'Add to Chrome')+' →</a>';
+  }else if(os==='mobile'){ // native apps — App Store + Google Play download badges
+    p.style.display='none';copy.style.display='none';
+    cmd.innerHTML='<span class="storebtns">'+
+      '<a class="storebtn" href="'+IOS_URL+'"><span class="g">🍎</span><span><small>'+(l==='tr'?'İndir':'Download on the')+'</small><b>App Store</b></span></a>'+
+      '<a class="storebtn" href="'+PLAY_URL+'"><span class="g">▶</span><span><small>'+(l==='tr'?'İndir':'Get it on')+'</small><b>Google Play</b></span></a>'+
+      '</span>';
   }else{
     p.style.display='';copy.style.display='';
-    p.textContent=CMDS[os][0];cmd.textContent=CMDS[os][1];
+    cmd.textContent=CMDS[os][1];p.textContent=CMDS[os][0];
   }
   document.querySelectorAll('#ostabs button').forEach(b=>b.classList.toggle('on',b.dataset.os===os));
 }

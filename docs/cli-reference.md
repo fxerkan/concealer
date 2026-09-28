@@ -271,8 +271,8 @@ Inject matching secrets into a child environment and **exec** the command. Value
 
 **Env-name rule.** Names are sanitized to valid shell identifiers: upper-cased, any
 character outside `[A-Z0-9_]` becomes `_`, and a leading digit gets a `_` prefix — so
-`grafana-rpifx` (a `website` secret) injects `GRAFANA_RPIFX_USERNAME`,
-`GRAFANA_RPIFX_PASSWORD`, `GRAFANA_RPIFX_WEB_URL`. Set a record's **`env_alias`** to pin
+`grafana-prod` (a `website` secret) injects `GRAFANA_PROD_USERNAME`,
+`GRAFANA_PROD_PASSWORD`, `GRAFANA_PROD_WEB_URL`. Set a record's **`env_alias`** to pin
 a stable base (e.g. `GRAFANA`). If two secrets would collide onto the same identifier,
 injection fails loudly rather than clobbering. The child also receives
 `CONCEALER_INJECTED` — a comma-separated list of the injected identifier names (names

@@ -30,7 +30,7 @@
 - **Branding rule:** product names ending in “er” render the “er” in the accent color. Applied in `webui.html` (`.brand .ac`).
 - **No tool names in user‑facing text.** No surface the user sees — CLI output, `--help`, TUI, web UI, MCP responses, Chrome extension — may contain the words `sops` or `age`. Say “vault key” / “encryption engine” instead. Subprocess stderr does name them, so every error string that reaches a user goes through **`scrub()`** (CLI `sys.exit`, web `/api/*` error JSON, MCP tool errors, TUI status line) — add new error boundaries to it. Internal names are untouched on purpose: `keys/age-key.txt`, `.sops.yaml`, `SOPS_AGE_KEY`, argv and temp‑file suffixes keep their real names, and comments/docstrings/`README`/`docs/` still document the delegation honestly (rule 3 above depends on it being visible to developers).
 - Timestamps are UTC ISO‑8601 (`now_iso()`).
-- **Versioning:** single source of truth is `VERSION` in `concealer` (surfaced by `concealer version` and MCP `serverInfo`). Stays in **`0.x.y` until the first full public release — never bump to `1.0`** before then. Any user‑visible change bumps `VERSION` **and** adds a dated entry to `CHANGELOG.md` (Keep a Changelog format).
+- **Versioning:** single source of truth is `VERSION` in `concealer` (surfaced by `concealer version` and MCP `serverInfo`). concealer went public at **`1.0.0`** alongside the mobile app's public release; from here it follows **semver** (`MAJOR.MINOR.PATCH`) and the desktop tool + mobile app stay on the **same version line**. Any user‑visible change bumps `VERSION` **and** adds a dated entry to `CHANGELOG.md` (Keep a Changelog format).
 
 ## Running & testing
 

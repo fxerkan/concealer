@@ -128,7 +128,7 @@ LIST = [("AWS_PROD_KEY","menuman/prod",False),("DROPBOX_APP","Dropbox-Syncer/pro
         ("STRIPE_KEY","shop/prod",False),("CLOUDFLARE_API_TOKEN","r2/prod",False)]
 FIELDS_ROWS = [("AWS_PROD_KEY","menuman/prod",False),("DROPBOX_APP","Dropbox-Syncer/prod",True),
                ("STRIPE_KEY","shop/prod",False)]
-DBX_FIELDS = [("DROPBOX_APP_NAME","rpifx-drpbx-uploader-app",False),("DROPBOX_APP_KEY","••••••••",True),
+DBX_FIELDS = [("DROPBOX_APP_NAME","acme-dropbox-app",False),("DROPBOX_APP_KEY","••••••••",True),
               ("DROPBOX_APP_SECRET","••••••••",True),("DROPBOX_ACCESS_TOKEN_JSON","••••••••",True)]
 
 shots = [
