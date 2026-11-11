@@ -16,6 +16,16 @@ the same version line. Dates are UTC.
   Records cross ssh only as ciphertext addressed to the receiving vault; merge is last‑write‑wins with
   tombstones; each sync is audited on both sides (counts only). `pair --list` / `pair --revoke <host>`
   manage pairings; revoking also kills the remote sync token.
+- `concealer agent register <name> --sync-only` — a token that can run `sync` and nothing else (cron/launchd).
+
+### Security
+
+- Sync hardening: strict record schema + timestamp checks (no future‑dated tombstones), mass‑deletion guard
+  (`--allow-deletes`), encrypted pre‑sync snapshots, vault file lock for mutating CLI commands, deterministic
+  tie‑break on equal timestamps, ssh option‑injection checks, pending revoke retry.
+- Agent tokens can't run `pair`/`sync`; machine‑sync tokens can't unlock the vault; `run`/`run_with_secrets`
+  children no longer inherit `CONCEALER_TOKEN`/`CONCEALER_HOME`.
+- `key_from_master` no longer writes the decrypted vault key to a temp file (Unix).
 
 ## [1.0.0] — 2026-09-27
 

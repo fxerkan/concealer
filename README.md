@@ -372,14 +372,23 @@ The vault is bound to a **password** (or a recovery code), not to this machine's
 Keep two of your own vaults (e.g. a laptop and a home server) in step without typing a password each time:
 
 ```bash
-concealer pair myserver            # once: asks BOTH master passwords (Enter = same), over ssh
-concealer sync myserver            # unattended (CONCEALER_TOKEN only) — put it in cron/launchd
+concealer pair myserver            # once: asks BOTH master passwords, over ssh
+concealer agent register sync-cron --sync-only    # token that can ONLY run `sync` (for cron/launchd)
+CONCEALER_TOKEN=<sync-only token> concealer sync myserver   # unattended
 concealer sync myserver --dry      # what would change, nothing saved
 concealer pair --list              # pairings on this vault
 concealer pair --revoke myserver   # drop the pairing + revoke the remote sync token
 ```
 
-- `pair` makes the remote mint a dedicated, revocable **sync token** (`sync:<this host>`, not usable by MCP);
+- MCP agent tokens can't run `pair`/`sync`, and `run_with_secrets` children never inherit `CONCEALER_TOKEN`.
+- Each side drops malformed or future‑dated records, refuses to delete more than 3 (or >10 %) records in one
+  round unless `--allow-deletes`, copies the encrypted vault to `keys/snapshots/` before saving, and merges
+  under a file lock. An unreachable peer on `--revoke` leaves the pairing disabled; the next `sync` finishes it.
+- **If a sync token leaks:** `concealer pair --revoke <peer>` on the machine that minted it. Any unlock token
+  wraps the vault key, so treat a leak as a vault‑key compromise: start a fresh vault (`init` in a new
+  `CONCEALER_HOME`), move the secrets with `export`/`import`, and rotate the values that matter.
+
+- `pair` makes the remote mint a dedicated, revocable **sync token** (`sync:<vault id>`; it opens nothing but the peer's sync);
   it is stored only **inside this encrypted vault**. Both vaults remember each other's public key.
 - `sync` sends the full record set (incl. deletion tombstones) **encrypted to the remote vault's public key**
   on ssh stdin; the remote merges (timestamp last‑write‑wins), answers with its merged set encrypted to
