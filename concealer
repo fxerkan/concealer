@@ -104,7 +104,8 @@ def server_info():
     except OSError: pass
     return info
 def _cfg_persist():   # called from settings POSTs: persist idle/confirm_ops/limits/policies/hibp
-    save_cfg({k: CFG[k] for k in ("idle", "confirm_ops", "limits", "policies", "hibp_key", "audit_anchor") if k in CFG})
+    save_cfg({k: CFG[k] for k in ("idle", "confirm_ops", "limits", "policies", "hibp_key", "audit_anchor",
+                                  "sync_accept_remote_deletes") if k in CFG})
 
 def _clean_limit(v):
     """Clamp/sanitize the limit dict coming from the web (per_call>=1, quota>=0 ⇒ 0=block)."""
@@ -1136,7 +1137,7 @@ def import_bundle(pw, blob, mode="overwrite"):
     """Decrypt an 'age -p'-encrypted bundle and merge into the vault. pw = the bundle's (source machine) password.
     mode: conflict resolution (overwrite|skip|duplicate) → passed to merge_secrets."""
     data = _decrypt_bundle(pw, blob)
-    d = load(); nn, nu, ns = merge_secrets(d, data.get("secrets", []), mode); save(d)
+    with _vault_lock(): d = load(); nn, nu, ns = merge_secrets(d, data.get("secrets", []), mode); save(d)
     return nn, nu, ns
 
 _MERGE_KEYS = ["name", "type"] + DIMS + ["tags", "url", "notes", "fields", "field_meta",
@@ -1169,7 +1170,8 @@ def sync_bundle(pw, blob):
     """Device sync: decrypt the peer's bundle (incl. tombstones), LWW-merge into the vault, save, and return a fresh
     bundle of the FULL merged set (incl. tombstones) so the peer can converge to the same state. Returns (applied, out_blob)."""
     data = _decrypt_bundle(pw, blob)
-    d = load(); applied = sync_merge(d, data.get("secrets", [])); save(d)
+    inc = [r for r in data.get("secrets", []) if _rec_ok(r)]   # same shape/timestamp checks as the ssh path
+    with _vault_lock(): d = load(); applied = sync_merge(d, inc); save(d)
     return applied, _encrypt_bundle(pw, secs(d))   # full set incl tombstones — the peer needs deletions too
 
 # ---------------- machine pairing + ssh sync ----------------
@@ -1211,9 +1213,16 @@ def _rec_ok(r):
     if not all(isinstance(v, (str, int, float, bool)) or v is None for v in r.get("fields", {}).values()): return False
     return _ts_ok(r.get("updated")) and _ts_ok(r.get("created", r["updated"])) and _ts_ok(r.get("deleted", ""), empty=True)
 
+import threading
+_LOCK_TL = threading.local()   # per-thread re-entry depth (web handlers run in threads → each locks via flock)
 @contextlib.contextmanager
 def _vault_lock():
     """Serialize load→merge→save across processes (sync vs CLI set/rm/…). No-op where flock is missing (Windows)."""
+    if getattr(_LOCK_TL, "depth", 0):   # re-entrant within a thread (e.g. `import` → import_bundle)
+        _LOCK_TL.depth += 1
+        try: yield
+        finally: _LOCK_TL.depth -= 1
+        return
     try: import fcntl
     except ImportError: fcntl = None
     if not fcntl: yield; return
@@ -1223,16 +1232,24 @@ def _vault_lock():
             try: fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB); break
             except BlockingIOError: time.sleep(0.5)
         else: raise RuntimeError("vault busy (another concealer process holds the lock)")
+        _LOCK_TL.depth = 1
         try: yield
-        finally: fcntl.flock(f, fcntl.LOCK_UN)
+        finally: _LOCK_TL.depth = 0; fcntl.flock(f, fcntl.LOCK_UN)
 
-def _snapshot(keep=10):
+SNAP_KEEP_DAYS = 14
+def _snapshot(deleting=False):
     """Restore point before a sync save: a copy of the ENCRYPTED vault file (no plaintext; needs no backup
-    password, so unattended runs can make it). Restore = copy it back over secrets.enc.yaml."""
-    os.makedirs(SNAPDIR, exist_ok=True)
-    dst = os.path.join(SNAPDIR, "pre-sync-" + now_iso()[:19].replace(":", "").replace("-", "") + ".enc.yaml")
+    password, so unattended runs can make it). Restore = copy it back over secrets.enc.yaml.
+    Retention is by AGE, never by count: copies younger than 14 days stay, and a copy taken before a sync that
+    deletes records ("-del") is never removed automatically."""
+    os.makedirs(SNAPDIR, mode=0o700, exist_ok=True); os.chmod(SNAPDIR, 0o700)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f")
+    dst = os.path.join(SNAPDIR, f"pre-sync-{stamp}{'-del' if deleting else ''}.enc.yaml")
     shutil.copy2(FILE, dst); os.chmod(dst, 0o600)
-    for old in sorted(os.listdir(SNAPDIR))[:-keep]: os.remove(os.path.join(SNAPDIR, old))
+    cutoff = time.time() - SNAP_KEEP_DAYS * 86400
+    for f in os.listdir(SNAPDIR):
+        fp = os.path.join(SNAPDIR, f)
+        if f.startswith("pre-sync-") and "-del" not in f and os.path.getmtime(fp) < cutoff: os.remove(fp)
     return dst
 
 def _age_enc_to(rcpt, text):
@@ -1254,7 +1271,7 @@ def _sync_merge_checked(d, raw, allow_deletes=False):
     work = json.loads(json.dumps(d)); before = {e["id"] for e in live(work)}
     applied = sync_merge(work, inc)
     gone = sorted(before - {e["id"] for e in live(work)})
-    if gone and not allow_deletes and (len(gone) > 3 or len(gone) * 10 > len(before)):
+    if not allow_deletes and len(gone) > 3 and len(gone) * 10 > len(before):
         raise RuntimeError(f"refusing to delete {len(gone)} of {len(before)} records in one sync (rerun with --allow-deletes)")
     return work, applied, len(raw) - len(inc), gone
 
@@ -1334,8 +1351,9 @@ def sync_serve():
                 audit("pair_revoke", key=p["label"], source="sync", detail="by peer", actor=who); return out({"ok": True})
             if op != "sync": return out({"error": "unknown op"})
             dry = bool(req.get("dry"))
-            work, applied, rej, gone = _sync_merge_checked(d, raw, bool(req.get("allow_deletes")))
-            if applied and not dry: _snapshot(); save(work)
+            ok_del = bool(req.get("allow_deletes")) and str(CFG.get("sync_accept_remote_deletes", "")).lower() in ("1", "true", "yes", "on")
+            work, applied, rej, gone = _sync_merge_checked(d, raw, ok_del)   # a peer can't waive OUR guard unless we opted in
+            if applied and not dry: _snapshot(bool(gone)); save(work)
         sent = len(secs(work)); blob = _age_enc_to(p["pub"], json.dumps({"secrets": secs(work)}))
         audit("sync", key=p["label"], source="sync", actor=who,
               detail=f"recv={len(raw)} applied={applied} rejected={rej} sent={sent} deleted={','.join(gone[:50])}" + (" dry" if dry else ""))
@@ -1421,7 +1439,7 @@ def sync_cmd(a):
         raw = _sync_open(resp["b64"])
         with _vault_lock():                              # re-read: a write during the round trip must not be clobbered
             d = load(); work, applied, rej, gone = _sync_merge_checked(d, raw, allow)
-            if applied and not dry: _snapshot(); save(work)
+            if applied and not dry: _snapshot(bool(gone)); save(work)
     except Exception as ex:
         audit("sync_fail", key=host, source="sync", detail=scrub(ex)[:200], actor=actor); sys.exit(f"sync error: {scrub(ex)}")
     audit("sync", key=host, source="sync", actor=actor,
@@ -2067,12 +2085,19 @@ def agent_cmd(a):
     if sub == "install":
         return agent_install(a[1:])
     if sub == "register":
-        so = "--sync-only" in a; a = [x for x in a if x != "--sync-only"]
+        so = "--sync-only" in a; wf = "--write-token-file" in a; a = [x for x in a if x not in ("--sync-only", "--write-token-file")]
+        if wf and not so: sys.exit("--write-token-file is only for --sync-only tokens.")
+        if len(a) >= 2 and not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", a[1]): sys.exit("bad agent name.")
         if len(a) < 2: sys.exit("usage: concealer agent register <name> [--sync-only]")
         keytext = key_from_master(getpass.getpass("Master password: "))
         if not keytext: sys.exit("wrong password.")
         tok = mint_token(keytext, a[1], "sync-local" if so else "agent", ttl=None)
         audit("agent_register", key=a[1], source="cli", detail="sync-only" if so else "")
+        if so and wf:   # straight to a 0600 file (dir 0700) → never on screen or in shell history
+            kd = os.path.dirname(AGENTS); os.chmod(kd, 0o700); tf = os.path.join(kd, f"{a[1]}.token")
+            fd = os.open(tf, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600); os.write(fd, tok.encode()); os.close(fd); os.chmod(tf, 0o600)
+            return print(f"sync-only token '{a[1]}' written to {tf} (0600).\n"
+                         f'  cron: CONCEALER_TOKEN="$(cat {tf})" concealer sync <host>\n  (revoke: concealer agent revoke {a[1]})')
         if so:   # cron/launchd: can run `concealer sync` and nothing else (not get/run/MCP)
             return print(f"sync-only token '{a[1]}' (works only for 'concealer sync'):\n  CONCEALER_TOKEN={tok}\n"
                          f"  (revoke: concealer agent revoke {a[1]})")
@@ -3044,7 +3069,7 @@ def _mkhelp():
         R("recovery", "regenerate the recovery-code set"),
         R("agent install [--all|--mcp-only|--skill-only] [ids]", "auto-detect agents, wire up MCP + skill"),
         R("agent register|list|revoke <name>", "long-lived, revocable token for agents"),
-        R("agent register <name> --sync-only", "token that can only run 'sync' (for cron/launchd)"),
+        R("agent register <name> --sync-only [--write-token-file]", "token that can only run 'sync' (cron); file: keys/<name>.token"),
         "",
         "SECRETS",
         R("list [term] [scope] [--tag X] [--type T]", "list records (masked)"),
@@ -3542,9 +3567,10 @@ def cli(argv):
         print(f"{len(cands)} candidates:")
         for c in cands: print(f"  {c['name']:28} {c['mask']:14} <- {c['source']}")
         if not do_import: print("\n(dry run) add --import to import them"); return
-        d = load(); scope = {dim: sel.get(dim, "") for dim in DIMS}
-        if not scope["project"] and root: scope["project"] = os.path.basename(os.path.abspath(os.path.expanduser(root)))
-        n_new, n_skip = _import_cands(d, cands, scope); save(d)
+        with _vault_lock():
+            d = load(); scope = {dim: sel.get(dim, "") for dim in DIMS}
+            if not scope["project"] and root: scope["project"] = os.path.basename(os.path.abspath(os.path.expanduser(root)))
+            n_new, n_skip = _import_cands(d, cands, scope); save(d)
         audit("scan_import", key=f"{n_new} secrets", source="scan", detail=root)
         print(f"\nimported: {n_new}, skipped (existing): {n_skip}  @ {label(scope)}")
     elif cmd == "policy":
@@ -3623,7 +3649,7 @@ def cli(argv):
         else:
             k, v = a[0], a[1]
             CFG[k] = int(v) if k == "idle" else ([x for x in v.split(",") if x] if k == "confirm_ops" else v)
-            save_cfg({"idle": CFG["idle"], "confirm_ops": CFG["confirm_ops"]}); print(f"{k} = {CFG[k]}")
+            _cfg_persist(); print(f"{k} = {CFG[k]}")   # keeps limits/policies (the old 2-key save dropped them)
     elif cmd == "deploy":
         target = _flag(a, "--target") or "dotenv"
         scope = _sel(a); scope.pop("name", None); scope.pop("type", None)
@@ -4343,8 +4369,9 @@ def serve_web(port):
                 if j["exposed"]: audit("web_autofill_exposed", key=j["secret_name"], source="web", detail=j["domain"])
                 return self._json({"ok": True})
             if path == "/api/secrets":     # create
-                b = self._body(); d = load(); e = norm(_entry_from_body(b))
-                secs(d).append(e); save(d)
+                with _vault_lock():
+                    b = self._body(); d = load(); e = norm(_entry_from_body(b))
+                    secs(d).append(e); save(d)
                 audit("create", key=e["name"], source="web", detail=label(e))
                 return self._json({"ok": True, "id": e["id"]})
             if path == "/api/copy":        # clipboard copy (audit)
@@ -4467,10 +4494,11 @@ def serve_web(port):
             if path == "/api/scan/import":
                 b = self._body(); root = b.get("path", ""); names = set(b.get("names") or [])
                 cands = [c for c in scan_folder(root, b.get("history", False), b.get("env", False)) if c["name"] in names]
-                d = load(); scope = {dim: b.get(dim, "") for dim in DIMS}
-                if not scope["project"] and root:
-                    scope["project"] = os.path.basename(os.path.abspath(os.path.expanduser(root)))
-                n_new, n_skip = _import_cands(d, cands, scope); save(d)
+                with _vault_lock():
+                    d = load(); scope = {dim: b.get(dim, "") for dim in DIMS}
+                    if not scope["project"] and root:
+                        scope["project"] = os.path.basename(os.path.abspath(os.path.expanduser(root)))
+                    n_new, n_skip = _import_cands(d, cands, scope); save(d)
                 audit("scan_import", key=f"{n_new} secrets", source="scan", detail=root)
                 return self._json({"imported": n_new, "skipped": n_skip})
             if path == "/api/history/purge":
@@ -4484,12 +4512,13 @@ def serve_web(port):
             path = urllib.parse.urlparse(self.path).path
             if not valid(self._tok() or ""): return self._json({"error": "locked"}, 401)
             if path.startswith("/api/secret/"):
-                sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
-                if not e: return self._json({"error": "not found"}, 404)
-                b = self._body(); ne = _entry_from_body(b)
-                for k in ["name", "type"] + DIMS + ["tags", "url", "notes", "fields", "collection", "rotation"]: e[k] = ne[k]
-                if "field_meta" in ne: e["field_meta"] = ne["field_meta"]   # write only if sent (preserves TUI overrides)
-                e["updated"] = now_iso(); save(d)
+                with _vault_lock():
+                    sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
+                    if not e: return self._json({"error": "not found"}, 404)
+                    b = self._body(); ne = _entry_from_body(b)
+                    for k in ["name", "type"] + DIMS + ["tags", "url", "notes", "fields", "collection", "rotation"]: e[k] = ne[k]
+                    if "field_meta" in ne: e["field_meta"] = ne["field_meta"]   # write only if sent (preserves TUI overrides)
+                    e["updated"] = now_iso(); save(d)
                 audit("update", key=e["name"], source="web", detail=label(e))
                 return self._json({"ok": True})
             self._json({"error": "not found"}, 404)
@@ -4503,11 +4532,12 @@ def serve_web(port):
                 ok = policy_delete(pid); audit("policy_delete", key=pid, source="web")
                 return self._json({"ok": ok})
             if path.startswith("/api/secret/"):
-                sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
-                if not e: return self._json({"error": "not found"}, 404)
-                if "delete" in CFG["confirm_ops"] and not verify_master(self._body().get("pw", "")):
-                    return self._json({"error": "bad_pw"}, 403)
-                tombstone(d, e); save(d)
+                with _vault_lock():
+                    sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
+                    if not e: return self._json({"error": "not found"}, 404)
+                    if "delete" in CFG["confirm_ops"] and not verify_master(self._body().get("pw", "")):
+                        return self._json({"error": "bad_pw"}, 403)
+                    tombstone(d, e); save(d)
                 audit("delete", key=e["name"], source="web", detail=label(e))
                 return self._json({"ok": True})
             self._json({"error": "not found"}, 404)
@@ -4678,7 +4708,9 @@ def mcp_stdio():
         elif m == "tools/list": send({"jsonrpc": "2.0", "id": mid, "result": {"tools": MCP_TOOLS}})
         elif m == "tools/call":
             p = req.get("params", {})
-            try: text = _mcp_call(p.get("name"), p.get("arguments", {}))
+            try:
+                with (_vault_lock() if p.get("name") == "set_secret" else contextlib.nullcontext()):
+                    text = _mcp_call(p.get("name"), p.get("arguments", {}))
             except Exception as e: text = f"error: {scrub(e)}"
             send({"jsonrpc": "2.0", "id": mid, "result": {"content": [{"type": "text", "text": text}]}})
         elif mid is not None:

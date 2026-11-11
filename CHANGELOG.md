@@ -26,6 +26,17 @@ the same version line. Dates are UTC.
 - Agent tokens can't run `pair`/`sync`; machine‑sync tokens can't unlock the vault; `run`/`run_with_secrets`
   children no longer inherit `CONCEALER_TOKEN`/`CONCEALER_HOME`.
 - `key_from_master` no longer writes the decrypted vault key to a temp file (Unix).
+- Vault file lock (re‑entrant, `keys/vault.lock`) now covers every writer: CLI, web, MCP `set_secret`, scan
+  import, bundle import, mobile `/api/sync` and machine sync. Mobile `/api/sync` records get the same
+  schema/timestamp checks. Pre‑sync snapshots are kept by age (14 days); pre‑deletion copies are never pruned.
+- `agent register … --sync-only --write-token-file` writes the cron token to `keys/<name>.token` (0600).
+
+### Changed
+
+- **`run` / MCP `run_with_secrets` children no longer inherit `CONCEALER_TOKEN`, `CONCEALER_HOME`,
+  `CONCEALER_FILE`, `CONCEALER_KEY`.** A script that called `concealer` from inside `concealer run` must now
+  get its own token/home (e.g. pass them explicitly).
+- `concealer config <key> <value>` no longer drops the agent limits / policies saved from the web Settings page.
 
 ## [1.0.0] — 2026-09-27
 

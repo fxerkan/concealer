@@ -106,9 +106,20 @@ def test_lww_newer_edit_wins():
     run(A, ["sync", "hostB"], tok=S["ta"])
     assert get(A, S["ta"], "ONLY_A") == "sk-DUMMY-a2"
 
+def test_single_delete_small_vault_passes():             # D3: one deletion in a tiny vault needs no flag
+    setv(A, S["ta"], "SOLO", "sk-DUMMY-solo"); run(A, ["sync", "hostB"], tok=S["ta"])
+    run(A, ["rm", "--name", "SOLO", "--project", "p", "--env", "prod"], tok=S["ta"])
+    run(A, ["sync", "hostB"], tok=S["ta"]); assert get(B, S["tb"], "SOLO", ok=False) is None
+
+def _module(home):
+    os.environ["CONCEALER_HOME"] = home
+    try:
+        spec = importlib.util.spec_from_loader("cer", SourceFileLoader("cer", CER))
+        cer = importlib.util.module_from_spec(spec); spec.loader.exec_module(cer); return cer
+    finally: os.environ.pop("CONCEALER_HOME", None)
+
 def test_equal_timestamp_tiebreak():                     # #11
-    spec = importlib.util.spec_from_loader("cer", SourceFileLoader("cer", CER))
-    cer = importlib.util.module_from_spec(spec); spec.loader.exec_module(cer)
+    cer = _module(A)
     ts = "2026-01-01T00:00:00+00:00"
     x = {"id": "r1", "name": "K", "fields": {"value": "one"}, "updated": ts, "created": ts}
     y = {"id": "r1", "name": "K", "fields": {"value": "two"}, "updated": ts, "created": ts}
@@ -123,8 +134,33 @@ def test_mass_delete_needs_allow_deletes():              # #1 mass tombstone gua
     r = run(A, ["sync", "hostB"], tok=S["ta"], ok=False)
     assert "refusing to delete 4" in r.stderr, r.stderr
     assert get(B, S["tb"], "X0") == "sk-DUMMY-x0", "nothing may be deleted without --allow-deletes"
+    r = run(A, ["sync", "hostB", "--allow-deletes"], tok=S["ta"], ok=False)   # D1: B hasn't opted in → peer can't waive it
+    assert "refusing to delete 4" in r.stderr and get(B, S["tb"], "X0") == "sk-DUMMY-x0", r.stderr
+    run(B, ["config", "sync_accept_remote_deletes", "1"])
     run(A, ["sync", "hostB", "--allow-deletes"], tok=S["ta"])
     assert get(B, S["tb"], "X0", ok=False) is None
+    assert glob.glob(os.path.join(B, "keys", "snapshots", "pre-sync-*-del.enc.yaml")), "pre-deletion copy must be marked"
+    assert oct(os.stat(os.path.join(B, "keys", "snapshots")).st_mode & 0o777) == "0o700"   # D2
+
+def test_deletion_snapshot_survives_later_syncs():       # Y2: retention by age, deletion copies never pruned
+    h = os.path.join(T, "snap"); os.makedirs(os.path.join(h, "keys")); open(os.path.join(h, "secrets.enc.yaml"), "w").write("x")
+    cer = _module(h)
+    old = cer._snapshot(False); os.utime(old, (time.time() - 15 * 86400,) * 2)   # an ordinary copy past 14 days
+    olddel = cer._snapshot(True); os.utime(olddel, (time.time() - 90 * 86400,) * 2)
+    for _ in range(11): cer._snapshot(False)
+    left = os.listdir(cer.SNAPDIR)
+    assert os.path.basename(olddel) in left, "the pre-deletion copy must survive"
+    assert os.path.basename(old) not in left and len(left) == 12, left
+
+def test_mobile_sync_bundle_validates():                 # D3: /api/sync path uses _rec_ok too
+    cer = _module(A); box = {"d": {"secrets": []}}
+    cer._decrypt_bundle = lambda pw, blob: {"secrets": [
+        {"id": "m1", "name": "OK", "fields": {}, "updated": "2026-01-01T00:00:00+00:00"},
+        {"id": "m2", "name": "FUT", "fields": {}, "updated": "9999-01-01T00:00:00+00:00", "deleted": "9999-01-01T00:00:00+00:00"},
+        {"id": "m3", "name": "BAD", "fields": {}, "updated": "2026-01-01T00:00:00+00:00", "admin": 1}]}
+    cer.load = lambda: box["d"]; cer.save = lambda d: box.update(d=d); cer._encrypt_bundle = lambda pw, s: b""
+    applied, _ = cer.sync_bundle("pw", b"")
+    assert applied == 1 and [e["name"] for e in box["d"]["secrets"]] == ["OK"]
 
 def test_future_and_malformed_records_rejected():        # #1 future tombstone, #4 schema/type injection
     bs = vault(B, S["tb"])["secrets"]; ob = next(e for e in bs if e["name"] == "ONLY_B")
@@ -162,10 +198,36 @@ def test_agent_token_refused_and_mcp_child_has_no_token():   # #2
     reply = next(l for l in r.stdout.splitlines() if '"id": 2' in l or '"id":2' in l)
     assert "tok=0 home=0" in reply and "locked: no CONCEALER_TOKEN" in reply, reply
     assert not [x for x in audit(A)[-3:] if x["action"] == "sync"], "an MCP-triggered child must not sync"
+    S["atok"] = atok
+
+def test_mcp_set_waits_for_lock_and_sync_not_clobbered():   # Y1
+    setv(B, S["tb"], "FROM_B", "sk-DUMMY-fb")
+    msgs = [{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {},
+             "clientInfo": {"name": "t", "version": "1"}}},
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "set_secret", "arguments": {
+             "name": "FROM_MCP", "project": "p", "environment": "prod", "value": "sk-DUMMY-mcp"}}}]
+    env = {k: v for k, v in os.environ.items() if not k.startswith("CONCEALER_")}
+    env.update(CONCEALER_HOME=A, CONCEALER_SSH=SSH)
+    with open(os.path.join(A, "keys", "vault.lock"), "a") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        mcp = subprocess.Popen([sys.executable, CER, "mcp"], env=dict(env, CONCEALER_TOKEN=S["atok"]), stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+        mcp.stdin.write("\n".join(json.dumps(m) for m in msgs) + "\n"); mcp.stdin.flush()
+        syn = subprocess.Popen([sys.executable, CER, "sync", "hostB"], env=dict(env, CONCEALER_TOKEN=S["ta"]),
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+        time.sleep(6)
+        assert get(A, S["ta"], "FROM_MCP", ok=False) is None, "set_secret must wait for the vault lock"
+        assert syn.poll() is None, "sync's merge must wait for the vault lock"
+        fcntl.flock(f, fcntl.LOCK_UN)
+    out, _ = mcp.communicate(timeout=120); assert "create: FROM_MCP" in out, out
+    assert syn.wait(120) == 0, syn.stderr.read()
+    assert get(A, S["ta"], "FROM_MCP") == "sk-DUMMY-mcp" and get(A, S["ta"], "FROM_B") == "sk-DUMMY-fb", "neither write may be lost"
 
 def test_sync_only_token():                              # #2 design: cron token
-    out = run(A, ["agent", "register", "sync-cron", "--sync-only"], f"{PWA}\n").stdout
-    ctok = re.search(r"CONCEALER_TOKEN=(\S+)", out).group(1)
+    out = run(A, ["agent", "register", "sync-cron", "--sync-only", "--write-token-file"], f"{PWA}\n").stdout
+    tf = os.path.join(A, "keys", "sync-cron.token"); ctok = open(tf).read()
+    assert ctok not in out and oct(os.stat(tf).st_mode & 0o777) == "0o600" and oct(os.stat(os.path.dirname(tf)).st_mode & 0o777) == "0o700"
     assert "sent" in run(A, ["sync", "hostB"], tok=ctok).stdout
     r = run(A, ["get", "--name", "ONLY_A", "--project", "p", "--env", "prod"], tok=ctok, ok=False)
     assert r.returncode and "sync-only" in r.stderr
@@ -217,9 +279,11 @@ def main():
     S["ta"], S["tb"] = init(A, PWA), init(B, PWB)
     setv(A, S["ta"], "ONLY_A", "sk-DUMMY-a1"); setv(B, S["tb"], "ONLY_B", "sk-DUMMY-b1")
     for t in [test_pair_rejects_bad_input, test_pair_and_token_label_uses_peer_id, test_dry_run_changes_nothing,
-              test_converge_with_snapshot, test_lww_newer_edit_wins, test_equal_timestamp_tiebreak,
-              test_mass_delete_needs_allow_deletes, test_future_and_malformed_records_rejected,
-              test_sync_token_cannot_unlock, test_agent_token_refused_and_mcp_child_has_no_token, test_sync_only_token,
+              test_converge_with_snapshot, test_lww_newer_edit_wins, test_single_delete_small_vault_passes,
+              test_equal_timestamp_tiebreak, test_mass_delete_needs_allow_deletes, test_deletion_snapshot_survives_later_syncs,
+              test_mobile_sync_bundle_validates, test_future_and_malformed_records_rejected,
+              test_sync_token_cannot_unlock, test_agent_token_refused_and_mcp_child_has_no_token,
+              test_mcp_set_waits_for_lock_and_sync_not_clobbered, test_sync_only_token,
               test_via_option_injection_rejected, test_audit_counts_and_deleted_ids, test_lock_serializes_writers,
               test_no_plaintext_on_disk_or_argv, test_revoke_pending_then_completed]:
         t0 = time.time(); t(); print(f"ok  {t.__name__}  ({time.time() - t0:.1f}s)")

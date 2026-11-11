@@ -373,17 +373,23 @@ Keep two of your own vaults (e.g. a laptop and a home server) in step without ty
 
 ```bash
 concealer pair myserver            # once: asks BOTH master passwords, over ssh
-concealer agent register sync-cron --sync-only    # token that can ONLY run `sync` (for cron/launchd)
-CONCEALER_TOKEN=<sync-only token> concealer sync myserver   # unattended
+concealer agent register sync-cron --sync-only --write-token-file   # → keys/sync-cron.token (0600), never printed
+CONCEALER_TOKEN="$(cat ~/.concealer/keys/sync-cron.token)" concealer sync myserver   # cron/launchd wrapper
 concealer sync myserver --dry      # what would change, nothing saved
 concealer pair --list              # pairings on this vault
 concealer pair --revoke myserver   # drop the pairing + revoke the remote sync token
 ```
 
 - MCP agent tokens can't run `pair`/`sync`, and `run_with_secrets` children never inherit `CONCEALER_TOKEN`.
-- Each side drops malformed or future‑dated records, refuses to delete more than 3 (or >10 %) records in one
-  round unless `--allow-deletes`, copies the encrypted vault to `keys/snapshots/` before saving, and merges
-  under a file lock. An unreachable peer on `--revoke` leaves the pairing disabled; the next `sync` finishes it.
+- **`--sync-only` is a policy, not a cryptographic limit:** concealer's CLI/MCP refuse to use that token for
+  anything but `sync`, but like every unlock token it wraps the vault key — code running as you that reads the
+  token file can decrypt the vault by hand. Protect the file like the vault itself.
+- Each side drops malformed or future‑dated records and refuses to delete more than 3 records **and** >10 % of
+  the vault in one round unless `--allow-deletes`. The receiving side honours a peer's `--allow-deletes` only if
+  it opted in: `concealer config sync_accept_remote_deletes 1`.
+- Before saving, the encrypted vault file is copied to `keys/snapshots/` (0700). Copies are kept for 14 days;
+  a copy taken before a sync that deleted records (`…-del.enc.yaml`) is never removed automatically.
+  Restore = copy it back over `secrets.enc.yaml`. All writers (CLI, web, MCP, sync) share a vault file lock. An unreachable peer on `--revoke` leaves the pairing disabled; the next `sync` finishes it.
 - **If a sync token leaks:** `concealer pair --revoke <peer>` on the machine that minted it. Any unlock token
   wraps the vault key, so treat a leak as a vault‑key compromise: start a fresh vault (`init` in a new
   `CONCEALER_HOME`), move the secrets with `export`/`import`, and rotate the values that matter.
