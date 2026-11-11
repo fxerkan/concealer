@@ -367,6 +367,27 @@ concealer list                    # works — machine-independent
 
 The vault is bound to a **password** (or a recovery code), not to this machine's hardware. Tokens are per‑machine on purpose: a copied folder is inert until someone types the master password.
 
+## Machine‑to‑machine sync (pair once, sync over ssh)
+
+Keep two of your own vaults (e.g. a laptop and a home server) in step without typing a password each time:
+
+```bash
+concealer pair myserver            # once: asks BOTH master passwords (Enter = same), over ssh
+concealer sync myserver            # unattended (CONCEALER_TOKEN only) — put it in cron/launchd
+concealer sync myserver --dry      # what would change, nothing saved
+concealer pair --list              # pairings on this vault
+concealer pair --revoke myserver   # drop the pairing + revoke the remote sync token
+```
+
+- `pair` makes the remote mint a dedicated, revocable **sync token** (`sync:<this host>`, not usable by MCP);
+  it is stored only **inside this encrypted vault**. Both vaults remember each other's public key.
+- `sync` sends the full record set (incl. deletion tombstones) **encrypted to the remote vault's public key**
+  on ssh stdin; the remote merges (timestamp last‑write‑wins), answers with its merged set encrypted to
+  this vault's key, and both converge. No value touches argv, temp files, logs or stdout.
+- Every sync is audited on both sides with counts only (`sent/recv/applied`).
+- The remote needs the same concealer version on its ssh `PATH` (`--remote-cmd` overrides,
+  e.g. `--remote-cmd /usr/local/bin/concealer`); `--via HOST` reaches the same peer through another ssh alias.
+
 ---
 
 ## Security model & notes

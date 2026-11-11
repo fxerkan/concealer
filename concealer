@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "1.0.0"   # tracks the public mobile-app release; semver from here on
+VERSION = "1.1.0"   # tracks the public mobile-app release; semver from here on
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -1166,6 +1166,139 @@ def sync_bundle(pw, blob):
     data = _decrypt_bundle(pw, blob)
     d = load(); applied = sync_merge(d, data.get("secrets", [])); save(d)
     return applied, _encrypt_bundle(pw, secs(d))   # full set incl tombstones — the peer needs deletions too
+
+# ---------------- machine pairing + ssh sync ----------------
+# `pair <host>` runs ONCE with both vaults' master passwords: each vault records the other under
+# d["sync_peers"] (inside the encrypted vault — never plaintext on disk). The remote mints a dedicated,
+# revocable unlock token (label "sync:<local label>", source "sync" → refused by the MCP gate) and hands
+# it back; only the initiating vault keeps it. After that `sync <host>` runs unattended: the local vault
+# opens with CONCEALER_TOKEN, the remote one with the pair token, and records cross ssh stdin/stdout only
+# as age ciphertext addressed to the receiving vault's public key (nothing in argv, temp files or logs).
+# Merge = sync_merge (LWW + tombstones). Revoke on either side drops the pairing (+ the remote token).
+_AGE_RCPT = re.compile(r"age1[0-9a-z]{20,}")
+
+def _age_enc_to(rcpt, text):
+    """Encrypt to an age recipient via stdin→stdout, so the plaintext never touches disk."""
+    if not _AGE_RCPT.fullmatch(rcpt or ""): raise RuntimeError("bad peer public key")
+    r = subprocess.run(["age", "-r", rcpt], input=text.encode(), capture_output=True)
+    if r.returncode: raise RuntimeError(scrub(r.stderr.decode(errors="ignore").strip()) or "encryption error")
+    return base64.b64encode(r.stdout).decode()
+
+def _sync_call(host, cmd, req, timeout=120):
+    """One request/response over ssh: JSON frame on stdin, JSON line back. CONCEALER_SSH overrides the
+    transport (tests use a local stand-in). BatchMode → never hangs on an ssh password prompt under cron."""
+    argv = shlex.split(os.environ.get("CONCEALER_SSH", "ssh")) + ["-T", "-o", "BatchMode=yes", host, f"{cmd} sync-serve"]
+    try: r = subprocess.run(argv, input=json.dumps(req), capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired: raise RuntimeError(f"{host}: timed out")
+    lines = [ln for ln in r.stdout.splitlines() if ln.strip()]
+    try: resp = json.loads(lines[-1])
+    except Exception: raise RuntimeError(f"{host}: no answer ({scrub(r.stderr.strip()[-300:]) or 'rc=%d' % r.returncode})")
+    if resp.get("error"): raise RuntimeError(f"{host}: {resp['error']}")
+    return resp
+
+def _find_peer(d, who):
+    """Pairing entry by vault id, ssh host or label → (id, entry) or (None, None)."""
+    for pid, p in d.get("sync_peers", {}).items():
+        if who in (pid, p.get("host"), p.get("label")): return pid, p
+    return None, None
+
+def _sync_apply(d, b64, dry):
+    """Decrypt a peer bundle with our vault key and LWW-merge it (into a copy when dry). → (merged d, incoming, applied)."""
+    incoming = json.loads(_age_dec_priv(base64.b64decode(b64))).get("secrets", [])
+    work = json.loads(json.dumps(d)) if dry else d
+    return work, incoming, sync_merge(work, incoming)
+
+def sync_serve():
+    """Remote end of pair/sync (hidden command, run over ssh). Reads ONE JSON frame from stdin, writes ONE
+    JSON line. Never prompts, never prints values; every error is a scrubbed {"error": ...}."""
+    global _KEY_CACHE
+    out = lambda o: print(json.dumps(o))
+    try:
+        req = json.loads(sys.stdin.read() or "{}"); op = req.get("op"); me = server_info()
+        if op == "pair":                                  # human-approved: needs THIS vault's master password
+            peer = req.get("peer") or {}
+            if not _AGE_RCPT.fullmatch(peer.get("pub", "")) or not peer.get("id"): return out({"error": "bad pairing request"})
+            key = key_from_master(req.get("pw", ""))
+            if not key: audit("pair_fail", key=peer.get("label", ""), source="sync"); return out({"error": "wrong master password"})
+            _KEY_CACHE = key; tl = f"sync:{peer.get('label') or peer['id']}"
+            tok = mint_token(key, tl, "sync")
+            d = load(); d.setdefault("sync_peers", {})[peer["id"]] = {
+                "label": peer.get("label", ""), "pub": peer["pub"], "token_label": tl, "paired": now_iso()}
+            save(d); audit("pair", key=peer.get("label", ""), source="sync", detail=f"peer={peer['id']}")
+            return out({"ok": True, "id": me["id"], "label": me["label"], "pub": _recipient(), "token": tok})
+        tok = req.get("token", ""); te = _find_token(tok)
+        if not te or te.get("source") != "sync":
+            audit("sync_fail", source="sync", detail="bad token"); return out({"error": "not paired (token invalid or revoked)"})
+        _KEY_CACHE = resolve_token(tok); d = load()
+        pid, p = req.get("from", ""), d.get("sync_peers", {}).get(req.get("from", ""))
+        if not p or p.get("token_label") != te["label"]:
+            audit("sync_fail", source="sync", detail="unknown peer"); return out({"error": "not paired"})
+        if op == "unpair":
+            del d["sync_peers"][pid]; save(d); revoke_token(te["label"])
+            audit("pair_revoke", key=p["label"], source="sync", detail="by peer"); return out({"ok": True})
+        if op != "sync": return out({"error": "unknown op"})
+        dry = bool(req.get("dry")); work, inc, applied = _sync_apply(d, req.get("b64", ""), dry); recv = len(inc)
+        if applied and not dry: save(work)
+        sent = len(secs(work)); blob = _age_enc_to(p["pub"], json.dumps({"secrets": secs(work)}))
+        audit("sync", key=p["label"], source="sync", detail=f"recv={recv} applied={applied} sent={sent}" + (" dry" if dry else ""))
+        return out({"ok": True, "recv": recv, "applied": applied, "sent": sent, "b64": blob})
+    except SystemExit as ex: return out({"error": scrub(ex.code)})   # load()/save() exit on crypto errors
+    except Exception as ex: return out({"error": scrub(ex)})
+
+def pair_cmd(a):
+    """pair <host> [--remote-cmd C] | pair [--list] | pair --revoke <host|label|id>"""
+    global _KEY_CACHE
+    rev = _flag(a, "--revoke")
+    if rev:
+        d = load(); pid, p = _find_peer(d, rev)
+        if not p: sys.exit(f"no pairing named '{rev}'.")
+        if p.get("token"):                                # initiating side: also kill the remote token
+            try: _sync_call(p["host"], p.get("cmd", "concealer"), {"op": "unpair", "from": server_info()["id"], "token": p["token"]}, 30)
+            except Exception as ex: print(f"warning: remote not reached ({scrub(ex)}); run 'concealer pair --revoke' there too.")
+        if p.get("token_label"): revoke_token(p["token_label"])
+        del d["sync_peers"][pid]; save(d)
+        audit("pair_revoke", key=p.get("host") or p["label"], source="cli"); return print(f"pairing removed: {p.get('host') or p['label']}")
+    if not a or a[0] == "--list":
+        peers = load().get("sync_peers", {})
+        if not peers: return print("no pairings. pair with: concealer pair <ssh-host>")
+        for pid, p in peers.items():
+            role = f"sync → {p['host']}" if p.get("host") else "serves sync"
+            print(f"  {p.get('label') or pid:16} {role:24} paired {p['paired']}")
+        return
+    host = a[0]; cmd = _flag(a, "--remote-cmd") or "concealer"
+    pw = getpass.getpass("Master password (this machine): "); key = key_from_master(pw)
+    if not key: sys.exit("wrong password.")
+    _KEY_CACHE = key; me = server_info()
+    rpw = getpass.getpass(f"Master password on {host} (Enter = same): ") or pw   # travels only on ssh stdin
+    try: resp = _sync_call(host, cmd, {"op": "pair", "pw": rpw, "peer": {"id": me["id"], "label": me["label"], "pub": _recipient()}})
+    except Exception as ex: sys.exit(f"pair error: {scrub(ex)}")
+    if not _AGE_RCPT.fullmatch(resp.get("pub") or "") or not resp.get("token"): sys.exit("pair error: bad answer from peer")
+    d = load(); peers = d.setdefault("sync_peers", {})
+    for k in [k for k, v in peers.items() if v.get("host") == host]: del peers[k]   # re-pair replaces
+    peers[resp["id"]] = {"label": resp.get("label", ""), "host": host, "cmd": cmd, "pub": resp["pub"],
+                         "token": resp["token"], "paired": now_iso()}
+    save(d); audit("pair", key=host, source="cli", detail=f"peer={resp['id']}")
+    print(f"paired with {host} ({resp.get('label')}). Sync now (cron-friendly): concealer sync {host}")
+
+def sync_cmd(a):
+    """sync <host|label> [--dry] [--via HOST]: one encrypted two-way LWW round trip with a paired vault."""
+    dry = "--dry" in a; a = [x for x in a if x != "--dry"]; via = _flag(a, "--via")
+    if not a: sys.exit("usage: concealer sync <host> [--dry] [--via HOST]")
+    d = load(); pid, p = _find_peer(d, a[0])
+    if not p or not p.get("token"): sys.exit(f"not paired with '{a[0]}': run 'concealer pair {a[0]}' once.")
+    host = via or p["host"]; mine = secs(d)
+    try:
+        resp = _sync_call(host, p.get("cmd", "concealer"), {"op": "sync", "from": server_info()["id"], "token": p["token"], "dry": dry,
+                                                          "b64": _age_enc_to(p["pub"], json.dumps({"secrets": mine}))})
+        _, inc, applied = _sync_apply(d, resp["b64"], dry); recv = len(inc)
+    except Exception as ex:
+        audit("sync_fail", key=host, source="sync", detail=scrub(ex)[:200]); sys.exit(f"sync error: {scrub(ex)}")
+    if applied and not dry:   # re-read first: a web/MCP write during the round trip must not be clobbered
+        d = load(); sync_merge(d, inc); save(d)
+    audit("sync", key=host, source="sync", detail=f"sent={len(mine)} recv={recv} applied={applied} "
+                                                  f"remote_applied={resp.get('applied', 0)}" + (" dry" if dry else ""))
+    print(f"sync {host}{' (dry)' if dry else ''}: sent {len(mine)}, received {recv}; "
+          f"updated here {applied}, there {resp.get('applied', 0)}")
 
 # ---------------- backup (.cerbak) ----------------
 # .cerbak = the whole vault encrypted with age -p using the BACKUP PASSWORD (different from master, required).
@@ -2792,6 +2925,9 @@ def _mkhelp():
         R("export [file]", "export a password-protected .cerbak bundle"),
         R("import <bundle.cerbak> [--mode=overwrite|skip|duplicate]", "import a bundle / restore a .cerbak backup (conflict handling)"),
         R("backup [--dir D]", "write a .cerbak vault backup (uses the Settings backup password; for cron/launchd)"),
+        R("pair <ssh-host> [--remote-cmd C]", "pair with another machine's vault over ssh (once; both master passwords)"),
+        R("pair [--list] | pair --revoke <host>", "list / revoke machine pairings (revoke kills the sync token)"),
+        R("sync <host> [--dry] [--via HOST]", "encrypted two-way sync with a paired machine (token-driven; cron-friendly)"),
         R("audit [verify]", "HMAC-chained audit log (verify: integrity check)"),
         R("audit anchor [--file F][--syslog][--webhook U]", "push head hash to an off-machine sink (tamper-evidence)"),
         R("config [key [val]]", "runtime settings (idle, confirm_ops)"),
@@ -2825,6 +2961,7 @@ def _mkhelp():
         R("CONCEALER_HOME", "vault directory (default: ~/.concealer; repo checkout: next to the script)"),
         R("CONCEALER_TOKEN", "CLI/MCP unlock token (init/unlock/agent register produce it)"),
         R("CONCEALER_IDLE", "web session idle-lock timeout (seconds)"),
+        R("CONCEALER_SSH", "transport command for pair/sync (default: ssh)"),
         "",
         "Docs: https://github.com/fxerkan/concealer",
     ]
@@ -3067,7 +3204,8 @@ def cli(argv):
         if "--check" in a: check_update()   # opt-in, on-demand only — never runs automatically
         return
     if cmd in ("help", "--help", "-h", ""): return print(HELP)
-    if cmd == "native-host": return native_host()   # Chrome-invoked stdio host: no preflight (keeps stdout clean)
+    if cmd == "native-host": return native_host()
+    if cmd == "sync-serve": return sync_serve()   # remote end of pair/sync over ssh: JSON in/out only, no preflight noise   # Chrome-invoked stdio host: no preflight (keeps stdout clean)
     _preflight()
     if cmd == "init": return init("--force" in a)
     if cmd == "passwd": return passwd()
@@ -3075,6 +3213,8 @@ def cli(argv):
     if cmd == "recovery": return recovery_regen()
     if cmd == "unlock": return unlock()
     if cmd == "agent": return agent_cmd(a)
+    if cmd == "pair": return pair_cmd(a)
+    if cmd == "sync": return sync_cmd(a)
     if cmd == "harden": return harden()
     if cmd == "backup":
         # write a .cer using the (age-wrapped) password + folder from the auto-backup config — for cron/launchd.

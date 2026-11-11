@@ -7,6 +7,16 @@ its first public release at **`1.0.0`** (alongside the mobile app) and follows
 [semver](https://semver.org/) from there; the desktop tool and mobile app share
 the same version line. Dates are UTC.
 
+## [1.1.0] — 2026-11-11
+
+### Added
+
+- **Machine‑to‑machine sync** — `concealer pair <ssh-host>` (one time, both master passwords)
+  and `concealer sync <host> [--dry] [--via HOST]` (unattended, token‑driven, cron/launchd‑friendly).
+  Records cross ssh only as ciphertext addressed to the receiving vault; merge is last‑write‑wins with
+  tombstones; each sync is audited on both sides (counts only). `pair --list` / `pair --revoke <host>`
+  manage pairings; revoking also kills the remote sync token.
+
 ## [1.0.0] — 2026-09-27
 
 First public release. The desktop tool and the iOS/Android mobile app ship on the
