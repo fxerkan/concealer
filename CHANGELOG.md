@@ -7,6 +7,12 @@ its first public release at **`1.0.0`** (alongside the mobile app) and follows
 [semver](https://semver.org/) from there; the desktop tool and mobile app share
 the same version line. Dates are UTC.
 
+## [1.0.1] — 2026-10-21
+
+### Fixed
+- `run` / `run_with_secrets` injected a deleted record's (tombstone's) empty value instead of the
+  live secret when both shared a name and scope; injection and import now skip tombstones.
+
 ## [1.0.0] — 2026-09-27
 
 First public release. The desktop tool and the iOS/Android mobile app ship on the

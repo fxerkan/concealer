@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "1.0.0"   # tracks the public mobile-app release; semver from here on
+VERSION = "1.0.1"   # tracks the public mobile-app release; semver from here on
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -1066,7 +1066,7 @@ def _import_cands(d, cands, scope):
     n_new = n_skip = 0
     for c in cands:
         ident = dict(scope); ident["name"] = c["name"]
-        hit = next((e for e in secs(d) if matches(e, ident)), None)
+        hit = next((e for e in live(d) if matches(e, ident)), None)   # a tombstone match would swallow the import
         if hit and str(hit["fields"].get("value")) == c["value"]: n_skip += 1; continue
         if hit:
             hit["fields"]["value"] = c["value"]; hit["updated"] = now_iso(); n_new += 1
@@ -1848,7 +1848,7 @@ def collect_secrets(target, d=None, names=None):
     command pulls just the secret it needs instead of the whole scope."""
     d = d or load(); chosen = {}
     names = set(names) if names else None
-    for e in secs(d):
+    for e in live(d):   # tombstones keep name+scope but no value — they must not shadow the live record
         if names is not None and e["name"] not in names: continue
         spec = 0; ok = True
         for dim in DIMS:
