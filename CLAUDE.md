@@ -42,7 +42,7 @@ CONCEALER_HOME=/tmp/tv ./concealer get --name A     # token-driven, no prompt
 CONCEALER_HOME=/tmp/tv ./concealer web 8799 &       # web unlock (master pw) holds the key in memory; then curl /api/*
 python3 -c "import py_compile; py_compile.compile('concealer', doraise=True)"   # syntax check
 ```
-There are no external test frameworks; verify by exercising the CLI (set `CONCEALER_TOKEN`), the JSON API (curl `/api/unlock` then the rest), and the MCP stdio protocol (`CONCEALER_TOKEN=… ./concealer mcp` with piped JSON‑RPC lines). New commands: `unlock`, `agent register|list|revoke`, `harden`, `recover`, `recovery`.
+Self-checks: `python3 test_agent_install.py`, `python3 test_sync.py` (pair/sync end-to-end between two temp vaults, ssh stubbed via `CONCEALER_SSH`). There are no external test frameworks; verify by exercising the CLI (set `CONCEALER_TOKEN`), the JSON API (curl `/api/unlock` then the rest), and the MCP stdio protocol (`CONCEALER_TOKEN=… ./concealer mcp` with piped JSON‑RPC lines). New commands: `unlock`, `agent register|list|revoke`, `harden`, `recover`, `recovery`.
 
 ## MCP contract
 
@@ -63,3 +63,4 @@ Tools: `list_secrets`, `search_secrets`, `run_with_secrets`, `set_secret`. The a
 - Broken‑pipe suppression in the HTTP handler.
 - The `.gitignore` protecting vault data (now also `keys/audit.head`, `keys/recovery.json`, `keys/agents.json`).
 - Idle auto‑lock (server session TTL + client timer) — it also clears `_SESS_KEY`/`_KEY_CACHE`.
+- **Machine sync (`pair`/`sync`/`sync-serve`):** pairing data lives only inside the vault (`d["sync_peers"]`); the remote's sync token (source `sync`) is held only by the initiating vault and is refused by `_unlock_key` and the MCP gate — only `sync_serve` resolves it. `sync`/`pair` refuse agent tokens (`_UNLOCK_FOR`); cron uses a `--sync-only` token (source `sync-local`, opens the vault only for `sync`). Keep `_rec_ok` (schema + timestamp ≤ now+300 s), the mass‑delete guard, the pre‑save snapshot and `_vault_lock` on every sync merge; `inject_env` must keep stripping `CONCEALER_TOKEN`/`CONCEALER_HOME`. Records travel only as `_age_enc_to()` ciphertext (stdin→stdout, never a plaintext temp file). Keep `sync-serve` JSON‑only on stdout and every pair/sync audited with counts only.

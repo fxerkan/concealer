@@ -12,7 +12,7 @@ Audit: keys/audit.log (JSONL, HMAC-chained, tamper-evident). Keeps only key
 NAMES and actions, never secret VALUES.
 """
 import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse, urllib.request, html, getpass, time, webbrowser
-import hashlib, hmac, shlex, re, csv, io, tempfile, base64, shutil, fnmatch, gc, zlib, socket
+import hashlib, hmac, shlex, re, contextlib, csv, io, tempfile, base64, shutil, fnmatch, gc, zlib, socket
 from datetime import datetime, timezone, timedelta
 
 if sys.platform.startswith("win"):
@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "1.0.1"   # tracks the public mobile-app release; semver from here on
+VERSION = "1.1.0"   # tracks the public mobile-app release; semver from here on
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -104,7 +104,8 @@ def server_info():
     except OSError: pass
     return info
 def _cfg_persist():   # called from settings POSTs: persist idle/confirm_ops/limits/policies/hibp
-    save_cfg({k: CFG[k] for k in ("idle", "confirm_ops", "limits", "policies", "hibp_key", "audit_anchor") if k in CFG})
+    save_cfg({k: CFG[k] for k in ("idle", "confirm_ops", "limits", "policies", "hibp_key", "audit_anchor",
+                                  "sync_accept_remote_deletes") if k in CFG})
 
 def _clean_limit(v):
     """Clamp/sanitize the limit dict coming from the web (per_call>=1, quota>=0 ⇒ 0=block)."""
@@ -1136,13 +1137,19 @@ def import_bundle(pw, blob, mode="overwrite"):
     """Decrypt an 'age -p'-encrypted bundle and merge into the vault. pw = the bundle's (source machine) password.
     mode: conflict resolution (overwrite|skip|duplicate) → passed to merge_secrets."""
     data = _decrypt_bundle(pw, blob)
-    d = load(); nn, nu, ns = merge_secrets(d, data.get("secrets", []), mode); save(d)
+    with _vault_lock(): d = load(); nn, nu, ns = merge_secrets(d, data.get("secrets", []), mode); save(d)
     return nn, nu, ns
+
+_MERGE_KEYS = ["name", "type"] + DIMS + ["tags", "url", "notes", "fields", "field_meta",
+                                       "collection", "rotation", "env_alias", "created", "updated", "deleted"]
+def _rec_hash(e):
+    return hashlib.sha256(json.dumps({k: e.get(k) for k in _MERGE_KEYS}, sort_keys=True, default=str).encode()).hexdigest()
 
 def sync_merge(d, incoming):
     """Bidirectional last-write-wins device sync. Match by id (fallback name+scope); adopt whichever record has the
     newer `updated` timestamp, tombstones included (a deletion is just a record whose newer version is deleted).
-    now_iso() strings are fixed-width UTC → lexicographic compare == chronological. Returns count applied.
+    now_iso() strings are fixed-width UTC → lexicographic compare == chronological. Equal timestamps → the higher
+    content hash wins, so both sides deterministically pick the same version. Returns count applied.
     ponytail: tombstones are kept forever (no purge) — a personal vault's deletions are few; add TTL purge if it grows."""
     applied = 0
     for raw in incoming:
@@ -1151,9 +1158,8 @@ def sync_merge(d, incoming):
             ident = {dim: e.get(dim, "") for dim in DIMS}; ident["name"] = e["name"]
             cur = next((x for x in secs(d) if matches(x, ident)), None)
         if cur:
-            if e["updated"] > cur["updated"]:
-                for k in ["name", "type"] + DIMS + ["tags", "url", "notes", "fields", "field_meta",
-                          "collection", "rotation", "env_alias", "created", "updated", "deleted"]:
+            if e["updated"] > cur["updated"] or (e["updated"] == cur["updated"] and _rec_hash(e) > _rec_hash(cur)):
+                for k in _MERGE_KEYS:
                     if k in e: cur[k] = e[k]
                 applied += 1
         else:
@@ -1164,8 +1170,283 @@ def sync_bundle(pw, blob):
     """Device sync: decrypt the peer's bundle (incl. tombstones), LWW-merge into the vault, save, and return a fresh
     bundle of the FULL merged set (incl. tombstones) so the peer can converge to the same state. Returns (applied, out_blob)."""
     data = _decrypt_bundle(pw, blob)
-    d = load(); applied = sync_merge(d, data.get("secrets", [])); save(d)
+    inc = [r for r in data.get("secrets", []) if _rec_ok(r)]   # same shape/timestamp checks as the ssh path
+    with _vault_lock(): d = load(); applied = sync_merge(d, inc); save(d)
     return applied, _encrypt_bundle(pw, secs(d))   # full set incl tombstones — the peer needs deletions too
+
+# ---------------- machine pairing + ssh sync ----------------
+# `pair <host>` runs ONCE with both vaults' master passwords: each vault records the other under
+# d["sync_peers"] (inside the encrypted vault — never plaintext on disk). The remote mints a dedicated,
+# revocable token (label "sync:<peer vault id>", source "sync") and hands it back; only the initiating vault
+# keeps it. A "sync" token opens NOTHING but `sync-serve` (refused by _unlock_key and the MCP gate).
+# `sync <host>` then runs unattended with a human CLI token or a sync-only local token
+# (`agent register <name> --sync-only`, source "sync-local"); MCP agent tokens are refused. Records cross
+# ssh stdin/stdout only as age ciphertext addressed to the receiving vault's public key. Each side drops
+# malformed / future-dated records, refuses a mass deletion unless --allow-deletes, snapshots the encrypted
+# vault file before saving, and merges under the vault lock. Revoke on either side drops the pairing.
+# Ceiling: every unlock token wraps the vault key, so code running as the user with ANY token can still
+# unwrap it by hand — these gates stop the CLI/MCP paths, not a same-user attacker writing their own crypto.
+_AGE_RCPT = re.compile(r"age1[0-9a-z]{20,}")
+_TS_RE = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00")      # now_iso() shape (desktop + mobile sync.js)
+_HOST_RE = re.compile(r"[A-Za-z0-9_.@:\[\]%][A-Za-z0-9_.@:\[\]%-]*")  # ssh destination; never starts with '-'
+_CMD_RE = re.compile(r"[A-Za-z0-9_./=:+@-]+(?: [A-Za-z0-9_./=:+@-]+)*")   # plain words: no shell metacharacters
+_PEERID_RE = re.compile(r"[0-9a-f]{8,32}")
+_REMOTE_PATH = 'PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin"'   # non-login ssh PATH misses these
+SYNC_MAX_SKEW = 300                                   # seconds a peer clock may run ahead
+SNAPDIR = os.path.join(HOME, "keys", "snapshots")     # pre-sync copies of the ENCRYPTED vault file
+PAIRFAIL = os.path.join(HOME, "keys", "pairfail.json")
+_REC_STR = {"id", "name", "type", *DIMS, "url", "notes", "collection", "env_alias", "created", "updated", "deleted"}
+_REC_KEYS = _REC_STR | {"tags", "fields", "field_meta", "rotation"}
+
+def _ts_ok(s, empty=False):
+    if empty and s == "": return True
+    if not isinstance(s, str) or not _TS_RE.fullmatch(s): return False
+    return datetime.fromisoformat(s) <= datetime.now(timezone.utc) + timedelta(seconds=SYNC_MAX_SKEW)
+
+def _rec_ok(r):
+    """Strict shape check for a record arriving from a peer: known keys, right types, sane timestamps."""
+    if not isinstance(r, dict) or not set(r) <= _REC_KEYS: return False
+    if not all(isinstance(r.get(k), str) and r[k] for k in ("id", "name")): return False
+    if any(k in r and not isinstance(r[k], str) for k in _REC_STR): return False
+    if not isinstance(r.get("tags", []), list) or not all(isinstance(t, str) for t in r.get("tags", [])): return False
+    if not all(isinstance(r.get(k, {}), dict) for k in ("fields", "field_meta", "rotation")): return False
+    if not all(isinstance(v, (str, int, float, bool)) or v is None for v in r.get("fields", {}).values()): return False
+    return _ts_ok(r.get("updated")) and _ts_ok(r.get("created", r["updated"])) and _ts_ok(r.get("deleted", ""), empty=True)
+
+import threading
+_LOCK_TL = threading.local()   # per-thread re-entry depth (web handlers run in threads → each locks via flock)
+@contextlib.contextmanager
+def _vault_lock():
+    """Serialize load→merge→save across processes (sync vs CLI set/rm/…). No-op where flock is missing (Windows)."""
+    if getattr(_LOCK_TL, "depth", 0):   # re-entrant within a thread (e.g. `import` → import_bundle)
+        _LOCK_TL.depth += 1
+        try: yield
+        finally: _LOCK_TL.depth -= 1
+        return
+    try: import fcntl
+    except ImportError: fcntl = None
+    if not fcntl: yield; return
+    os.makedirs(os.path.join(HOME, "keys"), exist_ok=True)
+    with open(os.path.join(HOME, "keys", "vault.lock"), "a") as f:
+        for _ in range(240):   # ≤2 min: a human sitting on a password prompt must not hang cron forever
+            try: fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB); break
+            except BlockingIOError: time.sleep(0.5)
+        else: raise RuntimeError("vault busy (another concealer process holds the lock)")
+        _LOCK_TL.depth = 1
+        try: yield
+        finally: _LOCK_TL.depth = 0; fcntl.flock(f, fcntl.LOCK_UN)
+
+SNAP_KEEP_DAYS = 14
+def _snapshot(deleting=False):
+    """Restore point before a sync save: a copy of the ENCRYPTED vault file (no plaintext; needs no backup
+    password, so unattended runs can make it). Restore = copy it back over secrets.enc.yaml.
+    Retention is by AGE, never by count: copies younger than 14 days stay, and a copy taken before a sync that
+    deletes records ("-del") is never removed automatically."""
+    os.makedirs(SNAPDIR, mode=0o700, exist_ok=True); os.chmod(SNAPDIR, 0o700)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f")
+    dst = os.path.join(SNAPDIR, f"pre-sync-{stamp}{'-del' if deleting else ''}.enc.yaml")
+    shutil.copy2(FILE, dst); os.chmod(dst, 0o600)
+    cutoff = time.time() - SNAP_KEEP_DAYS * 86400
+    for f in os.listdir(SNAPDIR):
+        fp = os.path.join(SNAPDIR, f)
+        if f.startswith("pre-sync-") and "-del" not in f and os.path.getmtime(fp) < cutoff: os.remove(fp)
+    return dst
+
+def _age_enc_to(rcpt, text):
+    """Encrypt to an age recipient via stdin→stdout, so the plaintext never touches disk."""
+    if not _AGE_RCPT.fullmatch(rcpt or ""): raise RuntimeError("bad peer public key")
+    r = subprocess.run(["age", "-r", rcpt], input=text.encode(), capture_output=True)
+    if r.returncode: raise RuntimeError(scrub(r.stderr.decode(errors="ignore").strip()) or "encryption error")
+    return base64.b64encode(r.stdout).decode()
+
+def _sync_open(b64):
+    """Decrypt a peer bundle with our vault key → raw record list (validated later, under the lock)."""
+    raw = json.loads(_age_dec_priv(base64.b64decode(b64))).get("secrets", [])
+    return raw if isinstance(raw, list) else []
+
+def _sync_merge_checked(d, raw, allow_deletes=False):
+    """Drop malformed/future-dated records, LWW-merge into a COPY of d, refuse a mass deletion unless allowed.
+    → (merged copy, applied, rejected, ids newly deleted)."""
+    inc = [r for r in raw if _rec_ok(r)]
+    work = json.loads(json.dumps(d)); before = {e["id"] for e in live(work)}
+    applied = sync_merge(work, inc)
+    gone = sorted(before - {e["id"] for e in live(work)})
+    if not allow_deletes and len(gone) > 3 and len(gone) * 10 > len(before):
+        raise RuntimeError(f"refusing to delete {len(gone)} of {len(before)} records in one sync (rerun with --allow-deletes)")
+    return work, applied, len(raw) - len(inc), gone
+
+def _sync_call(host, cmd, req, timeout=120):
+    """One request/response over ssh: JSON frame on stdin, JSON line back. CONCEALER_SSH overrides the
+    transport (tests). BatchMode → never hangs on a prompt under cron; '--' + host/cmd checks → no option injection."""
+    if not _HOST_RE.fullmatch(host or ""): raise RuntimeError("bad ssh host")
+    if not _CMD_RE.fullmatch(cmd or ""): raise RuntimeError("bad remote command")
+    argv = shlex.split(os.environ.get("CONCEALER_SSH", "ssh")) + ["-T", "-o", "BatchMode=yes", "--", host,
+                                                                   f"{_REMOTE_PATH} {cmd} sync-serve"]
+    try: r = subprocess.run(argv, input=json.dumps(req), capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired: raise RuntimeError(f"{host}: timed out")
+    lines = [ln for ln in r.stdout.splitlines() if ln.strip()]
+    try: resp = json.loads(lines[-1])
+    except Exception: raise RuntimeError(f"{host}: no answer ({scrub(r.stderr.strip()[-300:]) or 'rc=%d' % r.returncode})")
+    if resp.get("error"): raise RuntimeError(f"{host}: {resp['error']}")
+    return resp
+
+def _find_peer(d, who):
+    """Pairing entry by vault id, ssh host or label → (id, entry) or (None, None)."""
+    for pid, p in d.get("sync_peers", {}).items():
+        if who in (pid, p.get("host"), p.get("label")): return pid, p
+    return None, None
+
+def _pair_throttle(failed=None):
+    """Remote pair attempts: sleep 2^n s (≤60) after n consecutive failures; reset on success."""
+    try: n = json.load(open(PAIRFAIL)).get("n", 0)
+    except Exception: n = 0
+    if failed is None:
+        if n: time.sleep(min(2 ** n, 60))
+        return
+    with open(PAIRFAIL, "w") as f: json.dump({"n": n + 1 if failed else 0, "ts": now_iso()}, f)
+    os.chmod(PAIRFAIL, 0o600)
+
+def _deny_agent(what):
+    """pair/sync never run on an MCP agent token (an agent could otherwise trigger them via run_with_secrets)."""
+    label, src = _mcp_agent()
+    if src == "agent":
+        audit(f"{what}_denied", source="cli", detail="agent token", actor=label)
+        sys.exit(f"{what}: agent tokens are not allowed. Cron: concealer agent register <name> --sync-only")
+
+def sync_serve():
+    """Remote end of pair/sync (hidden command, run over ssh). Reads ONE JSON frame from stdin, writes ONE
+    JSON line. Never prompts, never prints values; every error is a scrubbed {"error": ...} and audited."""
+    global _KEY_CACHE
+    out = lambda o: print(json.dumps(o))
+    op, who = None, ""
+    try:
+        req = json.loads(sys.stdin.read() or "{}"); op = req.get("op"); me = server_info()
+        if op == "pair":                                  # human-approved: needs THIS vault's master password
+            peer = req.get("peer") or {}
+            if not _AGE_RCPT.fullmatch(peer.get("pub", "")) or not _PEERID_RE.fullmatch(peer.get("id", "")):
+                return out({"error": "bad pairing request"})
+            who = str(peer.get("label", ""))[:64]; _pair_throttle()
+            key = key_from_master(req.get("pw", ""))
+            _pair_throttle(failed=not key)
+            if not key: audit("pair_fail", key=who, source="sync"); return out({"error": "wrong master password"})
+            _KEY_CACHE = key; tl = f"sync:{peer['id']}"
+            tok = mint_token(key, tl, "sync")
+            with _vault_lock():
+                d = load(); d.setdefault("sync_peers", {})[peer["id"]] = {
+                    "label": who, "pub": peer["pub"], "token_label": tl, "paired": now_iso()}
+                save(d)
+            audit("pair", key=who, source="sync", detail=f"peer={peer['id']}", actor=tl)
+            return out({"ok": True, "id": me["id"], "label": me["label"], "pub": _recipient(), "token": tok})
+        tok = req.get("token", ""); te = _find_token(tok)
+        if not te or te.get("source") != "sync":
+            audit("sync_fail", source="sync", detail="bad token"); return out({"error": "not paired (token invalid or revoked)"})
+        _KEY_CACHE = resolve_token(tok); pid = req.get("from", ""); who = te["label"]
+        if op == "sync": raw = _sync_open(req.get("b64", ""))   # decrypt outside the lock
+        with _vault_lock():
+            d = load(); p = d.get("sync_peers", {}).get(pid)
+            if not p or p.get("token_label") != te["label"]:
+                audit("sync_fail", source="sync", detail="unknown peer", actor=who); return out({"error": "not paired"})
+            if op == "unpair":
+                del d["sync_peers"][pid]; save(d); revoke_token(te["label"])
+                audit("pair_revoke", key=p["label"], source="sync", detail="by peer", actor=who); return out({"ok": True})
+            if op != "sync": return out({"error": "unknown op"})
+            dry = bool(req.get("dry"))
+            ok_del = bool(req.get("allow_deletes")) and str(CFG.get("sync_accept_remote_deletes", "")).lower() in ("1", "true", "yes", "on")
+            work, applied, rej, gone = _sync_merge_checked(d, raw, ok_del)   # a peer can't waive OUR guard unless we opted in
+            if applied and not dry: _snapshot(bool(gone)); save(work)
+        sent = len(secs(work)); blob = _age_enc_to(p["pub"], json.dumps({"secrets": secs(work)}))
+        audit("sync", key=p["label"], source="sync", actor=who,
+              detail=f"recv={len(raw)} applied={applied} rejected={rej} sent={sent} deleted={','.join(gone[:50])}" + (" dry" if dry else ""))
+        return out({"ok": True, "recv": len(raw), "applied": applied, "rejected": rej, "sent": sent, "b64": blob})
+    except SystemExit as ex:   # load()/save() exit on crypto errors
+        audit("sync_fail", source="sync", detail=f"{op}: {scrub(ex.code)}"[:200], actor=who or None); return out({"error": scrub(ex.code)})
+    except Exception as ex:
+        audit("sync_fail", source="sync", detail=f"{op}: {scrub(ex)}"[:200], actor=who or None); return out({"error": scrub(ex)})
+
+def pair_cmd(a):
+    """pair <host> [--remote-cmd C] | pair [--list] | pair --revoke <host|label|id>"""
+    global _KEY_CACHE, _UNLOCK_FOR
+    _UNLOCK_FOR = "pair"
+    rev = _flag(a, "--revoke")
+    if rev or not a or a[0] == "--list": _deny_agent("pair")   # token-driven ops; pairing itself needs master passwords
+    if rev:
+        with _vault_lock():
+            d = load(); pid, p = _find_peer(d, rev)
+            if not p: sys.exit(f"no pairing named '{rev}'.")
+            if p.get("token"):                            # initiating side: also kill the remote token
+                try: _sync_call(p["host"], p.get("cmd", "concealer"), {"op": "unpair", "from": server_info()["id"], "token": p["token"]}, 30)
+                except Exception as ex:
+                    if not p.get("pending_revoke"):       # keep it until the peer confirms; `sync` retries
+                        p["pending_revoke"] = now_iso(); save(d)
+                        audit("pair_revoke_pending", key=p["host"], source="cli", detail=scrub(ex)[:200], actor=_cli_actor())
+                        return print(f"remote not reached ({scrub(ex)}): pairing disabled, revoke will retry on the next "
+                                     f"'concealer sync {p['host']}' (or run --revoke again to drop it locally).")
+                    print("warning: remote still not reached — dropping the pairing locally; revoke it there too.")
+            if p.get("token_label"): revoke_token(p["token_label"])
+            del d["sync_peers"][pid]; save(d)
+        audit("pair_revoke", key=p.get("host") or p["label"], source="cli", actor=_cli_actor())
+        return print(f"pairing removed: {p.get('host') or p['label']}")
+    if not a or a[0] == "--list":
+        peers = load().get("sync_peers", {})
+        if not peers: return print("no pairings. pair with: concealer pair <ssh-host>")
+        for pid, p in peers.items():
+            role = ("revoke pending → " if p.get("pending_revoke") else "sync → ") + p["host"] if p.get("host") else "serves sync"
+            print(f"  {p.get('label') or pid:16} {role:30} paired {p['paired']}")
+        return
+    host = a[0]; cmd = _flag(a, "--remote-cmd") or "concealer"
+    if not _HOST_RE.fullmatch(host): sys.exit("bad ssh host.")
+    if not _CMD_RE.fullmatch(cmd): sys.exit("bad --remote-cmd (plain words only, no shell characters).")
+    pw = getpass.getpass("Master password (this machine): "); key = key_from_master(pw)
+    if not key: sys.exit("wrong password.")
+    _KEY_CACHE = key; me = server_info()
+    rpw = getpass.getpass(f"Master password on {host}: ")   # travels only on ssh stdin
+    if not rpw: sys.exit("the remote master password is required.")
+    try: resp = _sync_call(host, cmd, {"op": "pair", "pw": rpw, "peer": {"id": me["id"], "label": me["label"], "pub": _recipient()}})
+    except Exception as ex: sys.exit(f"pair error: {scrub(ex)}")
+    if not _AGE_RCPT.fullmatch(resp.get("pub") or "") or not resp.get("token") or not _PEERID_RE.fullmatch(resp.get("id") or ""):
+        sys.exit("pair error: bad answer from peer")
+    with _vault_lock():
+        d = load(); peers = d.setdefault("sync_peers", {})
+        for k in [k for k, v in peers.items() if v.get("host") == host]: del peers[k]   # re-pair replaces
+        peers[resp["id"]] = {"label": str(resp.get("label", ""))[:64], "host": host, "cmd": cmd, "pub": resp["pub"],
+                             "token": resp["token"], "paired": now_iso()}
+        save(d)
+    audit("pair", key=host, source="cli", detail=f"peer={resp['id']}", actor=_cli_actor())
+    print(f"paired with {host} ({resp.get('label')}). Sync now (cron-friendly): concealer sync {host}")
+
+def sync_cmd(a):
+    """sync <host|label> [--dry] [--allow-deletes] [--via HOST]: one encrypted two-way LWW round trip with a paired vault."""
+    global _UNLOCK_FOR
+    _UNLOCK_FOR = "sync"; _deny_agent("sync")
+    dry = "--dry" in a; allow = "--allow-deletes" in a
+    a = [x for x in a if x not in ("--dry", "--allow-deletes")]; via = _flag(a, "--via")
+    if not a: sys.exit("usage: concealer sync <host> [--dry] [--allow-deletes] [--via HOST]")
+    if via is not None and not _HOST_RE.fullmatch(via): sys.exit("bad --via host.")
+    d = load(); pid, p = _find_peer(d, a[0]); actor = _cli_actor()
+    if not p or not p.get("token"): sys.exit(f"not paired with '{a[0]}': run 'concealer pair {a[0]}' once.")
+    host = via or p["host"]; cmd = p.get("cmd", "concealer")
+    if p.get("pending_revoke"):                           # finish an earlier revoke instead of syncing
+        try: _sync_call(host, cmd, {"op": "unpair", "from": server_info()["id"], "token": p["token"]}, 30)
+        except Exception as ex: sys.exit(f"pairing is being revoked; remote still not reached: {scrub(ex)}")
+        with _vault_lock():
+            d = load(); d.get("sync_peers", {}).pop(pid, None); save(d)
+        audit("pair_revoke", key=host, source="cli", detail="completed", actor=actor)
+        return print(f"pairing removed: {host}")
+    mine = secs(d)
+    try:
+        resp = _sync_call(host, cmd, {"op": "sync", "from": server_info()["id"], "token": p["token"], "dry": dry,
+                                      "allow_deletes": allow, "b64": _age_enc_to(p["pub"], json.dumps({"secrets": mine}))})
+        raw = _sync_open(resp["b64"])
+        with _vault_lock():                              # re-read: a write during the round trip must not be clobbered
+            d = load(); work, applied, rej, gone = _sync_merge_checked(d, raw, allow)
+            if applied and not dry: _snapshot(bool(gone)); save(work)
+    except Exception as ex:
+        audit("sync_fail", key=host, source="sync", detail=scrub(ex)[:200], actor=actor); sys.exit(f"sync error: {scrub(ex)}")
+    audit("sync", key=host, source="sync", actor=actor,
+          detail=f"sent={len(mine)} recv={len(raw)} applied={applied} rejected={rej} remote_applied={resp.get('applied', 0)} "
+                 f"deleted={','.join(gone[:50])}" + (" dry" if dry else ""))
+    print(f"sync {host}{' (dry)' if dry else ''}: sent {len(mine)}, received {len(raw)}; "
+          f"updated here {applied}, there {resp.get('applied', 0)}" + (f"; rejected {rej}" if rej else ""))
 
 # ---------------- backup (.cerbak) ----------------
 # .cerbak = the whole vault encrypted with age -p using the BACKUP PASSWORD (different from master, required).
@@ -1416,6 +1697,10 @@ def _age_enc_bytes(data, pw):
 def key_from_master(pw):
     """Decrypt BACKUP with the master pw → age key text (None on wrong pw). Both verifies and yields the key."""
     if not os.path.exists(BACKUP): return None
+    if not sys.platform.startswith("win"):   # decrypt to stdout (captured in memory) — no plaintext key temp file
+        rc, out = _age_pw(["-d", BACKUP], pw)
+        m = re.search(r"AGE-SECRET-KEY-1[0-9A-Z]+", out or "")
+        return m.group(0) + "\n" if rc == 0 and m else None
     tout = tempfile.NamedTemporaryFile(delete=False, suffix=".key").name
     try:
         rc, _ = _age_pw(["-d", "-o", tout, BACKUP], pw)
@@ -1495,6 +1780,7 @@ def revoke_token(label):
     n = len(d["tokens"]); d["tokens"] = [] if label == "all" else [t for t in d["tokens"] if t["label"] != label]
     _save_agents(d); return n - len(d["tokens"])
 
+_UNLOCK_FOR = None   # "sync"/"pair" while those commands run: gates which token sources may open the vault
 def _unlock_key():
     """Resolve the age private key text. In order: memory cache → CONCEALER_TOKEN →
     (plaintext file in an old vault=None) → master pw on the TTY. Error if not found."""
@@ -1502,6 +1788,10 @@ def _unlock_key():
     if _KEY_CACHE: return _KEY_CACHE
     tok = os.environ.get("CONCEALER_TOKEN")
     if tok:
+        src = (_find_token(tok) or {}).get("source")
+        if src == "sync": sys.exit("this is a machine-sync token: it only serves the paired peer's sync.")
+        if src == "sync-local" and _UNLOCK_FOR != "sync": sys.exit("this token is sync-only (concealer sync <host>).")
+        if src == "agent" and _UNLOCK_FOR: sys.exit(f"agent tokens cannot run {_UNLOCK_FOR}; cron: concealer agent register <name> --sync-only")
         k = resolve_token(tok)
         if k: _KEY_CACHE = k; return k
         sys.exit("CONCEALER_TOKEN invalid/expired/revoked. New token: concealer unlock")
@@ -1795,10 +2085,22 @@ def agent_cmd(a):
     if sub == "install":
         return agent_install(a[1:])
     if sub == "register":
-        if len(a) < 2: sys.exit("usage: concealer agent register <name>")
+        so = "--sync-only" in a; wf = "--write-token-file" in a; a = [x for x in a if x not in ("--sync-only", "--write-token-file")]
+        if wf and not so: sys.exit("--write-token-file is only for --sync-only tokens.")
+        if len(a) >= 2 and not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", a[1]): sys.exit("bad agent name.")
+        if len(a) < 2: sys.exit("usage: concealer agent register <name> [--sync-only]")
         keytext = key_from_master(getpass.getpass("Master password: "))
         if not keytext: sys.exit("wrong password.")
-        tok = mint_token(keytext, a[1], "agent", ttl=None); audit("agent_register", key=a[1], source="cli")
+        tok = mint_token(keytext, a[1], "sync-local" if so else "agent", ttl=None)
+        audit("agent_register", key=a[1], source="cli", detail="sync-only" if so else "")
+        if so and wf:   # straight to a 0600 file (dir 0700) → never on screen or in shell history
+            kd = os.path.dirname(AGENTS); os.chmod(kd, 0o700); tf = os.path.join(kd, f"{a[1]}.token")
+            fd = os.open(tf, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600); os.write(fd, tok.encode()); os.close(fd); os.chmod(tf, 0o600)
+            return print(f"sync-only token '{a[1]}' written to {tf} (0600).\n"
+                         f'  cron: CONCEALER_TOKEN="$(cat {tf})" concealer sync <host>\n  (revoke: concealer agent revoke {a[1]})')
+        if so:   # cron/launchd: can run `concealer sync` and nothing else (not get/run/MCP)
+            return print(f"sync-only token '{a[1]}' (works only for 'concealer sync'):\n  CONCEALER_TOKEN={tok}\n"
+                         f"  (revoke: concealer agent revoke {a[1]})")
         print(f"agent '{a[1]}' registered (long-lived, revocable token).")
         print("Add to the MCP server env (e.g. .mcp.json / claude config):")
         print(f'  "env": {{ "CONCEALER_TOKEN": "{tok}" }}')
@@ -1883,6 +2185,8 @@ def inject_env(target, source="cli", actor=None, command=None, gate=None, names=
             audit("inject_denied", key=",".join(sorted(e["name"] for e in recs)), source=source, detail=label(target), actor=actor)
             return None, d, note
     env = dict(os.environ); env.update(kv)
+    for k in ("CONCEALER_TOKEN", "CONCEALER_HOME", "CONCEALER_FILE", "CONCEALER_KEY"):
+        env.pop(k, None)   # a child (e.g. via MCP run_with_secrets) must not reuse this process's vault access
     if kv:
         env["CONCEALER_INJECTED"] = ",".join(sorted(kv))   # names only (identifiers), never values — lets the child discover what was injected
         det = label(target)
@@ -2765,6 +3069,7 @@ def _mkhelp():
         R("recovery", "regenerate the recovery-code set"),
         R("agent install [--all|--mcp-only|--skill-only] [ids]", "auto-detect agents, wire up MCP + skill"),
         R("agent register|list|revoke <name>", "long-lived, revocable token for agents"),
+        R("agent register <name> --sync-only [--write-token-file]", "token that can only run 'sync' (cron); file: keys/<name>.token"),
         "",
         "SECRETS",
         R("list [term] [scope] [--tag X] [--type T]", "list records (masked)"),
@@ -2792,6 +3097,9 @@ def _mkhelp():
         R("export [file]", "export a password-protected .cerbak bundle"),
         R("import <bundle.cerbak> [--mode=overwrite|skip|duplicate]", "import a bundle / restore a .cerbak backup (conflict handling)"),
         R("backup [--dir D]", "write a .cerbak vault backup (uses the Settings backup password; for cron/launchd)"),
+        R("pair <ssh-host> [--remote-cmd C]", "pair with another machine's vault over ssh (once; both master passwords)"),
+        R("pair [--list] | pair --revoke <host>", "list / revoke machine pairings (revoke kills the sync token)"),
+        R("sync <host> [--dry] [--allow-deletes] [--via H]", "encrypted two-way sync with a paired machine (cron-friendly)"),
         R("audit [verify]", "HMAC-chained audit log (verify: integrity check)"),
         R("audit anchor [--file F][--syslog][--webhook U]", "push head hash to an off-machine sink (tamper-evidence)"),
         R("config [key [val]]", "runtime settings (idle, confirm_ops)"),
@@ -2825,6 +3133,7 @@ def _mkhelp():
         R("CONCEALER_HOME", "vault directory (default: ~/.concealer; repo checkout: next to the script)"),
         R("CONCEALER_TOKEN", "CLI/MCP unlock token (init/unlock/agent register produce it)"),
         R("CONCEALER_IDLE", "web session idle-lock timeout (seconds)"),
+        R("CONCEALER_SSH", "transport command for pair/sync (default: ssh)"),
         "",
         "Docs: https://github.com/fxerkan/concealer",
     ]
@@ -3067,7 +3376,8 @@ def cli(argv):
         if "--check" in a: check_update()   # opt-in, on-demand only — never runs automatically
         return
     if cmd in ("help", "--help", "-h", ""): return print(HELP)
-    if cmd == "native-host": return native_host()   # Chrome-invoked stdio host: no preflight (keeps stdout clean)
+    if cmd == "native-host": return native_host()
+    if cmd == "sync-serve": return sync_serve()   # remote end of pair/sync over ssh: JSON in/out only, no preflight noise   # Chrome-invoked stdio host: no preflight (keeps stdout clean)
     _preflight()
     if cmd == "init": return init("--force" in a)
     if cmd == "passwd": return passwd()
@@ -3075,6 +3385,10 @@ def cli(argv):
     if cmd == "recovery": return recovery_regen()
     if cmd == "unlock": return unlock()
     if cmd == "agent": return agent_cmd(a)
+    if cmd in ("set", "add", "rm", "rotate", "mv", "cp", "import"):   # mutating: serialize with sync merges
+        global _HELD_LOCK; _HELD_LOCK = _vault_lock(); _HELD_LOCK.__enter__()   # released at process exit
+    if cmd == "pair": return pair_cmd(a)
+    if cmd == "sync": return sync_cmd(a)
     if cmd == "harden": return harden()
     if cmd == "backup":
         # write a .cer using the (age-wrapped) password + folder from the auto-backup config — for cron/launchd.
@@ -3253,9 +3567,10 @@ def cli(argv):
         print(f"{len(cands)} candidates:")
         for c in cands: print(f"  {c['name']:28} {c['mask']:14} <- {c['source']}")
         if not do_import: print("\n(dry run) add --import to import them"); return
-        d = load(); scope = {dim: sel.get(dim, "") for dim in DIMS}
-        if not scope["project"] and root: scope["project"] = os.path.basename(os.path.abspath(os.path.expanduser(root)))
-        n_new, n_skip = _import_cands(d, cands, scope); save(d)
+        with _vault_lock():
+            d = load(); scope = {dim: sel.get(dim, "") for dim in DIMS}
+            if not scope["project"] and root: scope["project"] = os.path.basename(os.path.abspath(os.path.expanduser(root)))
+            n_new, n_skip = _import_cands(d, cands, scope); save(d)
         audit("scan_import", key=f"{n_new} secrets", source="scan", detail=root)
         print(f"\nimported: {n_new}, skipped (existing): {n_skip}  @ {label(scope)}")
     elif cmd == "policy":
@@ -3334,7 +3649,7 @@ def cli(argv):
         else:
             k, v = a[0], a[1]
             CFG[k] = int(v) if k == "idle" else ([x for x in v.split(",") if x] if k == "confirm_ops" else v)
-            save_cfg({"idle": CFG["idle"], "confirm_ops": CFG["confirm_ops"]}); print(f"{k} = {CFG[k]}")
+            _cfg_persist(); print(f"{k} = {CFG[k]}")   # keeps limits/policies (the old 2-key save dropped them)
     elif cmd == "deploy":
         target = _flag(a, "--target") or "dotenv"
         scope = _sel(a); scope.pop("name", None); scope.pop("type", None)
@@ -4054,8 +4369,9 @@ def serve_web(port):
                 if j["exposed"]: audit("web_autofill_exposed", key=j["secret_name"], source="web", detail=j["domain"])
                 return self._json({"ok": True})
             if path == "/api/secrets":     # create
-                b = self._body(); d = load(); e = norm(_entry_from_body(b))
-                secs(d).append(e); save(d)
+                with _vault_lock():
+                    b = self._body(); d = load(); e = norm(_entry_from_body(b))
+                    secs(d).append(e); save(d)
                 audit("create", key=e["name"], source="web", detail=label(e))
                 return self._json({"ok": True, "id": e["id"]})
             if path == "/api/copy":        # clipboard copy (audit)
@@ -4178,10 +4494,11 @@ def serve_web(port):
             if path == "/api/scan/import":
                 b = self._body(); root = b.get("path", ""); names = set(b.get("names") or [])
                 cands = [c for c in scan_folder(root, b.get("history", False), b.get("env", False)) if c["name"] in names]
-                d = load(); scope = {dim: b.get(dim, "") for dim in DIMS}
-                if not scope["project"] and root:
-                    scope["project"] = os.path.basename(os.path.abspath(os.path.expanduser(root)))
-                n_new, n_skip = _import_cands(d, cands, scope); save(d)
+                with _vault_lock():
+                    d = load(); scope = {dim: b.get(dim, "") for dim in DIMS}
+                    if not scope["project"] and root:
+                        scope["project"] = os.path.basename(os.path.abspath(os.path.expanduser(root)))
+                    n_new, n_skip = _import_cands(d, cands, scope); save(d)
                 audit("scan_import", key=f"{n_new} secrets", source="scan", detail=root)
                 return self._json({"imported": n_new, "skipped": n_skip})
             if path == "/api/history/purge":
@@ -4195,12 +4512,13 @@ def serve_web(port):
             path = urllib.parse.urlparse(self.path).path
             if not valid(self._tok() or ""): return self._json({"error": "locked"}, 401)
             if path.startswith("/api/secret/"):
-                sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
-                if not e: return self._json({"error": "not found"}, 404)
-                b = self._body(); ne = _entry_from_body(b)
-                for k in ["name", "type"] + DIMS + ["tags", "url", "notes", "fields", "collection", "rotation"]: e[k] = ne[k]
-                if "field_meta" in ne: e["field_meta"] = ne["field_meta"]   # write only if sent (preserves TUI overrides)
-                e["updated"] = now_iso(); save(d)
+                with _vault_lock():
+                    sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
+                    if not e: return self._json({"error": "not found"}, 404)
+                    b = self._body(); ne = _entry_from_body(b)
+                    for k in ["name", "type"] + DIMS + ["tags", "url", "notes", "fields", "collection", "rotation"]: e[k] = ne[k]
+                    if "field_meta" in ne: e["field_meta"] = ne["field_meta"]   # write only if sent (preserves TUI overrides)
+                    e["updated"] = now_iso(); save(d)
                 audit("update", key=e["name"], source="web", detail=label(e))
                 return self._json({"ok": True})
             self._json({"error": "not found"}, 404)
@@ -4214,11 +4532,12 @@ def serve_web(port):
                 ok = policy_delete(pid); audit("policy_delete", key=pid, source="web")
                 return self._json({"ok": ok})
             if path.startswith("/api/secret/"):
-                sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
-                if not e: return self._json({"error": "not found"}, 404)
-                if "delete" in CFG["confirm_ops"] and not verify_master(self._body().get("pw", "")):
-                    return self._json({"error": "bad_pw"}, 403)
-                tombstone(d, e); save(d)
+                with _vault_lock():
+                    sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
+                    if not e: return self._json({"error": "not found"}, 404)
+                    if "delete" in CFG["confirm_ops"] and not verify_master(self._body().get("pw", "")):
+                        return self._json({"error": "bad_pw"}, 403)
+                    tombstone(d, e); save(d)
                 audit("delete", key=e["name"], source="web", detail=label(e))
                 return self._json({"ok": True})
             self._json({"error": "not found"}, 404)
@@ -4389,7 +4708,9 @@ def mcp_stdio():
         elif m == "tools/list": send({"jsonrpc": "2.0", "id": mid, "result": {"tools": MCP_TOOLS}})
         elif m == "tools/call":
             p = req.get("params", {})
-            try: text = _mcp_call(p.get("name"), p.get("arguments", {}))
+            try:
+                with (_vault_lock() if p.get("name") == "set_secret" else contextlib.nullcontext()):
+                    text = _mcp_call(p.get("name"), p.get("arguments", {}))
             except Exception as e: text = f"error: {scrub(e)}"
             send({"jsonrpc": "2.0", "id": mid, "result": {"content": [{"type": "text", "text": text}]}})
         elif mid is not None:
