@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "1.1.0"   # tracks the public mobile-app release; semver from here on
+VERSION = "1.1.1"   # tracks the public mobile-app release; semver from here on
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -3706,18 +3706,27 @@ def serve_lan(lan_port, web_port):
         except OSError: return False
         finally: s.close()
 
-    # Start the backend web instance if nothing is already serving on the loopback port.
-    if not _up():
-        cmd = _lan_backend_cmd() + ["web", str(web_port)]
-        kw = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    def _start_backend():   # start the backend web instance if nothing is serving on the loopback port
+        if _up(): return True
+        env = dict(os.environ); env["CONCEALER_NO_OPEN"] = "1"; env.pop("CONCEALER_WEB_IDLE_EXIT", None)
+        kw = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL, "env": env}
         if os.name == "nt": kw["creationflags"] = 0x00000008 | 0x00000200
         else: kw["start_new_session"] = True
-        subprocess.Popen(cmd, **kw)
+        subprocess.Popen(_lan_backend_cmd() + ["web", str(web_port)], **kw)
         for _ in range(40):                       # wait up to ~6s for it to bind
-            if _up(): break
+            if _up(): return True
             time.sleep(0.15)
-        if not _up():
-            sys.exit(scrub("could not start the web instance to bridge — run `concealer web` first"))
+        return False
+    if not _start_backend():
+        sys.exit(scrub("could not start the web instance to bridge — run `concealer web` first"))
+    # Keep http://127.0.0.1:<web_port> always answering while this (service) runs: an on-demand
+    # server started by the Chrome extension idle-exits, so re-spawn it whenever it goes away.
+    def _keepalive():
+        while True:
+            time.sleep(60)
+            try: _start_backend()
+            except Exception: pass
+    threading.Thread(target=_keepalive, daemon=True).start()
 
     class LanProxy(http.server.BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -4095,11 +4104,13 @@ def serve_web(port):
             # Cross-origin state change is also refused unless the Origin is loopback or the extension.
             port = self.server.server_address[1]
             host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip().strip("[]").lower()
-            if host and host not in ("127.0.0.1", "localhost", "::1"):
+            # concealer.localhost: browsers resolve *.localhost to loopback themselves (never via DNS),
+            # so it can't be rebound — a memorable name for the UI.
+            if host and host not in ("127.0.0.1", "localhost", "::1", "concealer.localhost"):
                 self._json({"error": "forbidden host"}, 403); return False
             origin = self.headers.get("Origin")
             if origin and not (origin.startswith("chrome-extension://")
-                               or origin in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")):
+                               or origin in (f"http://127.0.0.1:{port}", f"http://localhost:{port}", f"http://concealer.localhost:{port}")):
                 self._json({"error": "forbidden origin"}, 403); return False
             return True
         def _af_agent(self):

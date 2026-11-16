@@ -85,14 +85,18 @@ async function boot(){
   setStatus("checking server…");
   await loadPrefs();
   TOKEN = await getToken();
-  const ens = await ensureServer();
-  // Any native-host failure has the same fix: re-run the setup command. Besides "not
-  // registered", an upgrade can leave a launcher pointing at the removed old install —
-  // Chrome then reports "Native host has exited", which is not a server problem.
-  const hostBroken = ens.ok===false;
-  let s = await sessionUp();
-  if(!s && !hostBroken){   // host is (probably) starting the server → poll briefly while it binds
-    for(let i=0;i<20 && !s;i++){ await new Promise(r=>setTimeout(r,250)); s=await sessionUp(); }
+  // Fast path: server already up → skip the native-host round-trip (a process spawn per open).
+  let s = await sessionUp(), hostBroken = false, ens = {};
+  if(!s || s.version!==chrome.runtime.getManifest().version){
+    ens = await ensureServer();   // starts it, or replaces a server left over from an older install
+    // Any native-host failure has the same fix: re-run the setup command. Besides "not
+    // registered", an upgrade can leave a launcher pointing at the removed old install —
+    // Chrome then reports "Native host has exited", which is not a server problem.
+    hostBroken = ens.ok===false;
+    s = await sessionUp();
+    if(!s && !hostBroken){   // host is (probably) starting the server → poll briefly while it binds
+      for(let i=0;i<50 && !s;i++){ await new Promise(r=>setTimeout(r,100)); s=await sessionUp(); }
+    }
   }
   if(!s){
     if(hostBroken){ show("setup"); setStatus(ens.err||"", true); }   // → the `cer chrome-extension` card
@@ -102,7 +106,11 @@ async function boot(){
   setStatus(""); IDLE = s.idle||0;
   const extVer = chrome.runtime.getManifest().version, w=$("#verwarn");
   if(s.version && s.version!==extVer){
-    w.textContent = `Version mismatch: extension v${extVer}, app v${s.version}. Update concealer (brew/scoop/pip) and reload the extension so both match.`;
+    const a=s.version.split(".").map(Number), b=extVer.split(".").map(Number);
+    const i=[0,1,2].find(k=>(a[k]||0)!==(b[k]||0));
+    w.textContent = (a[i]||0)>(b[i]||0)   // app newer → the extension is the one behind
+      ? `Version mismatch: extension v${extVer}, app v${s.version}. Update the extension (chrome://extensions → Update) so both match.`
+      : `Version mismatch: extension v${extVer}, app v${s.version}. Update concealer (brew/scoop/pip) so both match.`;
     w.hidden=false;
   } else w.hidden=true;
   if(s.unlocked){

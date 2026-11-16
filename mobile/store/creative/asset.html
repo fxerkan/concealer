@@ -1,0 +1,96 @@
+<!doctype html><meta charset="utf-8">
+<!-- Universal App Store creative asset (header + search results). Render at 2622x1475 @2x = 5244x2950:
+     chrome --headless --window-size=2622,1475 --force-device-scale-factor=2 --screenshot=out.png "asset.html?l=en|tr"
+     The phone header crops the sides, the wide header crops top/bottom: keep the message in the centre,
+     let the two devices bleed off the edges. -->
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{width:2622px;height:1475px;overflow:hidden}
+body{background:#0a0b0d;font-family:-apple-system,"SF Pro Display","Helvetica Neue",sans-serif;color:#e8e8e6;position:relative}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+.dots{position:absolute;inset:0;background-image:radial-gradient(#2a2e38 3px,transparent 3.5px);background-size:46px 46px;opacity:.55}
+.glow{position:absolute;left:50%;top:50%;width:2500px;height:1700px;transform:translate(-50%,-50%);
+  background:radial-gradient(closest-side,rgba(255,77,77,.34),rgba(255,77,77,.10) 45%,rgba(10,11,13,0) 72%)}
+.vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(10,11,13,0) 45%,rgba(10,11,13,.85) 100%)}
+
+/* centre message */
+.mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:1300px;text-align:center}
+.bars{display:inline-block;text-align:left}
+.bars div{height:40px;border-radius:20px;background:#8a909b;margin-bottom:20px}
+.bars .a{width:180px}.bars .b{width:264px;height:50px;border-radius:25px;background:#ff4d4d}.bars .c{width:138px;margin-bottom:0}
+.word{font-size:218px;font-weight:700;letter-spacing:-4px;line-height:1;margin-top:44px;white-space:nowrap}
+.word span{background:#ff4d4d;color:#0a0b0d;border-radius:26px;padding:0 18px 6px;margin-left:8px}
+.what{font-size:104px;font-weight:700;letter-spacing:-1.5px;line-height:1.08;margin-top:60px}
+.what i{font-style:normal;color:#ff4d4d}
+.comp{display:inline-flex;align-items:center;gap:22px;margin-top:56px;padding:22px 44px;border-radius:999px;
+  background:rgba(18,21,27,.92);border:2px solid #343a48;font-size:50px;font-weight:600;color:#cfd3da;white-space:nowrap}
+.comp svg{width:54px;height:54px;stroke:#ff4d4d;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* shared UI bits */
+.pill{font:600 22px ui-monospace,Menlo,monospace;border-radius:10px;padding:6px 14px}
+.p1{color:#8ec5ff;background:#16263d}.p2{color:#ffd27a;background:#3a2c12}.p3{color:#9be7a8;background:#15321d}
+.m{font:26px ui-monospace,Menlo,monospace;letter-spacing:5px;color:#e8e8e6}
+
+/* desktop window, bleeds off the left edge */
+.win{position:absolute;left:-200px;top:228px;width:900px;height:1020px;background:#0d0f13;border:2px solid #2a2f3b;border-radius:28px;
+  box-shadow:0 50px 140px rgba(0,0,0,.7);overflow:hidden}
+.bar{height:68px;background:#151821;border-bottom:2px solid #232733;display:flex;align-items:center;padding-left:240px;gap:14px}
+.bar u{width:20px;height:20px;border-radius:50%;background:#3a3f4b}
+.bar b{margin-left:26px;font:600 26px ui-monospace,Menlo,monospace;color:#8a909b}
+.tr{display:flex;align-items:center;gap:22px;margin:22px 30px 0 240px;padding:26px 26px;background:#12151b;border:2px solid #1f232d;border-radius:18px}
+.tr b{flex:1;font:600 27px ui-monospace,Menlo,monospace}
+.term{margin:30px 30px 0 240px;padding:28px;background:#07080a;border:2px solid #1f232d;border-radius:18px;font:25px/1.7 ui-monospace,Menlo,monospace;color:#8a909b}
+.term em{font-style:normal;color:#9be7a8}.term s{text-decoration:none;color:#ff4d4d}
+
+/* phone, bleeds off the right edge */
+.phone{position:absolute;right:36px;top:150px;width:640px;height:1290px;background:#0a0b0d;border:14px solid #2b2f3a;border-radius:92px;
+  box-shadow:0 50px 140px rgba(0,0,0,.7);overflow:hidden;padding:0 30px}
+.isl{width:190px;height:50px;border-radius:25px;background:#000;margin:26px auto 30px}
+.ph{display:flex;align-items:center;gap:14px;font:700 40px ui-monospace,Menlo,monospace;padding-bottom:26px;border-bottom:2px solid #1c2029}
+.ph span{background:#ff4d4d;color:#0a0b0d;border-radius:8px;padding:0 6px;margin-left:-12px}
+.ph .mb div{height:7px;border-radius:4px;background:#8a909b;margin:4px 0}.ph .mb .x{width:26px}.ph .mb .y{width:38px;background:#ff4d4d}.ph .mb .z{width:20px}
+.card{margin-top:24px;padding:26px;background:#0f1218;border:2px solid #1f232d;border-radius:26px}
+.card .h{display:flex;justify-content:space-between;align-items:center}
+.card .h b{font-size:29px;font-weight:700}
+.card .s{color:#7d8491;font-size:23px;margin:10px 0 16px}
+.card .v{display:flex;justify-content:space-between;align-items:center}
+.card svg{width:36px;height:36px;stroke:#8a909b;fill:none;stroke-width:2}
+</style>
+<div class="dots"></div><div class="glow"></div><div class="vig"></div>
+
+<div class="win">
+  <div class="bar"><u></u><u></u><u></u><b>concealer · desktop</b></div>
+  <div class="tr"><b>API_KEY</b><span class="m">••••••••</span><span class="pill p1">api_key</span></div>
+  <div class="tr"><b>DATABASE_URL</b><span class="m">••••••••</span><span class="pill p3">database</span></div>
+  <div class="tr"><b>DEPLOY_TOKEN</b><span class="m">••••••••</span><span class="pill p1">token</span></div>
+  <div class="tr"><b>SMTP_LOGIN</b><span class="m">••••••••</span><span class="pill p2">login</span></div>
+  <div class="term">$ agent run deploy.sh<br><em>✓ secret injected</em><br><s>✗</s> value never shown to AI</div>
+</div>
+
+<div class="phone">
+  <div class="isl"></div>
+  <div class="ph"><div class="mb"><div class="x"></div><div class="y"></div><div class="z"></div></div>conceal <span>er</span></div>
+  <script>
+  const eye='<svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  [["API_KEY","api_key","p1","* / my-app / prod"],["DATABASE_URL","database","p3","* / my-app / prod"],["DEPLOY_TOKEN","token","p1","* / my-app / test"],
+   ["SMTP_LOGIN","login","p2","* / mail / prod"],["BACKUP_KEY","api_key","p1","* / backup / prod"]]
+   .forEach(r=>document.write(`<div class="card"><div class="h"><b>${r[0]}</b><span class="pill ${r[2]}">${r[1]}</span></div><div class="s">${r[3]}</div><div class="v"><span class="m">••••••••••</span>${eye}</div></div>`));
+  </script>
+</div>
+
+<div class="mid">
+  <div class="bars"><div class="a"></div><div class="b"></div><div class="c"></div></div>
+  <div class="word mono">conceal<span>er</span></div>
+  <div class="what" id="what"></div>
+  <div class="comp">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M1 20h22"/></svg>
+    <span id="comp"></span>
+    <svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18.5h2"/></svg>
+  </div>
+</div>
+<script>
+const T={en:["<i>AI</i> Secret Manager<br>&amp; Vault","Companion app for concealer desktop"],
+         tr:["<i>AI</i> Secret Manager<br>ve Vault","concealer desktop'ın mobil companion'ı"]};
+const t=T[new URLSearchParams(location.search).get("l")||"en"];
+what.innerHTML=t[0]; comp.textContent=t[1];
+</script>

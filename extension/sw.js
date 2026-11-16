@@ -155,3 +155,15 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
     return true;
   }
 });
+
+// Address-bar shortcut: type `cer` ⇥ ↵ to open the web UI — no IP/port to remember. The native
+// host starts the server first if it isn't running (e.g. after its idle self-exit).
+chrome.omnibox.setDefaultSuggestion({ description: "Open the concealer vault" });
+chrome.omnibox.onInputEntered.addListener(async (_text, disposition) => {
+  await new Promise(res => { try { chrome.runtime.sendNativeMessage("com.concealer.host", { cmd: "ensure", port: PORT }, () => { void chrome.runtime.lastError; res(); }); } catch (e) { res(); } });
+  const tabs = await chrome.tabs.query({});
+  const open = tabs.find(t => t.url && (t.url.startsWith(BASE) || t.url.startsWith("http://localhost:" + PORT) || t.url.startsWith("http://concealer.localhost:" + PORT)));
+  if (open) { await chrome.tabs.update(open.id, { active: true }); await chrome.windows.update(open.windowId, { focused: true }); }
+  else if (disposition === "currentTab") chrome.tabs.update({ url: BASE + "/" });
+  else chrome.tabs.create({ url: BASE + "/" });
+});

@@ -247,6 +247,7 @@ Then click the toolbar icon → unlock → copy. Highlights:
 
 - **Per‑field copy** — multi‑field secrets expand into child rows; copy or reveal exactly the field you need.
 - **On‑demand** — starts `concealer web` when you open the popup and **self‑exits after 15 min idle** (nothing lingers).
+- **Address-bar shortcut** — type `cer` then Tab, Enter: the web UI opens (started if needed), no IP or port to remember. `http://concealer.localhost:8787` works too.
 - **Auto‑lock** countdown, **🎲 password generator**, **search**, and three **themes** (Dark · White · Matrix).
 - Clipboard **auto‑clears**; values are never logged.
 

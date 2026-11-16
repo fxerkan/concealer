@@ -7,6 +7,24 @@ its first public release at **`1.0.0`** (alongside the mobile app) and follows
 [semver](https://semver.org/) from there; the desktop tool and mobile app share
 the same version line. Dates are UTC.
 
+## [1.1.1] — 2026-11-16
+
+### Added
+
+- Chrome extension: address-bar shortcut. Type `cer`, press Tab, then Enter to open the web UI.
+  The server is started first if it isn't running, so there's no IP or port to remember.
+- The web UI also answers on `http://concealer.localhost:8787` (browsers map `*.localhost` to loopback).
+
+### Fixed
+
+- Extension popup opens much faster: it checks the local server first and only launches the
+  native helper when the server is down or on another version.
+- `http://127.0.0.1:8787` no longer goes dead after the on-demand server's 15 min idle exit while
+  `concealer service` is installed. The background service now restarts the web instance when it
+  goes away, and never opens a browser tab when doing so.
+- Version-mismatch warning now says which side to update (extension or app). Extension version
+  is back on the app's version line.
+
 ## [1.1.0] — 2026-11-11
 
 ### Added

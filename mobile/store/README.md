@@ -18,14 +18,13 @@ To recapture (demo vault is handy: `python3 mobile/serve-demo.py`, host `http://
 - **iOS (App Store):** upload the 6.7"/6.9" set (1290×2796 or 1320×2868). `xcrun simctl io booted screenshot out.png` or the device screenshots here.
 - **Android (Play):** phone 1080×1920+ (9:16). `adb exec-out screencap -p > out.png`.
 
-## Rate button → website redirect
-The app's **Rate** button opens `https://concealer.fxerkan.com/rate/?p=<ios|android>`.
-That page (`docs/rate/index.html` in this repo) reads the platform and redirects to the right store,
-so the store URLs are edited **on the website, with no app release**. Set the iOS App Store URL in
-that page's `STORE.ios` once the app is live (the Play URL is already wired to `com.fxerkan.concealer`).
+## Rate button → fixed store URL
+The app's **Rate** button opens the store listing directly from a URL compiled into the app
+(`RATE_URL` in `mobile/www/index.html`). It must **not** go through a website redirect: a remote page that
+picks the destination per platform is server-controlled behaviour, which App Review treats as a hidden
+feature (the 1.0 build was rejected under guideline 5.6 for it). `docs/rate/` stays only as a shareable link.
 
 ## Before submitting
-- **App Store numeric ID:** after the first App Store Connect build, set `APPLE_APP_ID` in `mobile/www/index.html` (the Rate button) and rebuild.
 - **Privacy:** publish `https://concealer.fxerkan.com/privacy`. Data collection: **none** (no account, no analytics, no network beyond the user's own LAN host). Fill App Privacy / Data Safety as "No data collected".
 - **Category:** Developer Tools (iOS) / Tools (Android).
 - **Content rating:** everyone / 4+.

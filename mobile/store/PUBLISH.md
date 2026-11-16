@@ -19,7 +19,7 @@ Store release **1.0** (iOS build 1 / Android versionCode 1). App Store Connect a
   - Export/upload needs App Store Connect auth (API key + Issuer ID) — see below.
 - **Store listing:** `mobile/store/metadata/{en-US,tr}`, `feature-graphic.png`, `app-icon-1024.png`, `screenshots/`.
 - **Privacy policy:** `https://concealer.fxerkan.com/privacy/` (source `docs/privacy/`).
-- **Rate redirect:** `https://concealer.fxerkan.com/rate/` (source `docs/rate/` — set `STORE.ios` after publish).
+- **Rate link:** fixed in the app (`RATE_URL` in `mobile/www/index.html`); `https://concealer.fxerkan.com/rate/` is only a shareable link.
 
 ## Google Play (you: console steps; the AAB is ready)
 1. Play Console → Create app → name **concealer**, app, free, accept declarations.

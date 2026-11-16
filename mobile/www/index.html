@@ -612,11 +612,15 @@ $("set-theme").onchange = () => setTheme($("set-theme").value);
 $("set-idle").onchange = () => { LS.set("idle", $("set-idle").value); startLock(); };
 $("set-lock").onclick = lock;
 $("set-changehost").onclick = () => showSetup(true);
-// Rate + Support (open externally). The store URLs live on the website's /rate redirect page, so they can be
-// updated (App Store id, Play listing) WITHOUT shipping a new app build — the app only passes the platform hint.
+// Rate + Support (open externally). Store URLs are fixed in the binary on purpose: nothing the app opens
+// is decided by a remote page, so what App Review sees is exactly what ships.
 const platform = () => (window.Capacitor && Capacitor.getPlatform && Capacitor.getPlatform()) || "web";
 function openExternal(url){ try{ window.open(url, "_system"); }catch(e){ location.href = url; } }
-$("set-rate").onclick = () => openExternal("https://concealer.fxerkan.com/rate/?p=" + platform());
+const RATE_URL = {
+  ios: "https://apps.apple.com/app/id6816103801?action=write-review",
+  android: "https://play.google.com/store/apps/details?id=com.fxerkan.concealer",
+};
+$("set-rate").onclick = () => openExternal(RATE_URL[platform()] || "https://concealer.fxerkan.com");
 $("set-support").onclick = () => openExternal("mailto:concealer@fxerkan.com?subject=" + encodeURIComponent("concealer mobile — feedback"));
 
 // ---- detail (read-only: reveal + copy) ----
