@@ -72,11 +72,19 @@ running on localhost.
   `Stores UI preferences (theme, clipboard-clear and auto-lock timeouts) in chrome.storage.local and a short-lived session token in chrome.storage.session. No secret values are stored; nothing is synced.`
 - **clipboardWrite** —
   `Copies the secret value the user selects to the clipboard, then clears it after a timeout.`
-- **Host permission `http://127.0.0.1:8787/*` and `http://localhost:8787/*`** —
+- **tabs** —
+  `Finds the open tab whose domain matches a sign-in request the user approved, so the login form on that tab can be filled, and focuses an already-open vault tab instead of opening duplicates. Tab URLs are only compared locally and never sent anywhere.`
+- **alarms** —
+  `A periodic backstop timer that checks the local concealer server for pending sign-in requests while the background worker sleeps.`
+- **notifications** —
+  `Shows a browser notification when a sign-in request is waiting for the user's approval.`
+- **Host permission `http://127.0.0.1:8787/*`, `http://localhost:8787/*`, `http://concealer.localhost:8787/*`** —
   `Communicates only with the user's own concealer server running locally. No remote hosts are contacted.`
+- **Content script on `http://*/*`, `https://*/*`** —
+  `Fills a login form on the current page only after the user approved that exact sign-in in the extension, and shows the approval banner on that page. It reads nothing from pages otherwise and sends no page data anywhere.`
 - **Remotely hosted code:** No.
 
-**Data usage disclosures** — check:
+**Data usage disclosures** — tick **Authentication information** (the user's own credentials are filled into the page they approved; never transmitted off-device), then check:
 
 - Does NOT collect or use data for purposes unrelated to the single purpose.
 - Does NOT sell or transfer user data to third parties.

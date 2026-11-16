@@ -65,6 +65,11 @@ if the client changed). The refresh token is bound to its client — rotate them
 
 Troubleshooting
 ---------------
+- publish: HTTP 400 "Publish condition not met: … mandatory privacy information … Privacy practices
+  tab": a new permission has no justification yet (this stalled 0.9.20 → 1.1.1: tabs/alarms/
+  notifications + the content script were never justified). Dashboard → item → Privacy practices →
+  paste the texts from STORE_LISTING.md "Privacy tab" → Save draft → Submit for review. Every new
+  manifest permission needs its justification added there (and in STORE_LISTING.md) before CI can publish.
 - publish-extension fails fast (~12s), store stuck on an old version: it's the refresh token.
   The Pre-flight step prints `token endpoint: HTTP 400 … "invalid_grant"` when it expired/was
   revoked. Fix = do step 2b (consent screen → In production) so it stops expiring, then re-mint
