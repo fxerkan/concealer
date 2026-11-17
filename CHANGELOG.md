@@ -7,6 +7,13 @@ its first public release at **`1.0.0`** (alongside the mobile app) and follows
 [semver](https://semver.org/) from there; the desktop tool and mobile app share
 the same version line. Dates are UTC.
 
+## [1.2.1] — 2026-11-17
+
+### Fixed
+
+- Web UI: the secrets table header no longer paints over the open filter dropdowns
+  (Type, Collection, Tenant, …), which blocked their search box and options.
+
 ## [1.2.0] — 2026-11-16
 
 ### Added
