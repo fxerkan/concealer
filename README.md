@@ -20,6 +20,11 @@
   <b><a href="https://fxerkan.github.io/concealer/">📖 Documentation</a> · <a href="https://github.com/fxerkan/concealer/issues/new">🐛 Report a bug</a> · ⭐ <a href="https://github.com/fxerkan/concealer/stargazers">Star this repo</a> if it helps you!</b>
 </p>
 
+<p align="center">
+  <a href="https://youtu.be/zVDCiGC-bS8"><img src="https://raw.githubusercontent.com/fxerkan/concealer/main/docs/assets/video-tour-poster.jpg" alt="Watch the 2-minute concealer tour on YouTube" width="820"></a>
+  <br><sub>▶ <a href="https://youtu.be/zVDCiGC-bS8">2-minute tour</a> · <a href="https://youtu.be/HNTiNCzyjJw">Chrome extension &amp; AutoFill (46 s)</a> · <a href="https://youtube.com/shorts/Ljskzot1gOk">Short</a></sub>
+</p>
+
 `concealer` is a thin, auditable wrapper around two battle‑tested tools — it does **not** implement its own cryptography. Everything is encrypted by `sops`/`age`; concealer only adds the UX: typed secrets, scoping, tags, a professional web UI, tamper‑evident audit logs, and an MCP server so AI agents can *use* secrets without ever *seeing* them.
 
 **Agents use a secret (token) without ever seeing it:**

@@ -1,5 +1,5 @@
 import { Composition, Folder } from "remotion";
-import { STORE_FRAMES, StoreFilm, YT_FRAMES, YouTubeFilm } from "./Films";
+import { SHORTS_FRAMES, ShortsFilm, STORE_FRAMES, StoreFilm, YT_FRAMES, YouTubeFilm } from "./Films";
 
 export const RemotionRoot: React.FC = () => (
   <Folder name="concealer">
@@ -7,5 +7,7 @@ export const RemotionRoot: React.FC = () => (
     <Composition id="Store-Promo" component={StoreFilm} durationInFrames={STORE_FRAMES} fps={30} width={1920} height={1080} />
     {/* YouTube marketing tour */}
     <Composition id="YouTube-Tour" component={YouTubeFilm} durationInFrames={YT_FRAMES} fps={30} width={1920} height={1080} />
+    {/* 9:16 for YouTube Shorts / Reels / TikTok */}
+    <Composition id="Shorts-9x16" component={ShortsFilm} durationInFrames={SHORTS_FRAMES} fps={30} width={1080} height={1920} />
   </Folder>
 );

@@ -29,7 +29,8 @@
     "dev": "remotion studio",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
-    "lint": "eslint src && tsc"
+    "lint": "eslint src && tsc",
+    "music": "node scripts/music.mjs /tmp/concealer-bed.wav && ffmpeg -y -v error -i /tmp/concealer-bed.wav -af \"aecho=0.8:0.5:47|83|131:0.22|0.16|0.1,highpass=f=30,lowpass=f=15000,volume=7dB,alimiter=limit=0.9\" -b:a 192k public/music/concealer-bed.mp3"
   },
   "allowScripts": {
     "esbuild": false

@@ -5,9 +5,10 @@ import { Fragment } from "react";
 import { interpolate } from "remotion";
 import { clamp, img } from "./brand";
 import * as S from "./scenes";
+import { SHORTS } from "./Shorts";
 
 // Two cuts from one scene library: a short Chrome Web Store film (agents first, AutoFill second)
-// and a longer YouTube tour. Scenes cross-fade; the music bed loops under both.
+// and a longer YouTube tour. Scenes cross-fade over a single music bed.
 const T = 12;
 const total = (xs: { len: number }[]) => xs.reduce((a, s) => a + s.len, 0) - T * (xs.length - 1);
 
@@ -25,7 +26,8 @@ const Film: React.FC<{ scenes: { C: React.FC; len: number }[] }> = ({ scenes }) 
           </Fragment>
         ))}
       </TransitionSeries>
-      <Audio src={img("music/bed.mp3")} loop volume={(f) => interpolate(f, [0, 20, n - 45, n], [0, 0.32, 0.32, 0], clamp)} />
+      {/* one original track (scripts/music.mjs), 125 s: longer than every cut, so it never loops or doubles up */}
+      <Audio src={img("music/concealer-bed.mp3")} volume={(f) => interpolate(f, [0, 20, n - 45, n], [0, 0.6, 0.6, 0], clamp)} />
     </>
   );
 };
@@ -36,7 +38,9 @@ const YT = [
   S.INSTALL, S.AGENT_RUN, S.GUARD, S.AUDIT, S.AGENT_LOGIN, S.HUMAN_FILL, S.TOOLBAR,
   S.SECURITY, S.RISKS, S.EVERYWHERE, S.GETIT, S.END_YT,
 ];
+export const SHORTS_FRAMES = total(SHORTS);
 export const STORE_FRAMES = total(STORE);
 export const YT_FRAMES = total(YT);
 export const StoreFilm = () => <Film scenes={STORE} />;
 export const YouTubeFilm = () => <Film scenes={YT} />;
+export const ShortsFilm = () => <Film scenes={SHORTS} />;

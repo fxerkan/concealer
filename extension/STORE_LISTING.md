@@ -51,6 +51,8 @@ Open source: https://github.com/fxerkan/concealer
 - Screenshots (add all three): `extension/store/screenshot-1-list.png`,
   `extension/store/screenshot-2-fields.png`, `extension/store/screenshot-3-matrix.png`
 - Small promo tile 440×280 (optional): `extension/store/promo-440x280.png`
+- Promo video (YouTube URL, Store listing → "Global promo video"): `https://youtu.be/HNTiNCzyjJw`
+  (source: `video/` Remotion project, composition `Store-Promo`)
 
 ---
 

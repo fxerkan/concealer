@@ -235,7 +235,7 @@ const Install = () => {
 };
 export const INSTALL: Scene = { C: Install, len: 200 };
 
-const AGENT_LINES: Line[] = [
+export const AGENT_LINES: Line[] = [
   { t: 8, text: "> Run the migration on prod and check the Stripe webhooks", type: true, bold: true },
   { t: 74, text: "⏺ concealer · run_with_secrets", color: C.acc, bold: true },
   { t: 82, text: "  names:   [DATABASE_URL, STRIPE_KEY]", color: C.mut },
@@ -307,7 +307,7 @@ const Audit = () => (
 export const AUDIT: Scene = { C: Audit, len: 180 };
 
 // ── browser: agent sign-in (request_web_login) ────────────────────────────────────────────────────────────────
-const LOGIN_LINES: Line[] = [
+export const LOGIN_LINES: Line[] = [
   { t: 6, text: "> Log in to the Northwind console and check last night's deploy", type: true, bold: true },
   { t: 70, text: "⏺ concealer · request_web_login", color: C.acc, bold: true },
   { t: 76, text: "  target_url: console.northwind.cloud", color: C.mut },
@@ -315,6 +315,17 @@ const LOGIN_LINES: Line[] = [
   { t: 196, text: "  ⎿ filled", color: C.ok, bold: true },
   { t: 214, text: "⏺ Signed in. Reading the deploy log…" },
 ];
+export const LoginBrowser: React.FC<{ style?: React.CSSProperties }> = ({ style }) => (
+  <Browser url="console.northwind.cloud/signin" width={1060} height={820} style={style}>
+    <SignInPage fills={[{ at: 166, value: "nw-prod" }, { at: 172, value: "deploy-bot" }, { at: 180, value: "x", secret: true }]} done={196} />
+    <Sequence from={96} durationInFrames={62} layout="none">
+      <Audio src={img("sfx/ding.wav")} volume={0.25} />
+      <ApprovalBanner agent="claude-code" domain="northwind.cloud" secret="NW_PROD_LOGIN" user="deploy-bot" pressed={50} />
+    </Sequence>
+    <Cursor path={[{ f: 0, x: 900, y: 700 }, { f: 110, x: 900, y: 700 }, { f: 140, x: 512, y: 194 }, { f: 146, x: 512, y: 194, click: true }, { f: 200, x: 640, y: 300 }]} />
+  </Browser>
+);
+
 const AgentLogin = () => (
   <Bg style={{ padding: "70px 0 0 90px" }}>
     <Headline size={60}>
@@ -323,19 +334,30 @@ const AgentLogin = () => (
     <Window title="claude — ~/ops" width={700} height={620} style={{ position: "absolute", left: 90, top: 230 }}>
       <Terminal lines={LOGIN_LINES} size={21} />
     </Window>
-    <Browser url="console.northwind.cloud/signin" width={1060} height={820} style={{ position: "absolute", left: 820, top: 190 }}>
-      <SignInPage fills={[{ at: 166, value: "nw-prod" }, { at: 172, value: "deploy-bot" }, { at: 180, value: "x", secret: true }]} done={196} />
-      <Sequence from={96} durationInFrames={62} layout="none">
-        <Audio src={img("sfx/ding.wav")} volume={0.25} />
-        <ApprovalBanner agent="claude-code" domain="northwind.cloud" secret="NW_PROD_LOGIN" user="deploy-bot" pressed={50} />
-      </Sequence>
-      <Cursor path={[{ f: 0, x: 900, y: 700 }, { f: 110, x: 900, y: 700 }, { f: 140, x: 512, y: 194 }, { f: 146, x: 512, y: 194, click: true }, { f: 200, x: 640, y: 300 }]} />
-    </Browser>
+    <LoginBrowser style={{ position: "absolute", left: 820, top: 190 }} />
   </Bg>
 );
 export const AGENT_LOGIN: Scene = { C: AgentLogin, len: 290 };
 
 // ── browser: the human AutoFill menu ─────────────────────────────────────────────────────────────────────────
+export const FillBrowser: React.FC<{ style?: React.CSSProperties }> = ({ style }) => (
+  <Browser url="console.northwind.cloud/signin" width={1180} height={800} style={style}>
+    <SignInPage fills={[{ at: 104, value: "nw-staging" }, { at: 110, value: "ops-admin" }, { at: 118, value: "x", secret: true }]} focus={1} focusAt={40} done={134} />
+    <Sequence from={46} durationInFrames={54} layout="none">
+      <FillMenu
+        rows={[
+          ["NW_STAGING_LOGIN", "account nw-staging · ops-admin"],
+          ["NW_PROD_LOGIN", "account nw-prod · deploy-bot"],
+        ]}
+        hover={0}
+        hoverAt={30}
+        style={{ left: 344, top: 404 }}
+      />
+    </Sequence>
+    <Cursor path={[{ f: 0, x: 900, y: 650 }, { f: 30, x: 600, y: 376 }, { f: 40, x: 600, y: 376, click: true }, { f: 80, x: 560, y: 490 }, { f: 96, x: 560, y: 490, click: true }, { f: 150, x: 860, y: 640 }]} />
+  </Browser>
+);
+
 const HumanFill = () => {
   const f = useCurrentFrame();
   return (
@@ -344,21 +366,7 @@ const HumanFill = () => {
       <Headline size={64} style={{ marginTop: 14 }}>
         <Hot>AutoFill.</Hot> Click a field, pick an account.
       </Headline>
-      <Browser url="console.northwind.cloud/signin" width={1180} height={800} style={{ position: "absolute", left: 90, top: 250 }}>
-        <SignInPage fills={[{ at: 104, value: "nw-staging" }, { at: 110, value: "ops-admin" }, { at: 118, value: "x", secret: true }]} focus={1} focusAt={40} done={134} />
-        <Sequence from={46} durationInFrames={54} layout="none">
-          <FillMenu
-            rows={[
-              ["NW_STAGING_LOGIN", "account nw-staging · ops-admin"],
-              ["NW_PROD_LOGIN", "account nw-prod · deploy-bot"],
-            ]}
-            hover={0}
-            hoverAt={30}
-            style={{ left: 344, top: 404 }}
-          />
-        </Sequence>
-        <Cursor path={[{ f: 0, x: 900, y: 650 }, { f: 30, x: 600, y: 376 }, { f: 40, x: 600, y: 376, click: true }, { f: 80, x: 560, y: 490 }, { f: 96, x: 560, y: 490, click: true }, { f: 150, x: 860, y: 640 }]} />
-      </Browser>
+      <FillBrowser style={{ position: "absolute", left: 90, top: 250 }} />
       <div style={{ position: "absolute", left: 1330, top: 290, width: 520 }}>
         <Bullets
           delay={140}

@@ -105,7 +105,6 @@ export const Wordmark: React.FC<{ size: number; delay?: number; style?: CSSPrope
           color: C.bg,
           borderRadius: size * 0.1,
           padding: "0.04em 0.1em 0.08em",
-          marginLeft: size * 0.04,
           scale: String(pop),
           opacity: pop > 0 ? 1 : 0,
           boxShadow: `0 ${size * 0.08}px ${size * 0.3}px rgba(255,77,77,.35)`,

@@ -12,6 +12,10 @@ Kasanı aç ve secret değerlerini `cer web` yazmadan doğrudan Chrome araç çu
 yerel sunucuyu ihtiyaç anında başlatır ve boşta kalınca kendini kilitler.
 {: .fs-5 .fw-300 }
 
+<div style="position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden;margin:1.5rem 0">
+  <iframe src="https://www.youtube-nocookie.com/embed/HNTiNCzyjJw" title="concealer Chrome extension: agent sign-in and AutoFill" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+</div>
+
 1. TOC
 {:toc}
 
