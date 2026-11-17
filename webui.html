@@ -183,15 +183,15 @@ textarea.jsonv.masked{-webkit-text-security:disc}
   #stable th,#stable td{white-space:nowrap}
   #stable td:not(:first-child):not(:last-child){max-width:460px;overflow:hidden;text-overflow:ellipsis}
   /* sticky header pinned to the wrapper top */
-  #stablewrap thead th{position:sticky;top:0;z-index:20}
+  #stablewrap thead th{position:sticky;top:0;z-index:2}   /* keep all grid z-indexes < .subbar (15) so filter dropdowns paint above the header */
   /* frozen NAME (first col) */
-  #stable td:first-child{position:sticky;left:0;z-index:5;background:var(--panel);box-shadow:1px 0 0 var(--line2);overflow:hidden;text-overflow:ellipsis}
-  #stable thead th:first-child{position:sticky;left:0;z-index:25}
+  #stable td:first-child{position:sticky;left:0;z-index:1;background:var(--panel);box-shadow:1px 0 0 var(--line2);overflow:hidden;text-overflow:ellipsis}
+  #stable thead th:first-child{position:sticky;left:0;z-index:3}
   #stable tbody tr:nth-child(even) td:first-child{background:linear-gradient(var(--zebra),var(--zebra)),var(--panel)}   /* --zebra is translucent → layer it over opaque --panel so scrolled columns don't bleed through */
   #stable tbody tr:hover td:first-child{background:var(--panel2)}
   /* frozen ACTIONS (last col) */
-  #stable td:last-child{position:sticky;right:0;z-index:5;background:var(--panel);box-shadow:-1px 0 0 var(--line2)}
-  #stable thead th:last-child{position:sticky;right:0;z-index:25}
+  #stable td:last-child{position:sticky;right:0;z-index:1;background:var(--panel);box-shadow:-1px 0 0 var(--line2)}
+  #stable thead th:last-child{position:sticky;right:0;z-index:3}
   #stable tbody tr:nth-child(even) td:last-child{background:linear-gradient(var(--zebra),var(--zebra)),var(--panel)}
   #stable tbody tr:hover td:last-child{background:var(--panel2)}
 }
