@@ -7,7 +7,16 @@ const PORT = 8787;                       // concealer default; matches host_perm
 const BASE = `http://127.0.0.1:${PORT}`;
 const POLL_ALARM = "concealer-autofill-poll";
 
-async function token() { return (await chrome.storage.session.get("tok")).tok || null; }
+// Honour the popup's extension auto-lock deadline here too, so the on-page menu locks with it.
+async function token() {
+  const { tok, deadline } = await chrome.storage.session.get(["tok", "deadline"]);
+  if (tok && deadline && Date.now() > deadline) {
+    await chrome.storage.session.remove(["tok", "deadline"]);
+    fetch(BASE + "/api/lock", { method: "POST", headers: { "X-Concealer-Token": tok } }).catch(() => {});
+    return null;
+  }
+  return tok || null;
+}
 
 async function api(path, opts = {}) {
   const tok = await token();
@@ -23,23 +32,53 @@ function regDomain(host) {                // naive eTLD+1; the app made the same
   return p.length >= 2 ? p.slice(-2).join(".") : (host || "");
 }
 
-// Claim one approved job and drive the fill on a matching tab.
+// Multi-step sign-ins (AWS root: e-mail page, then password page): after a username-only fill
+// (or AWS IAM: account page, then username+password page) the rest waits here, in memory, for
+// the SAME tab's next page for 2 minutes — never on disk.
+const _cont = new Map();   // tabId -> {domain, username, password, exp}
+async function sendFill(tabId, creds) {
+  let res;
+  try { res = await chrome.tabs.sendMessage(tabId, Object.assign({ type: "concealer-fill" }, creds)); }
+  catch (e) { res = { ok: false, detail: "content script not reachable" }; }
+  if (res && res.ok && res.partial && creds.password) _cont.set(tabId, { domain: creds.domain, username: creds.username, password: creds.password, exp: Date.now() + 120000 });
+  else _cont.delete(tabId);
+  return res;
+}
+// Human clicked a suggestion (page panel or popup). The URL comes from Chrome's tab record,
+// not from the page, and the app re-checks that the record belongs to that site.
+async function fillWithId(tabId, id) {
+  const t = await chrome.tabs.get(tabId);
+  const creds = await api("/api/autofill/fill", { method: "POST", body: JSON.stringify({ id, url: t.url }) });
+  if (!creds) return { ok: false, detail: "locked, or this secret isn't for this site" };
+  chrome.storage.local.set({ ["last:" + creds.domain]: id });   // per Chrome profile: each profile keeps its own default account
+  return sendFill(tabId, creds);
+}
+async function suggest(tab, hasPw) {
+  let host = ""; try { host = new URL(tab.url).hostname; } catch (e) { return { rows: [] }; }
+  const c = _cont.get(tab.id);
+  if (hasPw && c && c.exp > Date.now() && c.domain === regDomain(host)) {
+    const res = await sendFill(tab.id, { domain: c.domain, username: c.username, password: c.password });
+    if (res && res.ok) return { continued: true };
+  }
+  let rows; try { rows = await api("/api/autofill/match?url=" + encodeURIComponent(tab.url)); } catch (e) { return { rows: [] }; }   // app down: stay quiet
+  if (rows === null) return { locked: true };
+  const last = (await chrome.storage.local.get("last:" + regDomain(host)))["last:" + regDomain(host)];
+  rows.sort((a, b) => (b.id === last) - (a.id === last));
+  return { rows };
+}
+
+// Claim one approved job and drive the fill on a matching tab. Several tabs can share the
+// domain (an open AWS console next to the sign-in page): try them, most recently used first,
+// until one actually has a login form.
 async function handleJob(job) {
-  // Find an open tab whose registrable domain matches the job's domain.
-  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
-  const tab = tabs.find(t => {
-    try { return regDomain(new URL(t.url).hostname) === job.domain; } catch { return false; }
-  });
-  if (!tab) return;                       // no tab for this domain yet; leave the job for the next poll
+  const tabs = (await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] }))
+    .filter(t => { try { return regDomain(new URL(t.url).hostname) === job.domain; } catch { return false; } })
+    .sort((a, b) => (b.active - a.active) || ((b.lastAccessed || 0) - (a.lastAccessed || 0)));
+  if (!tabs.length) return;               // no tab for this domain yet; leave the job for the next poll
   const creds = await api("/api/autofill/claim", { method: "POST", body: JSON.stringify({ job: job.id }) });
   if (!creds) return;                     // someone else claimed it, or it expired
-  let res;
-  try {
-    res = await chrome.tabs.sendMessage(tab.id, { type: "concealer-fill", domain: job.domain,
-                                                  username: creds.username, password: creds.password });
-  } catch (e) {
-    res = { ok: false, detail: "content script not reachable" };
-  }
+  let res = null;
+  for (const t of tabs) { res = await sendFill(t.id, creds); if (res && res.ok) break; }
   await api("/api/autofill/result", { method: "POST",
     body: JSON.stringify({ job: job.id, ok: !!(res && res.ok), exposed: !!(res && res.exposed),
                            detail: (res && res.detail) || "" }) });
@@ -137,10 +176,24 @@ loopNotify();   // start immediately on worker load
 function tick() { pollNotify(); poll(); driveBanners(); }
 chrome.alarms.onAlarm.addListener(a => { if (a.name === POLL_ALARM) tick(); });
 chrome.tabs.onUpdated.addListener((id, info) => { if (info.status === "complete") tick(); });
+chrome.tabs.onRemoved.addListener(id => _cont.delete(id));
+// Right-click on any input → "Autofill with concealer" opens the on-page menu at that field.
+function ctxMenu() { chrome.contextMenus.removeAll(() => chrome.contextMenus.create({ id: "cer-fill", title: "Autofill with concealer", contexts: ["editable"] })); }
+chrome.runtime.onInstalled.addListener(ctxMenu);
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "cer-fill" && tab) chrome.tabs.sendMessage(tab.id, { type: "af-open-menu" }, { frameId: info.frameId || 0 }).catch(() => {});
+});
 chrome.runtime.onMessage.addListener((msg, _s, reply) => {
   if (!msg) return;
   // The popup nudges an immediate poll right after the user approves/opens.
   if (msg.type === "concealer-poll") { Promise.resolve(tick()).then(() => reply({ ok: true })); return true; }
+  if (msg.type === "af-suggest" && _s.tab) { suggest(_s.tab, msg.hasPw).then(reply, () => reply(null)); return true; }
+  if (msg.type === "af-fill") {
+    const tabId = _s.tab ? _s.tab.id : msg.tabId;   // page panel: its own tab; popup: the tab it names
+    fillWithId(tabId, msg.id).then(reply, () => reply({ ok: false, detail: "fill error" })); return true;
+  }
+  // The in-page unlock frame (unlock.html) succeeded: let that tab's menu show the entries.
+  if (msg.type === "af-unlocked" && _s.tab) { chrome.tabs.sendMessage(_s.tab.id, { type: "af-unlocked" }, { frameId: 0 }).catch(() => {}); tick(); return; }
   // The on-page banner sends the user's decision; the SW has the token to act on it.
   if (msg.type === "af-decide") {
     (async () => {
@@ -166,4 +219,15 @@ chrome.omnibox.onInputEntered.addListener(async (_text, disposition) => {
   if (open) { await chrome.tabs.update(open.id, { active: true }); await chrome.windows.update(open.windowId, { focused: true }); }
   else if (disposition === "currentTab") chrome.tabs.update({ url: BASE + "/" });
   else chrome.tabs.create({ url: BASE + "/" });
+});
+
+// Typed addresses: `cer/` or `concealer.localhost` (no port) don't resolve to anything, but the
+// tab still reports the URL — catch it and send the tab to the vault (server started first).
+// Uses the existing `tabs` permission only. The omnibox keyword above can't do this: Chrome
+// runs a web search when Enter is pressed with nothing typed after the keyword.
+const ALIAS = /^https?:\/\/(cer|concealer|concealer\.localhost)\.?(:80)?\/?$/i;
+chrome.tabs.onUpdated.addListener(async (tabId, info) => {
+  if (!info.url || !ALIAS.test(info.url)) return;
+  await new Promise(res => { try { chrome.runtime.sendNativeMessage("com.concealer.host", { cmd: "ensure", port: PORT }, () => { void chrome.runtime.lastError; res(); }); } catch (e) { res(); } });
+  chrome.tabs.update(tabId, { url: BASE + "/" });
 });

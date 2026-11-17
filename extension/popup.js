@@ -15,7 +15,7 @@ let REVEAL_HIDE = 10;     // re-mask a revealed field after N seconds
 let IDLE = 0;             // server idle-lock (seconds), from /api/session
 let THEME = "dark";       // dark | light | matrix (same palettes as the web UI)
 
-function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(t._h); t._h=setTimeout(()=>t.hidden=true,2200); }
+function toast(msg,kind){ const t=$("#toast"); t.textContent=msg; t.className="toast"+(kind?" "+kind:""); t.hidden=false; clearTimeout(t._h); t._h=setTimeout(()=>t.hidden=true,2200); }
 // Chrome sizes the popup to content; a position:fixed modal adds none, so on a short (locked)
 // page it gets clipped. Grow <body> to the modal's height while it's open, reset on close.
 function fitModal(id){ const s=$("#"+id).querySelector(".sheet"); if(s) document.body.style.minHeight=(s.offsetHeight+28)+"px"; }  // offsetHeight forces sync layout
@@ -212,23 +212,25 @@ function regDom(h){ const p=(h||"").split(".").filter(Boolean); return p.length>
 function hostOf(u){ try{ return new URL(u).hostname; }catch(e){ return ""; } }
 async function activeTab(){ try{ const [t]=await chrome.tabs.query({active:true,currentWindow:true}); return t; }catch(e){ return null; } }
 async function refreshFillBtn(){
-  const btn=$("#fillpage"); if(!btn) return; btn.hidden=true;
+  const box=$("#fillpage"); if(!box) return; box.hidden=true; box.textContent="";
   const t=await activeTab(); if(!t||!/^https?:/.test(t.url||"")) return;
-  const dom=regDom(hostOf(t.url));
-  const hit=ROWS.find(e=>["website","login"].includes(e.type) && e.fields && e.fields.web_url
-                         && regDom(hostOf(e.fields.web_url))===dom);
-  if(hit){ btn.hidden=false; btn.dataset.id=hit.id; btn.dataset.tab=String(t.id); btn.textContent="⤵ Fill the Secrets — "+hit.name; }
+  let r; try{ r=await api("/api/autofill/match?url="+encodeURIComponent(t.url)); }catch(e){ return; }
+  if(!r.ok) return; const rows=await r.json(); if(!rows.length) return;
+  const last=(await chrome.storage.local.get("last:"+regDom(hostOf(t.url))))["last:"+regDom(hostOf(t.url))];
+  rows.sort((a,b)=>(b.id===last)-(a.id===last));
+  for(const c of rows.slice(0,4)){
+    const btn=document.createElement("button"); btn.className="primary full";
+    btn.textContent="⤵ Fill — "+c.name+(c.account?" ("+c.account+")":"");
+    btn.onclick=()=>fillThisPage(btn,c.id,t.id); box.appendChild(btn);
+  }
+  box.hidden=false;
 }
-async function fillThisPage(){
-  const btn=$("#fillpage"); const id=btn.dataset.id, tabId=Number(btn.dataset.tab);
+async function fillThisPage(btn,id,tabId){
   btn.disabled=true;
   try{
-    const r=await api("/api/secret/"+id+"?reveal=1&intent=autofill"); if(!r.ok) throw 0;
-    const e=await r.json(); const f=e.fields||{};
-    const t=await chrome.tabs.get(tabId); const dom=regDom(hostOf(t.url));
-    const res=await chrome.tabs.sendMessage(tabId,{type:"concealer-fill",domain:dom,
-                        username:f.username||"",password:f.password||""});
-    toast(res&&res.ok ? (res.exposed?"filled (⚠ value visible on page)":"filled") : "couldn't fill this page");
+    const res=await chrome.runtime.sendMessage({type:"af-fill",id,tabId});
+    if(res&&res.ok) toast(res.exposed?"filled — ⚠ value copied into another field":res.partial?"✓ filled — the rest follows on the next step":"✓ filled", res.exposed?"warn":"ok");
+    else toast("couldn't fill this page"+(res&&res.detail?" ("+res.detail+")":""), "warn");
   }catch(e){ toast("fill failed — reload the page and retry"); }
   finally{ btn.disabled=false; }
 }
@@ -382,7 +384,6 @@ async function saveSettings(){
 }
 
 // ---- wiring ----
-$("#fillpage").onclick=fillThisPage;
 $("#unlockbtn").onclick=unlock;
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") unlock(); });
 $("#search").addEventListener("input",e=>render(e.target.value));

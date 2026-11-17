@@ -23,6 +23,15 @@ Features: per-field copy (secret + non-secret) with auto-hiding reveal • auto-
 ⚙️ settings (theme Dark/White/Matrix, clipboard auto-clear, extension auto-lock, reveal auto-hide) •
 🌐 / brand name open the full web UI. Generate / Web UI / Settings work even while locked.
 
+**Sign-in autofill.** Click a login field (or right-click → "Autofill with concealer") on a site
+the vault has credentials for and a menu lists the matching secrets; one click fills account ID/alias (AWS console), username and
+password. Any record with a password and a URL matches (`website`, `login`, or `custom` with
+fields like `account_id` / `iam_user` / `console_password`). Multi-step forms (AWS root: e-mail,
+then password) are filled across both pages. The last pick is remembered per Chrome profile.
+Agents use the same path through MCP `request_web_login` and never see the value; a human
+approves on the page. Self-check: `python3 -m http.server 18793 -d extension`, then open
+`http://127.0.0.1:18793/test_autofill.html` (title turns `PASS`).
+
 ## Install
 
 **1. Install the extension**

@@ -1,0 +1,17 @@
+<!doctype html>
+<!-- In-page unlock, framed by content.js inside the on-page menu. It is an EXTENSION page, so the
+     host site can't read or keylog the master password typed here (cross-origin frame). -->
+<html><head><meta charset="utf-8">
+<style>
+  html,body{margin:0;background:#101216;color:#e8e8e6;font:12px/1.4 -apple-system,system-ui,sans-serif}
+  form{display:flex;gap:6px;padding:2px 4px 4px}
+  input{flex:1;min-width:0;background:#0a0b0d;color:#e8e8e6;border:1px solid #2a2f37;border-radius:7px;padding:6px 8px;font:inherit;outline:none}
+  input:focus{border-color:#ff4d4d}
+  button{cursor:pointer;border:0;border-radius:7px;padding:6px 10px;font:600 12px system-ui;background:#ff4d4d;color:#0a0b0d}
+  button:disabled{opacity:.6;cursor:default}
+  #st{padding:0 6px;color:#8a909b;min-height:15px} #st.err{color:#ff6b6b}
+</style></head><body>
+<form id="f"><input id="pw" type="password" placeholder="Master password" autocomplete="off" autofocus><button id="go">Unlock</button></form>
+<div id="st"></div>
+<script src="unlock.js"></script>
+</body></html>

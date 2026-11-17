@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "1.1.1"   # tracks the public mobile-app release; semver from here on
+VERSION = "1.2.0"   # tracks the public mobile-app release; semver from here on
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -3941,22 +3941,67 @@ def registrable_domain(host):
     parts = [p for p in (host or "").split(".") if p]
     return ".".join(parts[-2:]) if len(parts) >= 2 else host or ""
 
+# Field aliases so ANY record type can drive a sign-in, not just website/login: a `custom`
+# "AWS console" record with url/account_id/iam_user/console_password works the same way.
+_AF_URL = ("web_url", "url", "console_url", "signin_url", "login_url")
+_AF_USER = ("username", "user", "iam_user", "iam_username", "login", "email", "user_name")
+_AF_PW = ("password", "pass", "console_password", "pwd")
+_AF_ACCT = ("account_id", "aws_account_id", "account", "account_alias", "accountid")
+
+def _af_first(f, keys):
+    lo = {k.lower(): v for k, v in f.items() if isinstance(v, str) and v.strip()}
+    return next((lo[k].strip() for k in keys if k in lo), "")
+
+def af_login_view(e):
+    """Normalise a record into {url, username, password, account}. account falls back to the
+    12-digit id in an AWS-style URL (https://<id>.signin.aws.amazon.com/console)."""
+    f = e.get("fields") or {}
+    url = _af_first(f, _AF_URL) or (e.get("url") or "").strip()
+    acct = _af_first(f, _AF_ACCT)
+    if not acct:
+        m = re.match(r"(\d{12})\.signin\.aws", _af_host(url)); acct = m.group(1) if m else ""
+    return {"url": url, "username": _af_first(f, _AF_USER), "password": _af_first(f, _AF_PW), "account": acct}
+
+# Sites that sign you in on another domain of the same company (SSO host != service URL), so a
+# record saved as https://outlook.office.com still matches login.microsoftonline.com.
+# ponytail: hand-kept table; extend when a real site needs it.
+_AF_SAME = [{"microsoftonline.com", "office.com", "office365.com", "outlook.com", "live.com", "microsoft.com", "sharepoint.com"},
+            {"openai.com", "chatgpt.com"}, {"google.com", "gmail.com"}, {"apple.com", "icloud.com"},
+            {"proton.me", "protonvpn.com", "protonmail.com"}, {"amazon.com", "amazonaws.com"}]
+def af_site(dom):
+    return next((min(g) for g in _AF_SAME if dom in g), dom)
+
+def _af_hint(target_url):
+    """Account hint the PAGE carries: <id>.signin.aws.amazon.com or ?account=<id|alias>."""
+    h = _af_host(target_url); m = re.match(r"([^.]+)\.signin\.aws", h)
+    if m: return m.group(1)
+    try: return (urllib.parse.parse_qs(urllib.parse.urlparse(target_url).query).get("account") or [""])[0]
+    except Exception: return ""
+
+def af_candidates(d, target_url, sel=None):
+    """Records with a password whose URL shares the target's registrable domain, best first:
+    account hint match > exact host match > name order."""
+    host = _af_host(target_url); dom = registrable_domain(host); hint = _af_hint(target_url).lower()
+    out = []
+    for e in filt(d, sel):
+        v = af_login_view(e)
+        if not v["password"] or not dom or af_site(registrable_domain(_af_host(v["url"]))) != af_site(dom): continue
+        rank = (0 if hint and v["account"].lower() == hint else 1, 0 if _af_host(v["url"]) == host else 1, e["name"].lower())
+        out.append((rank, e, v))
+    return [(e, v) for _, e, v in sorted(out, key=lambda x: x[0])]
+
 def _af_pick_secret(d, target_url, name=None, sel=None):
-    """Find a website/login secret for this request. Returns (record|None, reason).
+    """Find a sign-in secret for this request. Returns (record|None, reason).
     reason: 'ok' | 'nomatch' | 'mismatch:<registrable-domain-of-secret>'."""
     dom = registrable_domain(_af_host(target_url))
-    cands = [e for e in filt(d, sel) if e["type"] in ("website", "login")]
     if name:
-        e = next((x for x in cands if x["name"] == name), None)
+        e = next((x for x in filt(d, sel) if x["name"] == name and af_login_view(x)["password"]), None)
         if not e: return None, "nomatch"
-        sdom = registrable_domain(_af_host(e["fields"].get("web_url", "")))
-        if sdom and dom and sdom != dom: return None, f"mismatch:{sdom}"
+        sdom = registrable_domain(_af_host(af_login_view(e)["url"]))
+        if not sdom or af_site(sdom) != af_site(dom): return None, f"mismatch:{sdom or '?'}"   # no URL on the record = can't prove the origin
         return e, "ok"
-    # else match by domain
-    for e in cands:
-        sdom = registrable_domain(_af_host(e["fields"].get("web_url", "")))
-        if sdom and sdom == dom: return e, "ok"
-    return None, "nomatch"
+    c = af_candidates(d, target_url, sel)
+    return (c[0][0], "ok") if c else (None, "nomatch")
 
 def _af_grant_k(agent, domain, sid): return f"{agent}|{domain}|{sid}"
 def af_grant_mint(agent, domain, sid, ttl=900, max_uses=10):
@@ -4001,7 +4046,7 @@ def _af_resolve(job, d):
     job["match"] = reason
     job["secret_id"] = e["id"] if e else ""
     job["secret_name"] = e["name"] if e else ""
-    job["username"] = e["fields"].get("username", "") if e else ""
+    job["username"] = af_login_view(e)["username"] if e else ""
     return reason
 
 # ---------------- demo mode: a throwaway vault with sample data (mirrors the mobile "Try the demo") ----
@@ -4188,6 +4233,9 @@ def serve_web(port):
                     out.append({"id": j["id"], "agent": j["agent"], "domain": j["domain"],
                                 "secret_name": j["secret_name"], "username": j["username"], "match": j["match"]})
                 return self._json(out)
+            if path == "/api/autofill/match":      # on-page suggestions for the human (session): names + usernames, NO secret values
+                return self._json([{"id": e["id"], "name": e["name"], "username": v["username"], "account": v["account"], "scope": label(e)}
+                                   for e, v in af_candidates(load(), q.get("url", ""))[:8]])
             if path == "/api/autofill/jobs":       # extension SW polls approved jobs (no values here)
                 _af_expire()
                 return self._json([{"id": j["id"], "domain": j["domain"], "secret_name": j["secret_name"]}
@@ -4363,14 +4411,23 @@ def serve_web(port):
                 j["status"] = "denied"
                 audit("web_autofill_deny", key=j["secret_name"] or j["name"] or j["domain"], source="web", detail=j["domain"])
                 return self._json({"ok": True})
+            if path == "/api/autofill/fill":       # human clicked a suggestion on the page -> VALUE DELIVERY (session holds the key).
+                # url is the tab URL as Chrome reports it to the extension (not page-supplied); the
+                # record must belong to that registrable domain, and the content script re-checks origin.
+                b = self._body(); d = load(); e = by_id(d, b.get("id", ""))
+                ok = e and not e.get("deleted") and any(x["id"] == e["id"] for x, _ in af_candidates(d, b.get("url", "")))
+                if not ok: return self._json({"error": "domain mismatch"}, 409)
+                v = af_login_view(e); dom = registrable_domain(_af_host(b.get("url", "")))
+                audit("web_autofill_fill", key=e["name"], source="ext", detail=dom + " manual")
+                return self._json({"domain": dom, "username": v["username"], "password": v["password"], "account": v["account"]})
             if path == "/api/autofill/claim":      # extension SW claims an approved job -> VALUE DELIVERY (session holds the key)
                 b = self._body(); j = _AF_JOBS.get(b.get("job", ""))
                 if not j or j["status"] != "approved": return self._json({"error": "gone"}, 404)
                 d = load(); e = by_id(d, j["secret_id"])
                 if not e: j["status"] = "expired"; return self._json({"error": "gone"}, 404)
                 j["status"] = "filling"
-                return self._json({"domain": j["domain"], "username": e["fields"].get("username", ""),
-                                   "password": e["fields"].get("password", "")})
+                v = af_login_view(e)
+                return self._json({"domain": j["domain"], "username": v["username"], "password": v["password"], "account": v["account"]})
             if path == "/api/autofill/result":     # extension reports the fill outcome + post-fill exposure scan
                 b = self._body(); j = _AF_JOBS.get(b.get("job", ""))
                 if not j: return self._json({"error": "gone"}, 404)
@@ -4625,7 +4682,7 @@ MCP_TOOLS = [
         "collection": {"type": "string", "description": "free-form grouping path (optional)"},
         "env_alias": {"type": "string", "description": "pin a stable env-injection identifier base (e.g. 'GRAFANA'); '' derives from name"},
         **_DIMPROPS}, "required": ["name"]}},
-    {"name": "request_web_login", "description": "Ask concealer to autofill a website/login secret into the browser tab you are on, WITHOUT exposing the value. A human approves in the concealer app; the concealer extension injects the credentials into the page's login form. Returns ONLY a status string — never the password. Requires the concealer app running (unlocked) and its browser extension.",
+    {"name": "request_web_login", "description": "Browser counterpart of run_with_secrets: ask concealer to type a stored sign-in (account id/alias, username, password) into the login form of the browser tab you are on, WITHOUT the value ever reaching you. Works for any record with a password field and a URL (website/login, or custom records like an AWS console login with account_id/username/password). A human approves on the page or in the app (\"This task\" approval auto-approves repeats for 15 min); the concealer extension fills the form. Multi-step forms (e.g. AWS root: e-mail page, then password page) are handled: after the first page you click Next and the extension fills the password on the next page by itself. When several secrets match the site (e.g. multiple AWS accounts), find the right one with search_secrets and pass its exact `name`. Returns ONLY a status string — never the password. Requires the concealer app running and its browser extension.",
      "inputSchema": {"type": "object", "properties": {
         "target_url": {"type": "string", "description": "URL/origin of the login page you are on"},
         "name": {"type": "string", "description": "optional exact secret name; else concealer matches by domain"},
@@ -4672,12 +4729,12 @@ def _mcp_call(name, args):
         jid = r0["job"]; dom = registrable_domain(_af_host(target)); deadline = time.time() + 90
         while time.time() < deadline:
             time.sleep(1.0)
-            try: s = _af_local("GET", f"/api/autofill/status?job={jid}", tok).get("status")
-            except Exception: s = None
+            try: st = _af_local("GET", f"/api/autofill/status?job={jid}", tok); s = st.get("status")
+            except Exception: st, s = {}, None
             if s in ("done", "denied", "failed", "expired"):
                 audit("web_autofill_result", key=args.get("name", "") or dom, source="mcp", detail=s, actor=agent)
                 return {"done": f"filled: {args.get('name') or dom}", "denied": "denied by user",
-                        "failed": "fill failed on the page", "expired": "expired: no approval or no extension on this tab"}[s]
+                        "failed": "fill failed on the page" + (f" ({st.get('result')})" if st.get("result") else ""), "expired": "expired: no approval or no extension on this tab"}[s]
         return "pending: waiting for approval or for the concealer extension on this tab"
     if name == "set_secret":
         actor = args.get("actor") or agent or os.environ.get("CONCEALER_ACTOR", "")

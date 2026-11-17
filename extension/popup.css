@@ -124,6 +124,7 @@ button.ok{color:var(--ok);border-color:var(--ok)}
 .toast{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);background:var(--panel2);
   border:1px solid var(--acc);border-radius:8px;padding:7px 12px;font-size:12px;max-width:90%;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+.toast.ok{border-color:var(--ok);color:var(--ok)} .toast.warn{border-color:var(--bad);color:var(--bad)}
 
 /* Secure Agentic Autofill — pending approval cards in the popup */
 #af{margin-bottom:10px}
@@ -144,4 +145,5 @@ button.ok{color:var(--ok);border-color:var(--ok)}
 .afcard.warn{border-color:var(--bad)}
 .afcard.warn .afs{color:var(--bad)}
 
-#fillpage{margin-bottom:9px}
+#fillpage{margin-bottom:9px;display:flex;flex-direction:column;gap:6px}
+#fillpage[hidden]{display:none}

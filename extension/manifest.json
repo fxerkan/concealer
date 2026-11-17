@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "concealer",
   "description": "Open the concealer vault and one-click copy secret values, without typing `cer web`.",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5pgBu15AFzBlcq1DXx/ZkuKY139g9CNHYYXIn9zMWoCndsPDx8RVRhvQPNu6G12k/sf9J1rlsC+QwbZokmvTRSLh+CCaK0ngQL5+MQVSIo1ceyoqYLWRp2miBCr180P5/iQdKsx9IAFhltuUlqvZcSIyuULHy7rW4nTBpjPbQfGjZagEKzCPaFP5qcQAQyxtM+BFMETHZRQ5vJfR7NU4zsVN4iHnyJpQhCqnMjrDMIQOgLlGAFLZrBIAe7wykaBpmidtWI85oCNZ6joFDkFqNkcTnqj1hzWm3MTYto8mqbmBqiRlm0QmBOLQP4bL1ls2uJPx2ItHI/3AQUc+iFEEJwIDAQAB",
   "action": {
     "default_popup": "popup.html",
@@ -35,7 +35,8 @@
     "clipboardWrite",
     "tabs",
     "alarms",
-    "notifications"
+    "notifications",
+    "contextMenus"
   ],
   "host_permissions": [
     "http://127.0.0.1:8787/*",
@@ -44,5 +45,17 @@
   ],
   "omnibox": {
     "keyword": "cer"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "unlock.html"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "use_dynamic_url": true
+    }
+  ]
 }

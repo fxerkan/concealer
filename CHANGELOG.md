@@ -7,6 +7,41 @@ its first public release at **`1.0.0`** (alongside the mobile app) and follows
 [semver](https://semver.org/) from there; the desktop tool and mobile app share
 the same version line. Dates are UTC.
 
+## [1.2.0] — 2026-11-16
+
+### Added
+
+- Chrome extension: sign-in menu on the page. Click or focus a login field on a site the vault
+  has credentials for and a concealer menu opens under it (name, account, username). One click
+  fills the form. The password is only fetched after that click and goes straight into the
+  form. If the vault is locked, you unlock it right in the menu and the entries appear; no
+  other tab opens. The master password box sits in an extension frame, so the site can't read
+  or keylog it.
+- Right-click any input → "Autofill with concealer" opens the same menu.
+- AWS console sign-in: the account ID or alias is filled together with the IAM username and
+  password. For the root flow (e-mail page, then password page) the password is held in memory
+  for two minutes and filled on the next page by itself. The same goes for the IAM chooser page,
+  where AWS reuses one box for the account ID: the username and password follow on the next page.
+- Any record with a password and a URL can drive a sign-in, not only `website`/`login`. Custom
+  records with fields like `account_id`, `iam_user`, `console_password` or a record-level URL
+  now match too. A 12-digit AWS account ID is read from `https://<id>.signin.aws.amazon.com` URLs.
+- Several accounts for the same site: the one matching the account on the page comes first,
+  then the last one you picked. That choice is kept per Chrome profile, so each profile
+  defaults to its own account.
+- `request_web_login` (MCP) fills the account ID too and handles multi-step forms. Its
+  description now tells agents to pass the exact secret `name` when several accounts match.
+
+### Changed
+
+- The popup's "Fill" button uses the same matching and lists up to four matching accounts.
+- A named fill request is refused when the secret has no URL, since the site can't be verified.
+- "filled" shows in green. The ⚠ warning is now only for a value copied into another field;
+  pages that mirror the password into its own box (React forms such as AWS sign-in) no longer
+  trigger it.
+- The on-page menu follows the extension's auto-lock setting, same as the popup.
+- When several tabs share the site (an open AWS console next to the sign-in page), an agent's
+  fill tries each one until it finds the login form. `request_web_login` reports why a fill failed.
+
 ## [1.1.1] — 2026-11-16
 
 ### Added

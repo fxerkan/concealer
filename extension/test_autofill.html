@@ -1,0 +1,82 @@
+<!doctype html>
+<!-- Self-check for content.js against AWS-console-shaped sign-in forms (not shipped; build.py
+     packs an explicit file list). Serve the extension dir over http and open this page:
+       python3 -m http.server 8790 -d extension  →  http://127.0.0.1:8790/test_autofill.html
+     The chrome.runtime stub plays the service worker; the result lands in <pre id=out> and the title. -->
+<meta charset="utf-8"><title>running</title>
+<div id="app"></div><pre id="out"></pre>
+<script>
+const ROWS = [{ id: "a", name: "aws-acct-a", account: "111111111111", username: "alice" },
+              { id: "r", name: "aws-root", account: "", username: "root@example.com" }];
+const CREDS = { a: { username: "alice", password: "sk-DUMMY-a", account: "111111111111" },
+                r: { username: "root@example.com", password: "sk-DUMMY-r", account: "" } };
+const listeners = []; let cont = null, locked = false;
+const listener = (m, s, r) => { for (const f of listeners) if (f(m, s, r) === true) return; };
+const dom = location.hostname.split(".").slice(-2).join(".");
+const fill = m => new Promise(res => listener(Object.assign({ type: "concealer-fill", domain: dom }, m), {}, res));
+window.chrome = { runtime: { getURL: p => p,
+  onMessage: { addListener: f => listeners.push(f) },
+  async sendMessage(m) {                                   // plays sw.js suggest()/fillWithId()
+    if (m.type === "af-suggest") {
+      if (m.hasPw && cont) { const c = cont; cont = null; await fill({ username: c.username, password: c.password }); return { continued: true }; }
+      return locked ? { locked: true } : { rows: ROWS };
+    }
+    if (m.type === "af-fill") { const c = CREDS[m.id]; const r = await fill(c); if (r.partial) cont = c; return r; }
+  } } };
+const app = document.getElementById("app");
+const IAM = `<form><label for=account>Account ID (12 digits) or account alias</label><input id=account name=account>
+  <label for=username>IAM username</label><input id=username name=username>
+  <label for=password>Password</label><input id=password name=password type=password></form>`;
+const ROOT1 = `<form><label for=resolving_input>Root user email address</label><input id=resolving_input type=email name=email></form>`;
+const ROOT2 = `<form><label for=password>Password</label><input id=password type=password name=password></form>`;
+const IAM1 = `<form><label for=resolving_input>Account ID (12 digits) or account alias</label><input id=resolving_input name=resolvingInput type=text></form>`;
+const IAM2 = `<form><label for=username>IAM username</label><input id=username name=username>
+  <label for=password>Password</label><input id=password name=password type=password></form>`;
+const SEARCH = `<input type=search name=q placeholder=Search>`;
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const $ = s => document.querySelector(s);
+const panel = () => [...document.documentElement.children].find(e => e.shadowRoot === null && e.style.zIndex === "2147483647");
+const log = [], ok = (c, m) => log.push((c ? "PASS " : "FAIL ") + m);
+async function main() {
+  const churn = setInterval(() => { const d = document.createElement("i"); document.body.appendChild(d); d.remove(); }, 50);   // AWS-style constant DOM churn
+  app.innerHTML = SEARCH; $("input").focus(); await wait(500);
+  ok(!panel(), "no panel when focusing a search box");
+  app.innerHTML = IAM; await wait(500);
+  ok(!panel(), "no panel before a login field is focused");
+  $("#username").focus(); await wait(300);
+  ok(!!panel(), "menu opens when the username field is focused");
+  document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); await wait(100);
+  ok(!panel(), "click outside closes the menu");
+  listener({ type: "af-open-menu" }, {}, () => {}); await wait(300);
+  ok(!!panel(), "right-click 'Autofill with concealer' opens the menu");
+  document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); locked = true;
+  $("#password").focus(); await wait(300);
+  ok(!!panel(), "locked vault: menu still opens (with the in-page unlock frame)");
+  locked = false; listener({ type: "af-unlocked" }, {}, () => {}); await wait(300);
+  ok(!!panel() && _sugAnchor === $("#password"), "after unlock the menu reopens on the same field");
+  ok(document.documentElement.innerText.indexOf("aws-acct-a") < 0, "panel text is not readable from the page (closed shadow root)");
+  await chrome.runtime.sendMessage({ type: "af-fill", id: "a" });
+  ok($("#account").value === "111111111111", "account id filled");
+  ok($("#username").value === "alice", "IAM username filled");
+  ok($("#password").value === "sk-DUMMY-a", "password filled");
+  $("#password").setAttribute("value", "sk-DUMMY-a");   // React mirrors controlled values into the attribute
+  const rr = await new Promise(res => listener({ type: "concealer-fill", domain: dom, password: "sk-DUMMY-a" }, {}, res));
+  ok(rr.ok && !rr.exposed, "password box's own value attribute (React) is not flagged as exposure");
+  app.innerHTML = ROOT1; await wait(700);
+  const r = await chrome.runtime.sendMessage({ type: "af-fill", id: "r" });
+  ok(r.partial && $("#resolving_input").value === "root@example.com", "root step 1: e-mail filled, password held back");
+  app.innerHTML = ROOT2; await wait(900);              // "Next" → SPA swaps in the password page
+  ok($("#password").value === "sk-DUMMY-r", "root step 2: password auto-filled on the next page");
+  app.innerHTML = IAM1; await wait(700);
+  const r2 = await chrome.runtime.sendMessage({ type: "af-fill", id: "a" });
+  ok(r2.partial && $("#resolving_input").value === "111111111111", "IAM chooser: shared box filled with the account id, not the username");
+  app.innerHTML = IAM2; await wait(900);
+  ok($("#username").value === "alice" && $("#password").value === "sk-DUMMY-a", "IAM step 2: username + password auto-filled");
+  const bad = await new Promise(res => listener({ type: "concealer-fill", domain: "evil.com", password: "x" }, {}, res));
+  ok(!bad.ok && bad.detail === "origin mismatch", "fill for another domain is refused");
+  clearInterval(churn); const out = log.join("\n"); $("#out").textContent = out;
+  document.title = out.includes("FAIL") ? "FAIL" : "PASS";
+}
+</script>
+<script src="content.js"></script>
+<script>main();</script>
