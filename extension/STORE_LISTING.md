@@ -78,6 +78,8 @@ running on localhost.
   `A periodic backstop timer that checks the local concealer server for pending sign-in requests while the background worker sleeps.`
 - **notifications** —
   `Shows a browser notification when a sign-in request is waiting for the user's approval.`
+- **contextMenus** —
+  `Adds one right-click item, "Autofill with concealer", on editable fields so the user can choose a saved login for that field. Nothing is read from the page until the user picks it.`
 - **Host permission `http://127.0.0.1:8787/*`, `http://localhost:8787/*`, `http://concealer.localhost:8787/*`** —
   `Communicates only with the user's own concealer server running locally. No remote hosts are contacted.`
 - **Content script on `http://*/*`, `https://*/*`** —
