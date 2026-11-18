@@ -20,6 +20,10 @@ on:
         description: "Publish live after upload (false = upload as draft only)"
         type: boolean
         default: false
+      cancel_pending:
+        description: "First cancel a submission stuck in review (the store refuses uploads while one is pending: ITEM_NOT_UPDATABLE)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -27,6 +31,8 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      CWS_PUBLISHER: 630166a4-bd9e-452f-8fa3-a4825e09d907   # publisher id (dashboard URL), not a secret
     steps:
       - uses: actions/checkout@v4
       - name: Build zip (strips the self-signed key)
@@ -63,6 +69,10 @@ jobs:
             "https://www.googleapis.com/chromewebstore/v1.1/items/$EXTID?projection=DRAFT")
           echo "item state: HTTP $(printf '%s' "$S" | tail -n1)"
           printf '%s\n' "$S" | sed '$d'
+          # v2 status shows what the v1.1 draft view can't: a submission waiting in review
+          echo "review status:"
+          curl -s -H "Authorization: Bearer $AT" \
+            "https://chromewebstore.googleapis.com/v2/publishers/$CWS_PUBLISHER/items/$EXTID:fetchStatus" || true
       # Direct API calls (instead of a 3rd-party action) so a failure prints Google's actual reason
       # (itemError / statusDetail), not an opaque "400 Bad Request".
       - name: Upload (and publish) to Chrome Web Store
@@ -73,10 +83,17 @@ jobs:
           EXTID: ${{ secrets.CWS_EXTENSION_ID }}
           ZIP: ${{ steps.zip.outputs.path }}
           PUBLISH: ${{ inputs.publish }}
+          CANCEL: ${{ inputs.cancel_pending }}
         run: |
           set -euo pipefail
           AT=$(curl -s -X POST https://oauth2.googleapis.com/token -d client_id="$CID" -d client_secret="$CSECRET" \
             -d refresh_token="$RTOKEN" -d grant_type=refresh_token | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
+          if [ "$CANCEL" = "true" ]; then
+            C=$(curl -s -w '\n%{http_code}' -X POST -H "Authorization: Bearer $AT" -H 'Content-Length: 0' \
+              "https://chromewebstore.googleapis.com/v2/publishers/$CWS_PUBLISHER/items/$EXTID:cancelSubmission")
+            echo "cancel submission: $C"
+            [ "$(printf '%s' "$C" | tail -n1)" = "200" ] || { echo "::error::cancelSubmission failed: $(printf '%s' "$C" | sed '$d' | tr '\n' ' ')"; exit 1; }
+          fi
           U=$(curl -s -X PUT -H "Authorization: Bearer $AT" -H 'x-goog-api-version: 2' -T "$ZIP" \
             "https://www.googleapis.com/upload/chromewebstore/v1.1/items/$EXTID")
           echo "upload: $U"
