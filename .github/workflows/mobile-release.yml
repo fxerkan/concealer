@@ -71,8 +71,8 @@ jobs:
       - name: Upload to Play
         env:
           GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_KEY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_KEY }}
-          ANDROID_VERSION_NAME: "1.0"
         run: |
+          export ANDROID_VERSION_NAME=$(node -p "require('./package.json').version")   # same as the app's versionName
           python3 -m pip install --quiet google-api-python-client google-auth
           cd "$GITHUB_WORKSPACE"
           python3 mobile/store/play_upload.py "${{ inputs.android_track || 'internal' }}"
