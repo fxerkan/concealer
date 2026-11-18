@@ -2,6 +2,7 @@ import UIKit
 import Capacitor
 import LocalAuthentication
 import StoreKit
+import AuthenticationServices
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -55,6 +56,7 @@ class ViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(BiometricPlugin())
         bridge?.registerPluginInstance(RatePlugin())
+        bridge?.registerPluginInstance(AutofillPlugin())
     }
 }
 
@@ -76,6 +78,41 @@ public class RatePlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["store": ok])
             }
         }
+    }
+}
+
+enum AppGroup { static let id = "group.com.fxerkan.concealer" }
+
+/// iOS side of password autofill. The fill UI itself runs in the AutoFill extension; the app only
+/// mirrors its state there (`share`: the encrypted bundle + theme/bio flags, same bytes as localStorage)
+/// and reports / opens the system setting.
+@objc(AutofillPlugin)
+public class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "AutofillPlugin"
+    public let jsName = "ConcealerAutofill"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "status", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "enable", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "context", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "share", returnType: CAPPluginReturnPromise),
+    ]
+    @objc func status(_ call: CAPPluginCall) {
+        ASCredentialIdentityStore.shared.getState { st in call.resolve(["supported": true, "enabled": st.isEnabled]) }
+    }
+    @objc func enable(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            if #available(iOS 17.0, *) { ASSettingsHelper.openCredentialProviderAppSettings { _ in } }
+            else { UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!) }
+            call.resolve()
+        }
+    }
+    @objc func context(_ call: CAPPluginCall) { call.resolve(["mode": ""]) }   // the app itself is never the fill screen
+    @objc func share(_ call: CAPPluginCall) {
+        guard let state = call.getString("state"),
+              let dir = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppGroup.id)
+        else { return call.reject("no app group", "failed") }
+        do { try Data(state.utf8).write(to: dir.appendingPathComponent("state.json"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]); call.resolve() }
+        catch { call.reject(error.localizedDescription, "failed") }
     }
 }
 
@@ -112,11 +149,7 @@ public class BiometricPlugin: CAPPlugin, CAPBridgedPlugin {
             guard ok else { return call.reject(err?.localizedDescription ?? "failed", (err as? LAError)?.code == .userCancel ? "canceled" : "failed") }
             guard let ac = SecAccessControlCreateWithFlags(nil, kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly, .biometryCurrentSet, nil)
             else { return call.reject("access control", "failed") }
-            SecItemDelete(self.base() as CFDictionary)
-            var q = self.base()
-            q[kSecValueData as String] = Data(secret.utf8)
-            q[kSecAttrAccessControl as String] = ac
-            let st = SecItemAdd(q as CFDictionary, nil)
+            let st = self.put(secret, ac)
             st == errSecSuccess ? call.resolve() : call.reject("keychain \(st)", "failed")
         }
     }
@@ -136,11 +169,18 @@ public class BiometricPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             var q = self.base()
             q[kSecReturnData as String] = true
+            q[kSecReturnAttributes as String] = true
             q[kSecMatchLimit as String] = kSecMatchLimitOne
             q[kSecUseAuthenticationContext as String] = ctx
             var out: CFTypeRef?
             let st = SecItemCopyMatching(q as CFDictionary, &out)
-            if st == errSecSuccess, let d = out as? Data, let s = String(data: d, encoding: .utf8) {
+            if st == errSecSuccess, let a = out as? [String: Any], let d = a[kSecValueData as String] as? Data,
+               let s = String(data: d, encoding: .utf8) {
+                // items stored before 1.2.2 sit in the app-only group: move them so the AutoFill extension sees them
+                if a[kSecAttrAccessGroup as String] as? String != AppGroup.id,
+                   let ac = SecAccessControlCreateWithFlags(nil, kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly, .biometryCurrentSet, nil) {
+                    _ = self.put(s, ac)
+                }
                 call.resolve(["secret": s])
             } else if st == errSecUserCanceled {
                 call.reject("canceled", "canceled")
@@ -150,6 +190,15 @@ public class BiometricPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject("keychain \(st)", "failed")
             }
         }
+    }
+
+    private func put(_ secret: String, _ ac: SecAccessControl) -> OSStatus {
+        SecItemDelete(base() as CFDictionary)
+        var q = base()
+        q[kSecValueData as String] = Data(secret.utf8)
+        q[kSecAttrAccessControl as String] = ac
+        q[kSecAttrAccessGroup as String] = AppGroup.id
+        return SecItemAdd(q as CFDictionary, nil)
     }
 
     @objc func clear(_ call: CAPPluginCall) {

@@ -82,7 +82,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
 .login .lbody{flex:1;overflow:auto;padding:8px 16px 16px;max-width:460px;width:100%;margin:0 auto}
 #v-unlock .lbody{display:flex;flex-direction:column;justify-content:center}
 .login .lfoot{flex:0 0 auto;text-align:center;color:var(--mut);font-size:12px;padding:12px}.login .lfoot .ac{color:var(--ac)}
-.lback{position:absolute;right:14px;top:14px}
+.lback{position:absolute;right:14px;top:calc(14px + env(safe-area-inset-top))}
 .empty{color:var(--mut);text-align:center;margin-top:60px}
 .fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;
   background:var(--ac);color:var(--ink);border:0;font-size:30px;line-height:56px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
@@ -155,6 +155,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
 <!-- UNLOCK: local bundle exists, offline capable -->
 <section id="v-unlock" class="view login">
   <div class="lhead">
+    <button class="icona lback" id="u-cancel" style="display:none">Cancel</button>
     <h1 class="brand"><svg class="logo" viewBox="0 0 512 512" width="30" height="30"><rect x="128" y="176" width="176" height="38" rx="19" fill="#8a909b"/><rect x="128" y="232" width="256" height="52" rx="26" class="mid"/><rect x="128" y="302" width="136" height="38" rx="19" fill="#8a909b"/></svg>conceal<span class="ac">er</span></h1>
     <p class="slogan">The local‑only AI Secret Manager for the AI‑coding era</p>
   </div>
@@ -178,6 +179,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
     <span id="demo-badge" style="display:none;background:#e5484d;color:#fff;font:700 10px/1.6 ui-monospace,monospace;padding:2px 6px;border-radius:5px;letter-spacing:.5px;margin-left:6px">DEMO</span>
     <span class="sp"></span>
     <span class="lockt" id="l-timer" title="auto-lock"></span>
+    <button class="icona" id="l-cancel" style="display:none">Cancel</button>
     <button class="icona" id="l-lock" aria-label="Lock"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
     <button class="icona settingsbtn" id="l-settings" aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
   </header>
@@ -218,7 +220,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
     <div class="sect" id="set-afbox" style="display:none">
     <h2>Password autofill</h2>
     <button class="btn sec" id="set-af"></button>
-    <p class="hint">Sign-in fields in other apps and browsers offer “Fill with concealer”. You unlock the vault, pick the sign-in, and it's filled in. New sign-ins can be saved the same way.</p>
+    <p class="hint" id="set-afhint">Sign-in fields in other apps and browsers offer “Fill with concealer”. You unlock the vault, pick the sign-in, and it's filled in. New sign-ins can be saved the same way.</p>
     </div>
     <div class="sect">
     <h2>Sync</h2>
@@ -400,7 +402,7 @@ async function decryptBundle(bytes, pw){
   const plain = await d.decrypt(bytes, "uint8array");
   return JSON.parse(new TextDecoder().decode(plain)).secrets || [];
 }
-async function persist(){ if(S.demo) return; const bytes = await encryptBundle(S.secrets, S.pw); LS.set("bundle", b64enc(bytes)); S.rev=String(Date.now()); LS.set("rev", S.rev); }
+async function persist(){ if(S.demo) return; const bytes = await encryptBundle(S.secrets, S.pw); LS.set("bundle", b64enc(bytes)); S.rev=String(Date.now()); LS.set("rev", S.rev); shareState(); }
 // The Android autofill screen is a second WebView on the same storage: when it saved a sign-in, adopt
 // that bundle before this (older) in-memory copy gets persisted over it.
 async function adoptNewer(){
@@ -566,6 +568,7 @@ $("u-bio").onclick = bioUnlock;
 // unlock screen: biometric prompt first when it's on, otherwise the cursor goes straight to the password
 function showUnlock(auto=true){
   $("u-bio").style.display = bioOn() ? "block" : "none";
+  $("u-cancel").style.display = S.af ? "block" : "none"; $("u-reset").style.display = S.af ? "none" : "";
   $("u-bio").innerHTML = (bioKind==="face" ? BIO_FACE : BIO_FP) + "Unlock with " + bioName();
   show("unlock");
   if(auto && bioOn()) bioUnlock(); else focusPw();
@@ -580,6 +583,7 @@ $("u-reset").onclick = () => showSetup(true);
 const scopeFmt = e => DIMS.map(k=>e[k]||"*").join(" / ");
 function openList(){ stopScan(); $("u-pw").value=""; $("s-pw").value=""; $("demo-badge").style.display = S.demo?"inline-block":"none";
   $("l-add").style.display = $("l-settings").style.display = $("l-lock").style.display = S.af ? "none" : "";
+  $("l-cancel").style.display = S.af ? "" : "none";
   startLock(); refreshFilters(); renderList(); show("list"); }
 function refreshFilters(){    // populate the type filter with the types actually present
   const types=[...new Set(live(S.secrets).map(e=>e.type||"api_key"))].sort();
@@ -619,6 +623,14 @@ $("l-add").onclick = () => openEdit(-1);
 // to the app being filled. save: the captured sign-in opens prefilled in the editor (or updates the
 // existing record for that site + username).
 const AF = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ConcealerAutofill;
+$("u-cancel").onclick = $("l-cancel").onclick = () => AF.done();
+// iOS: the AutoFill extension can't see this WebView's storage, so mirror what it needs into the App
+// Group (the same encrypted bundle as localStorage + display flags). Never from the fill screen itself.
+function shareState(){
+  if(S.af || !AF || platform()!=="ios") return;
+  AF.share({state: JSON.stringify(Object.fromEntries(["bundle","rev","theme","bio","idle"].map(k => [k, LS.get(k)])))}).catch(()=>{});
+}
+document.addEventListener("visibilitychange", () => { if(document.hidden) shareState(); });
 async function afProbe(){ try{ const r = AF && await AF.context(); if(r && r.mode) S.af = r; }catch{} }
 const hostOf = u => { try{ return new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(u) ? u : "https://"+u).hostname.toLowerCase(); }catch{ return ""; } };
 const regDom = h => /^[\d.]+$/.test(h) ? h : h.split(".").slice(-2).join(".");   // ponytail: last two labels; misses co.uk-style suffixes
@@ -746,7 +758,9 @@ function openSettings(){
 async function afStatus(){
   let st = null; try{ st = AF && await AF.status(); }catch{}
   $("set-afbox").style.display = (st && st.supported && !S.demo) ? "block" : "none";
-  if(st) $("set-af").textContent = st.enabled ? "✓ Autofill service is on — change in Android settings" : "Use concealer for autofill";
+  const ios = platform()==="ios";
+  if(st) $("set-af").textContent = st.enabled ? "✓ Autofill is on — change in " + (ios ? "iOS Settings" : "Android settings") : "Use concealer for autofill";
+  if(ios) $("set-afhint").textContent = "Sign-in fields in Safari and other apps offer concealer under Passwords. You unlock the vault, pick the sign-in, and it's filled in.";
 }
 $("set-af").onclick = () => AF.enable();
 document.addEventListener("visibilitychange", () => { if(!document.hidden && curView()==="settings") afStatus(); });
@@ -893,6 +907,8 @@ setTheme(LS.get("theme") || "dark");   // apply persisted choice on load
 
 // ---- boot ----
 function boot(){
+  shareState();
+  if(S.af && !LS.get("bundle")){ showUnlock(false); flash($("u-msg"),"Open the concealer app and set up your vault first."); return; }
   if(LS.get("bundle")){ showUnlock(); }
   else { showSetup(false); }
 }

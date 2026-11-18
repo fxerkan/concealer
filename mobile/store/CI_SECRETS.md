@@ -14,6 +14,7 @@ machine already uses, and pipes each value straight into `gh secret set` (never 
 | `APPLE_DIST_CERT_PRIVATE_KEY_PEM` | vault `APPLE_DIST_CERT._PRIVATE_KEY_PEM` |
 | `APPLE_ASC_API_KEY_KEY_ID` / `APPLE_ASC_API_KEY_ISSUER_ID` / `APPLE_ASC_API_KEY_P8_PRIVATE_KEY` | vault `APPLE_ASC_API_KEY.*` |
 | `APPLE_PROVISIONING_PROFILE_BASE64` | base64 of `_credentials/Concealer_App_Store_Profile.mobileprovision` |
+| `APPLE_AUTOFILL_PROVISIONING_PROFILE_BASE64` | base64 of `_credentials/Concealer_AutoFill_App_Store_Profile.mobileprovision` (App Store profile for `com.fxerkan.concealer.autofill`) |
 
 ## Populate
 

@@ -7,6 +7,16 @@ its first public release at **`1.0.0`** (alongside the mobile app) and follows
 [semver](https://semver.org/) from there; the desktop tool and mobile app share
 the same version line. Dates are UTC.
 
+## [Unreleased]
+
+### Added
+
+- iOS: **password autofill**. concealer shows up under Passwords in Safari's and other apps' sign-in
+  fields. You unlock with the master password or Face ID / Touch ID, pick the sign-in (this site's come
+  first), and it's filled in. Turn it on in Settings › Password autofill. The fill screen is the app's
+  own UI running in an AutoFill extension; it reads the same encrypted vault the app keeps, shared
+  through an App Group.
+
 ## [1.2.2] — 2026-11-18
 
 ### Added

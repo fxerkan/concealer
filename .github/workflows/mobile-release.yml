@@ -107,9 +107,11 @@ jobs:
       - name: Restore provisioning profile
         env:
           PROFILE_B64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+          AUTOFILL_PROFILE_B64: ${{ secrets.APPLE_AUTOFILL_PROVISIONING_PROFILE_BASE64 }}
         run: |
           mkdir -p _credentials
           echo "$PROFILE_B64" | base64 -d > _credentials/Concealer_App_Store_Profile.mobileprovision
+          echo "$AUTOFILL_PROFILE_B64" | base64 -d > _credentials/Concealer_AutoFill_App_Store_Profile.mobileprovision
       - name: Re-sign + upload to App Store Connect
         env:
           APPLE_DIST_CERT_PRIVATE_KEY_PEM: ${{ secrets.APPLE_DIST_CERT_PRIVATE_KEY_PEM }}

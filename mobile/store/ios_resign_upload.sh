@@ -16,6 +16,7 @@
 # Needs (in the same Apple account, team 96RZX28T7X):
 #   - mobile/build/App.xcarchive              (xcodebuild ... archive)
 #   - _credentials/Concealer_App_Store_Profile.mobileprovision
+#   - _credentials/Concealer_AutoFill_App_Store_Profile.mobileprovision  (the AutoFill extension)
 set -euo pipefail
 cd "$(dirname "$0")/../.."          # repo root
 ROOT=$PWD
@@ -63,6 +64,15 @@ cp "$PROFILE" "$APP/embedded.mobileprovision"
 /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' "$W/prof.plist" > "$W/ent.plist"
 xattr -cr "$APP"
 for f in "$APP"/Frameworks/*.framework; do codesign --force --sign "$IDENT" --keychain "$KC" "$f"; done
+# Extensions first (inside-out): each needs its own App Store profile + that profile's entitlements.
+AXPROF=_credentials/Concealer_AutoFill_App_Store_Profile.mobileprovision
+for AX in "$APP"/PlugIns/*.appex; do
+  [ -e "$AX" ] || continue
+  cp "$AXPROF" "$AX/embedded.mobileprovision"
+  security cms -D -i "$AXPROF" > "$W/axprof.plist"
+  /usr/libexec/PlistBuddy -x -c 'Print :Entitlements' "$W/axprof.plist" > "$W/axent.plist"
+  codesign --force --sign "$IDENT" --entitlements "$W/axent.plist" --keychain "$KC" "$AX"
+done
 codesign --force --sign "$IDENT" --entitlements "$W/ent.plist" --keychain "$KC" "$APP"
 codesign --verify --deep --strict "$APP"
 rm -rf mobile/build/ipa; mkdir -p mobile/build/ipa
