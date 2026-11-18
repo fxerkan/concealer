@@ -2,6 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="utf-8">
+<meta name="concealer-app" content="vault">   <!-- tells the Chrome extension to stay off this page -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- CSP (F2): the server also sends this as a header; the meta is a fallback if the page is opened directly.
      'unsafe-inline' is still needed by the inline handlers/styles — remove once refactored (see SECURITY_AUDIT_OWASP.md). -->
@@ -162,6 +163,19 @@ textarea.jsonv.masked{-webkit-text-security:disc}
 
 /* --- sticky sub-bar + table header (measured header/subbar heights in --hh/--sh) --- */
 :root{--hh:56px;--sh:0px}
+/* settings: jump nav + one card per area */
+.setwrap{display:flex;gap:28px;align-items:flex-start}
+.setnav{position:sticky;top:calc(var(--hh) + 16px);display:flex;flex-direction:column;gap:2px;min-width:190px}
+.setnav a{color:var(--mut);text-decoration:none;padding:7px 12px;border-radius:8px;font-size:13px}
+.setnav a:hover,.setnav a.active{background:var(--panel2);color:var(--txt)}
+.setmain{flex:1;min-width:0;max-width:820px;display:flex;flex-direction:column;gap:18px}
+.setcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;scroll-margin-top:calc(var(--hh) + 16px)}
+.setcard h3{margin:0 0 4px;font-size:16px}
+.setcard>p.mut{margin:0 0 12px;max-width:680px;font-size:13px}
+.seg{display:inline-flex;gap:6px;flex-wrap:wrap}.seg button.active{background:var(--acc);border-color:var(--acc);color:var(--ink)}
+.pkrow{display:flex;gap:12px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}.pkrow span:first-child{flex:1}
+.kvs{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;margin-bottom:10px}
+@media(max-width:720px){.setwrap{flex-direction:column;gap:14px}.setnav{position:static;flex-direction:row;flex-wrap:wrap;min-width:0}}
 .subbar{position:sticky;top:var(--hh);z-index:15;background:var(--bg);padding:12px 0 8px;margin-bottom:8px;border-bottom:1px solid var(--line)}
 .subrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .subrow .search{flex:1;min-width:200px;width:auto}
@@ -178,7 +192,7 @@ textarea.jsonv.masked{-webkit-text-security:disc}
    crushing to fit. The wrapper becomes the scroll container, so the header sticks to
    its top (top:0) rather than the viewport. */
 @media(min-width:721px){
-  #stablewrap{overflow:auto;max-height:calc(100vh - 200px)}
+  #stablewrap{overflow:auto;max-height:calc(100vh - 200px);isolation:isolate}   /* own stacking context: sticky th z-index can't climb over the subbar's filter popups */
   #stable{width:max-content;min-width:100%}
   #stable th,#stable td{white-space:nowrap}
   #stable td:not(:first-child):not(:last-child){max-width:460px;overflow:hidden;text-overflow:ellipsis}
@@ -384,6 +398,7 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
     </div>
     <div id="loginerr" style="color:var(--bad);margin-top:10px;min-height:18px"></div>
     <button class="primary" id="unlockbtn" style="width:100%;margin-top:8px" data-i18n="unlock" onclick="unlock()">Aç</button>
+    <button id="pkbtn" style="width:100%;margin-top:8px" hidden onclick="passkeyUnlock()">👆 <span data-i18n="pk_unlock">Unlock with passkey / Touch ID</span></button>
     <div class="foot">conceal<span class="ac">er</span> · <a href="https://github.com/fxerkan/concealer" title="GitHub" style="color:inherit;text-decoration:underline;text-underline-offset:2px">v__VERSION__ <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" style="vertical-align:-2px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a></div>
   </div>
 </div>
@@ -632,44 +647,108 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
       </div>
       <div id="pol_list"></div>
 
-      <hr style="border-color:var(--line);margin:26px 0;max-width:820px">
-      <label class="fld" data-i18n="set_limits">MCP access limits (anti-bulk-exfiltration)</label>
-      <p class="mut" style="max-width:820px;margin:4px 0 10px" data-i18n="set_limits_hint">AI agents may only read secrets through a registered agent token. Per call caps a single response; the window quota caps how many distinct secrets an agent may reveal within the window — repeated queries can't reassemble the whole vault. Set the window quota to 0 to fully block an agent.</p>
-      <div id="limits_wrap" style="max-width:820px"></div>
-      <button class="primary" data-i18n="save" onclick="saveLimits()">Save</button>
     </section>
 
     <section id="view-settings" class="hidden">
-      <div class="grid" style="max-width:680px">
-        <div class="field"><label class="fld" data-i18n="set_idle">Auto-lock (seconds)</label>
-          <input id="set_idle" type="number" min="30" max="86400"></div>
-        <div class="field"><label class="fld" data-i18n="set_confirm">Ask master password before</label>
-          <div id="set_confirm" style="display:flex;flex-direction:column;gap:6px;padding-top:4px"></div></div>
-        <div class="field full"><label class="fld" data-i18n="set_hibp">HIBP API key <span id="hibp_set" class="mut"></span></label>
+     <div class="setwrap">
+      <nav class="setnav" onclick="setJump(event)">
+        <a href="#set-sec" data-i18n="sg_security">Security &amp; lock</a>
+        <a href="#set-look" data-i18n="sg_look">Appearance</a>
+        <a href="#set-agents" data-i18n="sg_agents">AI agents (MCP)</a>
+        <a href="#set-ext" data-i18n="sg_ext">Browser extension</a>
+        <a href="#set-int" data-i18n="sg_int">Integrations</a>
+        <a href="#set-sync" data-i18n="sg_sync">Sync</a>
+        <a href="#set-port" data-i18n="set_portability">Portability</a>
+        <a href="#set-bk" data-i18n="set_backup">Backup (.cerbak)</a>
+        <a href="#set-about" data-i18n="sg_about">About</a>
+      </nav>
+      <div class="setmain">
+      <div class="setcard" id="set-sec">
+        <h3 data-i18n="sg_security">Security &amp; lock</h3>
+        <p class="mut" data-i18n="sg_security_hint">When the vault locks itself and which actions ask for the master password.</p>
+        <div class="grid">
+          <div class="field"><label class="fld" data-i18n="set_idle">Auto-lock</label>
+            <select id="set_idle_sel" onchange="idleSelChanged()"></select>
+            <input id="set_idle" type="number" min="30" max="86400" style="margin-top:6px" data-i18n-ph="idle_custom" placeholder="seconds"></div>
+          <div class="field"><label class="fld" data-i18n="set_confirm">Ask master password before</label>
+            <div id="set_confirm" style="display:flex;flex-direction:column;gap:6px;padding-top:4px"></div></div>
+        </div>
+        <button class="primary" data-i18n="save" onclick="saveSettings()">Save</button>
+        <hr style="border-color:var(--line);margin:18px 0">
+        <label class="fld" data-i18n="pk_title">Passkey / Touch ID</label>
+        <p class="mut" style="font-size:12px;margin:0 0 8px" data-i18n="pk_hint">Unlock with your fingerprint, Windows Hello, a security key, or an Apple Watch where macOS allows it, instead of typing the master password. The master password keeps working. Passkeys belong to http://localhost; this page switches there when needed.</p>
+        <div id="pk_list"></div>
+        <button onclick="passkeyAdd()">+ <span data-i18n="pk_add">Add a passkey on this device</span></button>
+      </div>
+
+      <div class="setcard" id="set-look">
+        <h3 data-i18n="sg_look">Appearance</h3>
+        <p class="mut" data-i18n="sg_look_hint">Theme and language apply right away, in this browser.</p>
+        <div class="grid">
+          <div class="field"><label class="fld" data-i18n="set_theme">Theme</label>
+            <div class="seg"><button data-th="dark" onclick="setTheme('dark')">🌙 <span data-i18n="th_dark">Dark</span></button><button data-th="light" onclick="setTheme('light')">☀️ <span data-i18n="th_light">Light</span></button><button data-th="matrix" onclick="setTheme('matrix')">🟩 Matrix</button></div></div>
+          <div class="field"><label class="fld" data-i18n="set_lang">Language</label>
+            <div class="seg"><button data-lg="tr" onclick="setLang('tr')">Türkçe</button><button data-lg="en" onclick="setLang('en')">English</button></div></div>
+        </div>
+      </div>
+
+      <div class="setcard" id="set-agents">
+        <h3 data-i18n="sg_agents">AI agents (MCP)</h3>
+        <p class="mut" data-i18n="set_limits_hint">AI agents may only read secrets through a registered agent token. Per call caps a single response; the window quota caps how many distinct secrets an agent may reveal within the window — repeated queries can't reassemble the whole vault. Set the window quota to 0 to fully block an agent.</p>
+        <p class="mut" data-i18n="sg_agents_cli">Add an agent: cer agent install (or cer agent register NAME) · remove: cer agent revoke NAME</p>
+        <div id="limits_wrap"></div>
+        <button class="primary" data-i18n="save" onclick="saveLimits()">Save</button>
+      </div>
+
+      <div class="setcard" id="set-ext">
+        <h3 data-i18n="sg_ext">Browser extension</h3>
+        <p class="mut" data-i18n="sg_ext_hint">The Chrome extension fills sign-ins from the vault and offers to save the ones you type (with extra fields such as an AWS account ID). Saving by hand: right-click a page → “Save sign-in to concealer”, or 💾 in the extension. One-time setup: cer chrome-extension. Clipboard clearing and the extension's own auto-lock are in the extension's ⚙ menu.</p>
+      </div>
+
+      <div class="setcard" id="set-int">
+        <h3 data-i18n="sg_int">Integrations</h3>
+        <div class="field"><label class="fld" data-i18n="set_hibp">HIBP API key <span id="hibp_set" class="mut"></span></label>
           <input id="set_hibp" type="password" data-i18n-ph="set_hibp_ph" placeholder="leave blank to keep — for email breach checks">
           <p class="mut" style="font-size:12px;margin:4px 0 0" data-i18n="set_hibp_hint">Optional. Only used for the email breach check (Risks → Exposure). Get one at haveibeenpwned.com/API/Key.</p></div>
+        <label class="fld" style="margin-top:6px" data-i18n="anc_title">Audit log anchor</label>
+        <p class="mut" style="font-size:12px;margin:0 0 8px" data-i18n="anc_hint">Copies the audit chain's latest hash off this machine, so even a full rewrite of the log is caught. Only a sequence number and a hash leave, never a secret. Sent by cer audit anchor (run it from cron).</p>
+        <div class="grid">
+          <div class="field"><label class="fld" data-i18n="anc_file">File (another disk or machine)</label><input id="anc_file" type="text" placeholder="/Volumes/…/concealer-anchor.log"></div>
+          <div class="field"><label class="fld">Webhook URL</label><input id="anc_webhook" type="url" placeholder="https://…"></div>
+          <div class="field full"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="anc_syslog" style="width:auto"> <span data-i18n="anc_syslog">Also write to syslog</span></label></div>
+        </div>
+        <button class="primary" data-i18n="save" onclick="saveIntegrations()">Save</button>
       </div>
-      <button class="primary" data-i18n="save" onclick="saveSettings()">Save</button>
-      <hr style="border-color:var(--line);margin:22px 0;max-width:680px">
-      <label class="fld" data-i18n="set_portability">Portability (move between machines)</label>
-      <div class="toolbar" style="margin-top:8px">
-        <button data-i18n="export_btn" onclick="doExport()">⬇ Export (.cerbak)</button>
-        <input type="file" id="imp_file" accept=".cerbak,.cer" style="width:auto">
-        <select id="imp_mode" title="conflict handling" style="width:auto">
-          <option value="overwrite" data-i18n="imp_mode_overwrite">On conflict: overwrite</option>
-          <option value="skip" data-i18n="imp_mode_skip">On conflict: skip</option>
-          <option value="duplicate" data-i18n="imp_mode_duplicate">On conflict: duplicate</option>
-        </select>
-        <button data-i18n="import_btn" onclick="doImport()">⬆ Import</button>
-      </div>
-      <p class="mut" style="max-width:680px" data-i18n="set_export_hint">Export writes a .cerbak of the whole vault, encrypted with your master password. Import merges its records into this vault (restores an exported or backed-up .cerbak).</p>
 
-      <hr style="border-color:var(--line);margin:22px 0;max-width:680px">
-      <label class="fld" data-i18n="set_backup">Backup (.cerbak)</label>
-      <p class="mut" style="max-width:680px;margin:4px 0 10px" data-i18n="set_backup_hint">A .cerbak backup is the whole vault encrypted with a dedicated backup password (separate from your master password) — an opaque binary you can't open to read. Restore it via Import above. Automatic backups write a .cerbak to a local folder on unlock once the interval has elapsed.</p>
-      <div class="toolbar" style="margin-top:4px">
-        <button data-i18n="backup_now" onclick="doBackup()">⬇ Backup now (.cerbak)</button>
+      <div class="setcard" id="set-sync">
+        <h3 data-i18n="sg_sync">Sync</h3>
+        <p class="mut" data-i18n="sg_sync_hint">Pair machines once with cer pair HOST, then keep them in step with cer sync HOST. The mobile app syncs with this vault the same way.</p>
+        <div class="field"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="sync_del" style="width:auto"> <span data-i18n="sync_del">Apply deletions made on other devices</span></label>
+          <p class="mut" style="font-size:12px;margin:4px 0 0" data-i18n="sync_del_hint">Off: a record deleted elsewhere stays here (safe default against an accidental mass delete).</p></div>
+        <button class="primary" data-i18n="save" onclick="saveSync()">Save</button>
       </div>
+
+      <div class="setcard" id="set-port">
+        <h3 data-i18n="set_portability">Portability (move between machines)</h3>
+        <p class="mut" data-i18n="set_export_hint">Export writes a .cerbak of the whole vault, encrypted with your master password. Import merges its records into this vault (restores an exported or backed-up .cerbak).</p>
+        <div class="toolbar" style="margin-top:8px">
+          <button data-i18n="export_btn" onclick="doExport()">⬇ Export (.cerbak)</button>
+          <input type="file" id="imp_file" accept=".cerbak,.cer" style="width:auto">
+          <select id="imp_mode" title="conflict handling" style="width:auto">
+            <option value="overwrite" data-i18n="imp_mode_overwrite">On conflict: overwrite</option>
+            <option value="skip" data-i18n="imp_mode_skip">On conflict: skip</option>
+            <option value="duplicate" data-i18n="imp_mode_duplicate">On conflict: duplicate</option>
+          </select>
+          <button data-i18n="import_btn" onclick="doImport()">⬆ Import</button>
+        </div>
+      </div>
+
+      <div class="setcard" id="set-bk">
+        <h3 data-i18n="set_backup">Backup (.cerbak)</h3>
+        <p class="mut" data-i18n="set_backup_hint">A .cerbak backup is the whole vault encrypted with a dedicated backup password (separate from your master password) — an opaque binary you can't open to read. Restore it via Import above. Automatic backups write a .cerbak to a local folder on unlock once the interval has elapsed.</p>
+        <div class="toolbar" style="margin-top:4px">
+          <button data-i18n="backup_now" onclick="doBackup()">⬇ Backup now (.cerbak)</button>
+        </div>
       <div class="grid" style="max-width:680px;margin-top:14px">
         <div class="field full"><label class="fld" style="display:flex;gap:8px;align-items:center">
           <input type="checkbox" id="bk_enabled" style="width:auto"> <span data-i18n="bk_auto">Automatic backups</span></label></div>
@@ -698,7 +777,18 @@ pre.code code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-hei
         <button data-i18n="bk_run" onclick="runBackupNow()">▶ Run auto-backup now</button>
         <span id="bk_last" class="mut"></span>
       </div>
+      </div>
 
+      <div class="setcard" id="set-about">
+        <h3 data-i18n="sg_about">About</h3>
+        <div class="kvs">
+          <span class="mut" data-i18n="about_ver">Version</span><span id="about_ver" class="mono"></span>
+          <span class="mut" data-i18n="about_key">Vault key</span><span id="about_key"></span>
+        </div>
+        <p class="mut" data-i18n="about_cli">Change the master password: cer passwd (needs a recovery code) · new recovery codes: cer recovery</p>
+      </div>
+      </div>
+     </div>
       <div class="foot" style="max-width:680px;margin:30px auto 0;text-align:center">conceal<span class="ac">er</span> · <a href="https://github.com/fxerkan/concealer" title="GitHub" style="color:inherit;text-decoration:underline;text-underline-offset:2px">v__VERSION__ <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" style="vertical-align:-2px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a></div>
     </section>
   </main>
@@ -730,7 +820,7 @@ const I18N={
   login_sub:"YZ kodlama çağı için yerel gizli bilgi yöneticisi.",master_pw:"Master password",unlock:"Aç",
   wrong_pw:"Yanlış master password.",locked_wait:s=>`Çok fazla hatalı deneme — ${s} sn bekleyin.`,secrets:"Sırlar",audit_log:"Denetim Kayıtları",lock:"🔒 Kilitle",filters:"Filtreler",search:"ara",
   search_secrets:"🔎 ara: ad, url, etiket, not…",all_types:"tüm tipler",new_secret:"+ Yeni Sır",
-  th_name:"Ad",th_type:"Tip",th_scope:"Kapsam (tenant/proje/ortam/repo)",th_tags:"Etiketler",th_updated:"Güncellendi",th_actions:"İşlemler",
+  th_name:"Ad",th_type:"Tip",th_scope:"Kapsam (tenant/proje/ortam/repo)",th_tags:"Etiketler",th_updated:"Güncellendi",th_created:"Oluşturuldu",th_actions:"İşlemler",
   no_records:"kayıt yok",records:"kayıt",view:"Görüntüle",edit:"Düzenle",del:"Sil",more:"Daha fazla",per_page:"sayfa başına",
   del_confirm:s=>`"${s}" silinsin mi?`,deleted:"silindi",saved:"kaydedildi",created:"oluşturuldu",updated:"güncellendi",
   copied:`kopyalandı — ${CLIP_CLEAR}s sonra pano temizlenecek`,copy_fail:"kopyalanamadı (izin?)",
@@ -799,7 +889,21 @@ const I18N={
   generate:"🎲 Üret",generate_title:"Parola / Sır Üret",gen_format:"format",gen_password:"parola",gen_hex:"hex token",
   gen_b64:"base64url token",gen_length:"uzunluk",gen_classes:"karakter sınıfları",gen_result:"üretilen değer",
   gen_regen:"yeniden üret",gen_save:"concealer'a Kaydet",
-  settings:"Ayarlar",settings_tab:"Ayarlar",confirm:"Onayla",set_idle:"Otomatik kilit (saniye)",set_confirm:"Şu işlemlerden önce master parola sor",
+  settings:"Ayarlar",settings_tab:"Ayarlar",confirm:"Onayla",set_idle:"Otomatik kilit",pk_unlock:"Passkey / Touch ID ile aç",pk_title:"Passkey / Touch ID",
+  pk_hint:"Master parola yazmak yerine parmak izi, Windows Hello, güvenlik anahtarı ya da macOS'un izin verdiği yerde Apple Watch ile aç. Master parola çalışmaya devam eder. Passkey'ler http://localhost adresine bağlıdır; gerekirse sayfa oraya geçer.",
+  pk_add:"Bu cihaza passkey ekle",pk_remove:"Kaldır",pk_none:"Henüz passkey yok.",pk_added:"✓ Passkey eklendi",pk_fail:"Passkey ile açılamadı",
+  pk_noprf:"Bu tarayıcı ya da kimlik doğrulayıcı gerekli passkey özelliğini (PRF) desteklemiyor — Chrome'u güncelle ya da başka bir passkey dene",pk_unsupported:"Bu tarayıcı passkey desteklemiyor",saved_while_locked:n=>`✓ Kilitliyken kaydedilen ${n} giriş bilgisi vault'a eklendi`,
+  sg_security:"Güvenlik ve kilit",sg_security_hint:"Vault ne zaman kendini kilitlesin, hangi işlemler master parola istesin.",
+  idle_min:n=>n+" dakika boşta kalınca",idle_h:n=>n+" saat boşta kalınca",idle_custom:"Özel (saniye)",
+  sg_look:"Görünüm",sg_look_hint:"Tema ve dil bu tarayıcıda hemen uygulanır.",set_theme:"Tema",set_lang:"Dil",th_dark:"Koyu",th_light:"Açık",
+  sg_agents:"AI agent'lar (MCP)",sg_agents_cli:"Agent ekle: cer agent install (ya da cer agent register AD) · kaldır: cer agent revoke AD",
+  sg_ext:"Tarayıcı eklentisi",sg_ext_hint:"Chrome eklentisi giriş formlarını vault'tan doldurur ve senin yazdığın girişleri kaydetmeyi önerir (AWS hesap ID'si gibi ekstra alanlarla birlikte). Elle kaydetmek için: sayfada sağ tık → “Save sign-in to concealer” ya da eklentideki 💾. Tek seferlik kurulum: cer chrome-extension. Pano temizleme ve eklentinin kendi oto-kilidi eklentinin ⚙ menüsünde.",
+  sg_int:"Entegrasyonlar",anc_title:"Denetim kaydı çapası",anc_hint:"Denetim zincirinin son hash'ini bu makinenin dışına da yazar; kayıt baştan sahtelense bile fark edilir. Yalnızca sıra numarası ve hash gider, hiçbir secret gitmez. Gönderimi cer audit anchor yapar (cron'dan çalıştır).",
+  anc_file:"Dosya (başka disk ya da makine)",anc_syslog:"Syslog'a da yaz",
+  sg_sync:"Senkronizasyon",sg_sync_hint:"Makineleri bir kez cer pair HOST ile eşle, sonra cer sync HOST ile eşitle. Mobil uygulama da bu vault ile aynı şekilde eşitlenir.",
+  sync_del:"Diğer cihazlarda silinen kayıtları burada da sil",sync_del_hint:"Kapalıyken başka yerde silinen kayıt burada kalır (kazara toplu silmeye karşı güvenli varsayılan).",
+  sg_about:"Hakkında",about_ver:"Sürüm",about_key:"Vault anahtarı",key_hard:"master parolayla korunuyor ✓",key_soft:"diskte korumasız — cer harden çalıştır",
+  about_cli:"Master parolayı değiştir: cer passwd (kurtarma kodu ister) · yeni kurtarma kodları: cer recovery",set_confirm:"Şu işlemlerden önce master parola sor",
   set_limits:"MCP erişim limitleri (toplu-sızma engeli)",
   set_limits_hint:"AI ajanlar secret'ları yalnız kayıtlı bir agent token'ıyla okuyabilir. Çağrı başı tek yanıtı, pencere kotası ise bir ajanın pencere içinde açabileceği DISTINCT secret sayısını sınırlar — tekrarlı sorgularla tüm vault toplanamaz. Bir ajanı tamamen engellemek için pencere kotasını 0 yap.",
   lim_who:"Kim",lim_default:"Varsayılan (tüm ajanlar)",lim_per_call:"Çağrı başı",lim_quota:"Pencere kotası (distinct)",lim_window:"Pencere (sn)",
@@ -837,7 +941,7 @@ const I18N={
   login_sub:"The local-only secret manager for the AI-coding era.",master_pw:"Master password",unlock:"Unlock",
   wrong_pw:"Wrong master password.",locked_wait:s=>`Too many wrong attempts — wait ${s}s.`,secrets:"Secrets",audit_log:"Audit Logs",lock:"🔒 Lock",filters:"Filters",search:"search",
   search_secrets:"🔎 search: name, url, tag, notes…",all_types:"all types",new_secret:"+ New Secret",
-  th_name:"Name",th_type:"Type",th_scope:"Scope (tenant/project/env/repo)",th_tags:"Tags",th_updated:"Updated",th_actions:"Actions",
+  th_name:"Name",th_type:"Type",th_scope:"Scope (tenant/project/env/repo)",th_tags:"Tags",th_updated:"Updated",th_created:"Created",th_actions:"Actions",
   no_records:"no records",records:"records",view:"View",edit:"Edit",del:"Delete",more:"More",per_page:"per page",
   del_confirm:s=>`Delete "${s}"?`,deleted:"deleted",saved:"saved",created:"created",updated:"updated",
   copied:`copied — clipboard clears in ${CLIP_CLEAR}s`,copy_fail:"copy failed (permission?)",
@@ -906,7 +1010,21 @@ const I18N={
   generate:"🎲 Generate",generate_title:"Generate Password / Secret",gen_format:"format",gen_password:"password",gen_hex:"hex token",
   gen_b64:"base64url token",gen_length:"length",gen_classes:"character classes",gen_result:"generated value",
   gen_regen:"regenerate",gen_save:"Save to concealer",
-  settings:"Settings",settings_tab:"Settings",confirm:"Confirm",set_idle:"Auto-lock (seconds)",set_confirm:"Ask master password before",
+  settings:"Settings",settings_tab:"Settings",confirm:"Confirm",set_idle:"Auto-lock",pk_unlock:"Unlock with passkey / Touch ID",pk_title:"Passkey / Touch ID",
+  pk_hint:"Unlock with your fingerprint, Windows Hello, a security key, or an Apple Watch where macOS allows it, instead of typing the master password. The master password keeps working. Passkeys belong to http://localhost; this page switches there when needed.",
+  pk_add:"Add a passkey on this device",pk_remove:"Remove",pk_none:"No passkeys yet.",pk_added:"✓ Passkey added",pk_fail:"Couldn't unlock with the passkey",
+  pk_noprf:"This browser or authenticator doesn't support the passkey feature this needs (PRF). Update Chrome or try another passkey",pk_unsupported:"This browser doesn't support passkeys",saved_while_locked:n=>`✓ ${n} sign-in(s) saved while locked were added to the vault`,
+  sg_security:"Security & lock",sg_security_hint:"When the vault locks itself and which actions ask for the master password.",
+  idle_min:n=>"After "+n+" minute"+(n>1?"s":"")+" idle",idle_h:n=>"After "+n+" hour"+(n>1?"s":"")+" idle",idle_custom:"Custom (seconds)",
+  sg_look:"Appearance",sg_look_hint:"Theme and language apply right away, in this browser.",set_theme:"Theme",set_lang:"Language",th_dark:"Dark",th_light:"Light",
+  sg_agents:"AI agents (MCP)",sg_agents_cli:"Add an agent: cer agent install (or cer agent register NAME) · remove: cer agent revoke NAME",
+  sg_ext:"Browser extension",sg_ext_hint:"The Chrome extension fills sign-ins from the vault and offers to save the ones you type, extra fields such as an AWS account ID included. To save by hand: right-click the page → “Save sign-in to concealer”, or 💾 in the extension. One-time setup: cer chrome-extension. Clipboard clearing and the extension's own auto-lock are in the extension's ⚙ menu.",
+  sg_int:"Integrations",anc_title:"Audit log anchor",anc_hint:"Copies the audit chain's latest hash off this machine, so even a full rewrite of the log gets caught. Only a sequence number and a hash leave, never a secret. cer audit anchor sends it (run it from cron).",
+  anc_file:"File (another disk or machine)",anc_syslog:"Also write to syslog",
+  sg_sync:"Sync",sg_sync_hint:"Pair machines once with cer pair HOST, then keep them in step with cer sync HOST. The mobile app syncs with this vault the same way.",
+  sync_del:"Apply deletions made on other devices",sync_del_hint:"Off: a record deleted elsewhere stays here (safe default against an accidental mass delete).",
+  sg_about:"About",about_ver:"Version",about_key:"Vault key",key_hard:"protected by the master password ✓",key_soft:"unprotected on disk — run cer harden",
+  about_cli:"Change the master password: cer passwd (needs a recovery code) · new recovery codes: cer recovery",set_confirm:"Ask master password before",
   set_limits:"MCP access limits (anti-bulk-exfiltration)",
   set_limits_hint:"AI agents may only read secrets through a registered agent token. Per call caps a single response; the window quota caps how many distinct secrets an agent may reveal within the window — repeated queries can't reassemble the whole vault. Set the window quota to 0 to fully block an agent.",
   lim_who:"Who",lim_default:"Default (all agents)",lim_per_call:"Per call",lim_quota:"Window quota (distinct)",lim_window:"Window (sec)",
@@ -956,6 +1074,7 @@ function setLang(l){
   LANG=l; localStorage.setItem('concealer_lang',l); document.documentElement.lang=l;
   document.getElementById('lang-tr').classList.toggle('active',l==='tr');
   document.getElementById('lang-en').classList.toggle('active',l==='en');
+  document.querySelectorAll('[data-lg]').forEach(b=>b.classList.toggle('active',b.dataset.lg===l));
   applyStatic();
   if(!$('#app').classList.contains('hidden')){
     rebuildSelects(); FDIMS.forEach(renderMsel);
@@ -1025,9 +1144,77 @@ function tagChip(name){
 let _lockTimer=null;
 async function unlock(){
   const r=await fetch('/api/unlock',{method:'POST',body:JSON.stringify({pw:$('#pw').value})});
-  if(r.ok){ $('#pw').value=''; $('#loginerr').textContent=''; lockCountdown(0); showApp(); return; }
+  return afterUnlock(r);
+}
+async function afterUnlock(r){
+  if(r.ok){ const j=await r.json().catch(()=>({})); $('#pw').value=''; $('#loginerr').textContent=''; lockCountdown(0); await showApp();
+    if(j.saved_while_locked) toast(t('saved_while_locked',j.saved_while_locked)); return; }
   if(r.status===429){ const d=await r.json().catch(()=>({})); lockCountdown(d.retry_after||300); return; }
   $('#loginerr').textContent=t('wrong_pw');
+}
+// ---------- passkey (WebAuthn PRF): Touch ID / Windows Hello / security key ----------
+// The authenticator turns (credential, salt) into a secret only after the fingerprint/PIN; the
+// server unwraps the vault key with it. Passkeys are bound to "localhost" (an IP can't hold one),
+// so 127.0.0.1 / concealer.localhost hop over to http://localhost:<port> first.
+const b64u=buf=>btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const unb64u=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
+const PK_HOST=()=>location.hostname==='localhost';
+const pkGoLocal=q=>{ location.href=`http://localhost:${location.port}/${q}`; };
+async function pkRefresh(){
+  try{ const o=await (await fetch('/api/passkeys/options')).json(); $('#pkbtn').hidden=!(o.length&&window.PublicKeyCredential); return o; }catch(e){ return []; }
+}
+async function passkeyUnlock(){
+  if(!PK_HOST()) return pkGoLocal('?passkey=1');
+  const opts=await pkRefresh(); if(!opts.length) return;
+  try{
+    const c=await navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rpId:'localhost',userVerification:'required',
+      allowCredentials:opts.map(o=>({type:'public-key',id:unb64u(o.cred)})),
+      extensions:{prf:{evalByCredential:Object.fromEntries(opts.map(o=>[o.cred,{first:unb64u(o.salt)}]))}}}});
+    const first=c.getClientExtensionResults().prf?.results?.first;
+    if(!first){ $('#loginerr').textContent=t('pk_noprf'); return; }
+    const r=await fetch('/api/unlock',{method:'POST',body:JSON.stringify({passkey:b64u(c.rawId),secret:b64u(first)})});
+    if(!r.ok&&r.status!==429){ $('#loginerr').textContent=t('pk_fail'); return; }
+    return afterUnlock(r);
+  }catch(e){ if(e.name!=='NotAllowedError')$('#loginerr').textContent=t('pk_fail')+' ('+e.message+')'; }   // NotAllowed = user cancelled
+}
+async function loadPasskeys(){
+  const r=await api('/api/passkeys'); const l=r.ok?await r.json():[];
+  $('#pk_list').innerHTML=l.length?l.map(p=>`<div class="pkrow"><span>👆 ${esc(p.name)}</span><span class="mut">${esc(fmtTs(p.created))}</span>
+    <button class="ghost" onclick="passkeyRemove('${esc(p.label)}')">${t('pk_remove')}</button></div>`).join(''):`<p class="mut">${t('pk_none')}</p>`;
+}
+function passkeyAdd(){
+  if(!window.PublicKeyCredential){ toast(t('pk_unsupported')); return; }
+  if(!PK_HOST()) return pkGoLocal('?v=settings');
+  askPw(t('pk_add'),async pw=>{
+    const salt=crypto.getRandomValues(new Uint8Array(32));
+    try{
+      const c=await navigator.credentials.create({publicKey:{rp:{id:'localhost',name:'concealer'},
+        user:{id:crypto.getRandomValues(new Uint8Array(16)),name:'concealer vault',displayName:'concealer vault'},
+        challenge:crypto.getRandomValues(new Uint8Array(32)),pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+        authenticatorSelection:{residentKey:'preferred',userVerification:'required'},extensions:{prf:{eval:{first:salt}}}}});
+      const p=c.getClientExtensionResults().prf||{};
+      if(p.enabled===false){ toast(t('pk_noprf')); return; }
+      let first=p.results?.first;
+      if(!first){   // most authenticators only evaluate the PRF on a sign-in, not at creation
+        const g=await navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rpId:'localhost',userVerification:'required',
+          allowCredentials:[{type:'public-key',id:c.rawId}],extensions:{prf:{eval:{first:salt}}}}});
+        first=g.getClientExtensionResults().prf?.results?.first;
+      }
+      if(!first){ toast(t('pk_noprf')); return; }
+      const name=(navigator.userAgentData&&navigator.userAgentData.platform)||(/Mac/.test(navigator.platform)?'macOS':navigator.platform)||'this device';
+      const r=await api('/api/passkeys',{method:'POST',body:JSON.stringify({pw,name,cred:b64u(c.rawId),salt:b64u(salt),secret:b64u(first)})});
+      if(r.status===403){ toast(t('wrong_pw')); return; }
+      const j=await r.json(); if(!r.ok){ toast(j.error||t('pk_fail')); return; }
+      toast(t('pk_added')); loadPasskeys();
+    }catch(e){ if(e.name!=='NotAllowedError')toast(t('pk_fail')+' ('+e.message+')'); }
+  });
+}
+function passkeyRemove(label){
+  askPw(t('pk_remove'),async pw=>{
+    const r=await api('/api/passkeys/remove',{method:'POST',body:JSON.stringify({pw,label})});
+    if(r.status===403){ toast(t('wrong_pw')); return; }
+    toast(t('deleted')); loadPasskeys();
+  });
 }
 // Disable the login for `secs` seconds after too many wrong passwords, ticking down a message.
 function lockCountdown(secs){
@@ -1039,7 +1226,7 @@ function lockCountdown(secs){
   if(btn)btn.disabled=true; if(pw)pw.disabled=true; tick(); _lockTimer=setInterval(tick,1000);
 }
 async function lock(){ await fetch('/api/lock',{method:'POST'}); showLogin(); }
-function showLogin(){ clearInterval(idleTimer); stopAutofillPoll(); closeModal(); $('.menu').classList.remove('open'); $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#pw').focus(); history.replaceState({}, '', location.pathname); }
+function showLogin(){ clearInterval(idleTimer); stopAutofillPoll(); closeModal(); $('.menu').classList.remove('open'); $('#app').classList.add('hidden'); $('#login').classList.remove('hidden'); $('#pw').focus(); pkRefresh().then(o=>{ if(o.length&&new URLSearchParams(location.search).has('passkey'))passkeyUnlock(); }); history.replaceState({}, '', location.pathname); }
 async function showApp(startSecs){
   $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
   TYPES=await (await api('/api/types')).json();
@@ -1178,12 +1365,46 @@ function askPwFor(title, label, cb){
 // ---------- settings ----------
 async function loadSettings(){
   const s=await (await api('/api/settings')).json(); window.CFG=s;
-  $('#set_idle').value=s.idle;
+  idleSelFill(s.idle);
+  renderLimits(s); loadPasskeys();
+  const a=s.audit_anchor||{}; $('#anc_file').value=a.file||''; $('#anc_webhook').value=a.webhook||''; $('#anc_syslog').checked=!!a.syslog;
+  $('#sync_del').checked=!!s.sync_accept_remote_deletes;
+  $('#about_ver').textContent='v'+(s.version||'');
+  $('#about_key').innerHTML=s.hardened===false?`<span style="color:var(--bad)">${t('key_soft')}</span>`:`<span style="color:var(--ok)">${t('key_hard')}</span>`;
+  setTheme(localStorage.getItem('concealer_theme')||'dark'); document.querySelectorAll('[data-lg]').forEach(b=>b.classList.toggle('active',b.dataset.lg===LANG));
   $('#set_confirm').innerHTML=['export','delete','settings','create','update'].map(o=>
     `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="cop" value="${o}" ${s.confirm_ops.includes(o)?'checked':''} style="width:auto"> ${esc(actLabel(o))}</label>`).join('');
   if($('#set_hibp')){ $('#set_hibp').value=''; $('#hibp_set').textContent=s.hibp_key_set?t('bk_pw_isset'):t('bk_pw_unset'); }
   loadBackup();
 }
+// auto-lock: presets (same steps as the mobile app, plus longer ones) or a custom number of seconds
+const IDLE_STEPS=[60,120,300,600,900,1800,3600,14400,28800];
+function idleLabel(v){ return v<3600?t('idle_min',v/60):t('idle_h',v/3600); }
+function idleSelFill(v){
+  const sel=$('#set_idle_sel');
+  sel.innerHTML=IDLE_STEPS.map(x=>`<option value="${x}">${idleLabel(x)}</option>`).join('')+`<option value="">${t('idle_custom')}</option>`;
+  sel.value=IDLE_STEPS.includes(v)?String(v):''; $('#set_idle').value=v; idleSelChanged();
+}
+// jump nav scrolls without touching location (history entries carry the tab state)
+function setJump(e){ const a=e.target.closest('a'); if(!a)return; e.preventDefault(); $(a.getAttribute('href')).scrollIntoView({behavior:'smooth',block:'start'}); }
+function idleSelChanged(){ const v=$('#set_idle_sel').value; $('#set_idle').hidden=!!v; if(v)$('#set_idle').value=v; }
+function postSettings(extra){
+  askPw(t('settings'),async pw=>{
+    const r=await api('/api/settings',{method:'POST',body:JSON.stringify(Object.assign({pw},extra))});
+    if(r.status===403){toast(t('wrong_pw'));return;}
+    window.CFG=await r.json(); toast(t('saved'));
+  });
+}
+function saveIntegrations(){
+  const hibp=$('#set_hibp').value, extra={audit_anchor:{file:$('#anc_file').value,webhook:$('#anc_webhook').value,syslog:$('#anc_syslog').checked}};
+  if(hibp)extra.hibp_key=hibp;
+  askPw(t('settings'),async pw=>{
+    const r=await api('/api/settings',{method:'POST',body:JSON.stringify(Object.assign({pw},extra))});
+    if(r.status===403){toast(t('wrong_pw'));return;}
+    window.CFG=await r.json(); $('#set_hibp').value=''; $('#hibp_set').textContent=window.CFG.hibp_key_set?t('bk_pw_isset'):t('bk_pw_unset'); toast(t('saved'));
+  });
+}
+function saveSync(){ postSettings({sync_accept_remote_deletes:$('#sync_del').checked}); }
 async function loadBackup(){
   if(!$('#bk_enabled'))return;                       // eski sunucu / bu bolum yok → sessizce gec
   const r=await api('/api/backup'); if(!r.ok)return; // eski sunucu 404 → sekmeyi bozma (sunucuyu yeniden baslat)
@@ -1296,7 +1517,6 @@ let POLS=[];
 async function loadPolicies(){
   const pd=await (await api('/api/policies')).json(); POLS=pd.policies||[];
   polRender(); updatePolicyBadge();
-  const s=await (await api('/api/settings')).json(); window.CFG=s; renderLimits(s);   // MCP erisim limitleri = agent policy'si
 }
 function polKindLabel(k){ return t('pk_'+k); }
 function polRender(){
@@ -1425,13 +1645,11 @@ async function policyNotifyCheck(){
 function saveSettings(){
   const idle=Math.max(30,Math.min(86400,parseInt($('#set_idle').value)||300));
   const ops=[...document.querySelectorAll('.cop:checked')].map(c=>c.value);
-  const hibp=$('#set_hibp')?$('#set_hibp').value:'';   // bos = degistirme (gonderme)
   askPw(t('settings'),async pw=>{
-    const payload={pw,idle,confirm_ops:ops}; if(hibp)payload.hibp_key=hibp;
+    const payload={pw,idle,confirm_ops:ops};
     const r=await api('/api/settings',{method:'POST',body:JSON.stringify(payload)});
     if(r.status===403){toast(t('wrong_pw'));return;}
-    window.CFG=await r.json(); idleLeft=window.CFG.idle;
-    if($('#set_hibp')){ $('#set_hibp').value=''; $('#hibp_set').textContent=window.CFG.hibp_key_set?t('bk_pw_isset'):t('bk_pw_unset'); }
+    window.CFG=await r.json(); idleLeft=window.CFG.idle; idleSelFill(window.CFG.idle);
     toast(t('saved'));
   });
 }
@@ -1935,7 +2153,8 @@ async function doDeploy(){
 }
 
 // ---------- grid ortak yardimcilari (secrets/audit/leaks model-driven gridleri kullanir) ----------
-function gridCmp(a,b){ const na=parseFloat(a.replace(/[^\d.\-]/g,'')),nb=parseFloat(b.replace(/[^\d.\-]/g,''));
+function gridCmp(a,b){ if(/^\d{4}-\d\d-\d\d/.test(a)&&/^\d{4}-\d\d-\d\d/.test(b))return a<b?-1:a>b?1:0;   // ISO dates sort lexically
+  const na=parseFloat(a.replace(/[^\d.\-]/g,'')),nb=parseFloat(b.replace(/[^\d.\-]/g,''));
   if(!isNaN(na)&&!isNaN(nb)&&/\d/.test(a)&&/\d/.test(b))return na-nb; return a.localeCompare(b,undefined,{numeric:true}); }
 function gridRz(e,h,done){ e.preventDefault(); e.stopPropagation(); const sx=e.pageX, sw=h.offsetWidth;
   const mv=ev=>h.style.width=Math.max(50,sw+ev.pageX-sx)+'px';
@@ -1960,6 +2179,7 @@ function scBaseCols(){ return [
   {k:'scope',   l:t('th_scope'),   cls:'mut mono', v:e=>DIMS.map(d=>e[d]||'*').join('/'), r:e=>DIMS.map(d=>esc(e[d]||'*')).join(' / ')},
   {k:'tags',    l:t('th_tags'),    v:e=>(e.tags||[]).join(','), r:e=>(e.tags||[]).map(tagChip).join('')},
   {k:'updated', l:t('th_updated'), cls:'mut', v:e=>e.updated||'', r:e=>fmtTs(e.updated)},
+  {k:'created', l:t('th_created'), cls:'mut', v:e=>e.created||'', r:e=>fmtTs(e.created)},
   {k:'access',  l:t('th_access'),  cls:'mut', st:'font-size:12px', v:e=>e.access?e.access.ts:'', r:e=>e.access?fmtTs(e.access.ts)+' '+tagChip(e.access.source)+(e.access.actor?' '+esc(e.access.actor):''):t('never')},
 ]; }
 function scFieldCols(){   // kayitlardaki tum field adlari (custom dahil: web_url, host, username…)
@@ -1977,14 +2197,16 @@ function scAllCols(){ return scBaseCols().concat(scFieldCols()); }
 // until the user opts them in (no more auto-flood of dozens of field columns).
 function scShownSet(){
   const raw=localStorage.getItem('sc_col_shown');
-  if(raw!=null)return new Set(JSON.parse(raw));
+  if(raw!=null){ const s=new Set(JSON.parse(raw));
+    if(!localStorage.getItem('sc_col_created')){ s.add('created'); localStorage.setItem('sc_col_shown',JSON.stringify([...s])); localStorage.setItem('sc_col_created','1'); }   // one-time: show the new Created column for existing layouts
+    return s; }
   return new Set(scBaseCols().map(c=>c.k));
 }
 function scCols(){
   const all=scAllCols(), byk=Object.fromEntries(all.map(c=>[c.k,c]));
   const order=JSON.parse(localStorage.getItem('sc_col_order')||'[]'), shown=scShownSet();
   const out=[]; order.forEach(k=>{ if(byk[k]){out.push(byk[k]);delete byk[k];} });
-  all.forEach(c=>{ if(byk[c.k])out.push(c); });   // yeni/kaydedilmemis kolonlar dogal sirada
+  all.forEach((c,i)=>{ if(!byk[c.k])return; const j=i?out.indexOf(all[i-1]):-1; out.splice(j<0?out.length:j+1,0,c); });   // unsaved columns land right after their natural predecessor
   out.forEach(c=>c.hidden=!shown.has(c.k));
   return out;
 }
@@ -2228,6 +2450,7 @@ function setTheme(name){
   else document.documentElement.setAttribute('data-theme',name);
   localStorage.setItem('concealer_theme',name);
   ['dark','light','matrix'].forEach(n=>{const b=$('#theme-'+n);if(b)b.classList.toggle('active',n===name);});
+  document.querySelectorAll('[data-th]').forEach(b=>b.classList.toggle('active',b.dataset.th===name));
 }
 // hizli donem secimi (audit + stats). ms=null => tumu.
 const PERIODS=[{k:'30m',ms:1800000},{k:'1h',ms:3600000},{k:'6h',ms:21600000},{k:'24h',ms:86400000},

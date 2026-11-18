@@ -9,10 +9,114 @@ the same version line. Dates are UTC.
 
 ## [1.2.1] — 2026-11-17
 
+### Added
+
+- The Chrome extension offers to **save sign-ins** you type, password-manager style: after you
+  sign in, a prompt asks to save the site (or to update the password when it changed). Extra
+  fields on the page, such as the AWS console's account ID, come along, and you can add more
+  before saving. Multi-step sign-ins (account → username → password) are merged into one record.
+  "Never for this site" stops the prompt for that site.
+- Filling a sign-in now fills every field of the record: each saved field name is looked up on
+  the page (label, name or id) and that field gets the value, so region, account ID or any other
+  extra field you saved comes back. The password only ever goes into the password box.
+- **Unlock with a passkey: Touch ID, Windows Hello, a security key, or an Apple Watch where
+  macOS allows it.** Add one in Settings → Security & lock (master password once), then use
+  "Unlock with passkey / Touch ID" on the unlock screen or 👆 in the extension. The passkey is one
+  more key slot, like an agent token: after the fingerprint the authenticator produces a secret
+  (WebAuthn PRF) that unwraps the vault key; the secret is never stored and the master password
+  keeps working. Passkeys belong to `http://localhost`, so the page switches there when opened on
+  127.0.0.1. Needs a browser with PRF support (current Chrome, Edge, Safari).
+- Mobile app: **unlock with Face ID, Touch ID or fingerprint.** Turn it on in Settings →
+  Security & lock; the app then asks for your face or finger at launch and when you come back to
+  it. The master password is kept in the phone's secure hardware (iOS Keychain / Android Keystore)
+  and released only after a match; enrolling a new face or finger turns it off. The cursor goes
+  straight to the master password box, Enter unlocks, and Settings is grouped into Security & lock,
+  Sync, Appearance and About like the web UI.
+- The extension can join a vault that is already unlocked in the browser (used after a passkey
+  unlock), so it doesn't ask for the master password a second time.
+- **Saving a sign-in never asks for the master password.** While the vault is locked, the sign-in
+  is encrypted to the vault's public key (no unlock needed, nothing in plaintext on disk) and
+  waits in `keys/pending/`; the next unlock adds every waiting sign-in and says how many. If the
+  vault is open in the web UI, it is saved straight away. Only the extension can do this (the
+  request must come from a trusted extension ID, which a web page can't fake), and it returns no
+  vault data.
+- **Save a sign-in by hand**: right-click any page → "Save sign-in to concealer", or 💾 in the
+  extension. It takes what is typed on the page right now, and every field stays editable.
+- AWS's new sign-in host (`*.signin.aws`) matches records saved for the older
+  `signin.aws.amazon.com` host, and the other way round.
+- `./dev.sh` (or `npm run dev`) runs this checkout as a separate development instance: port 18787,
+  its own vault in `~/.concealer-dev` with sample data, master password `demo`. The extension's ⚙
+  menu has an **App port** setting to point it at that instance.
+- A **Created** column in the secrets list, shown by default next to Updated and sortable.
+  The app's sort menu gains "Created" too.
+
+### Changed
+
+- **Faster opening on a big vault.** The web UI and the extension popup now open almost
+  instantly on a vault with hundreds of secrets (the requests fired on open went from ~1 s to
+  ~20 ms on 480 records). While the vault is unlocked in the web app, the decrypted vault stays
+  in its memory until the file changes, so each open no longer decrypts it again; locking or the
+  idle lock drops it. The last-access column no longer re-reads the whole audit log on every list.
+
+- **Settings** is reorganised into sections with a side menu: Security & lock, Appearance, AI
+  agents (MCP), Browser extension, Integrations, Sync, Portability, Backup and About. Auto-lock is
+  now a list of durations (or a custom number of seconds). The MCP access limits moved here from
+  the Policy tab. Two options that were CLI-only can now be set here too: the audit log anchor and
+  whether deletions from synced devices are applied. Theme and language can be changed here as
+  well as from the header.
+- The mobile app's auto-lock list gains 15 minutes, 30 minutes and 1 hour.
+- The extension's on-page autofill menu shows the concealer logo instead of the lock emoji.
+
 ### Fixed
 
 - Web UI: the secrets table header no longer paints over the open filter dropdowns
   (Type, Collection, Tenant, …), which blocked their search box and options.
+- Sorting the secrets list by a date column (Updated, Last access) did nothing: every row
+  compared equal. Dates now sort in order.
+- The filter dropdowns (Type, Collection, …) are no longer covered by the list's table header.
+- The extension no longer opens its autofill menu on concealer's own unlock page.
+- After a successful fill the extension no longer warns that the password was "copied into another
+  field" when that field is one concealer filled itself (a username equal to the password). Success
+  messages are green and errors red.
+- Right-click → "Fill with concealer" now works anywhere on the page, not only on an input field.
+- The extension's master password boxes (popup and the on-page unlock) get the cursor as soon as
+  they appear, and the on-page unlock no longer sits on "unlocking…" after a successful unlock.
+- When a site has no saved sign-in, the extension's on-page menu says so and offers to save one.
+- Sites on `localhost` or an IP address are matched by their full host (an IP used to be cut to
+  its last two numbers, e.g. "0.1").
+- The extension's helper no longer stops a newer concealer, or one on another port, that happens
+  to be running: it only replaces an older copy of itself on the default port.
+- Sign-in matching no longer treats every `.com.tr` site (or every `*.herokuapp.com`,
+  `*.github.io`, `*.vercel.app` … app) as the same site. Two-label suffixes and shared hosts
+  now count one more label, in the app and the extension alike.
+- Records saved with the service URL now match the company's separate sign-in host: Office 365
+  (`login.microsoftonline.com`), ChatGPT (`auth.openai.com`), Gmail (`accounts.google.com`),
+  iCloud, Proton.
+- Multi-step sign-ins whose password step moves to a sibling host of the same company
+  (`login.microsoftonline.com` → `login.microsoft.com`) now get the password filled too.
+- The on-page menu was slow or missing after the app had been idle for 15 minutes: the
+  background service now brings the web instance back within ~5 s instead of up to 60 s, and
+  the menu starts the app itself (then retries) when it finds it down. The in-page unlock no
+  longer spawns the native helper when the app is already running.
+- The in-page unlock box no longer logs a "Blocked autofocusing" error on the extensions page.
+- An agent's `request_web_login` could drop the connection ("app isn't reachable") when one
+  browser session had locked while another was still open: the request now uses a live
+  session's key and never exits the handler on a decrypt error.
+- The page menu no longer opens on ordinary inputs (search bars, a share dialog's "add user or
+  email" box). Without a password box on the page, a field must declare itself a credential
+  through its own name, id or autocomplete (user, email, login, account, tenant, alias); search
+  fields never count.
+- An approved agent fill is claimed exactly once (it could be delivered twice when two polls
+  raced).
+- After you approve an agent's sign-in request, the fill now starts right away instead of
+  waiting up to 30 s for the next background poll.
+- The page menu no longer asks for the master password again while the vault is still
+  unlocked. The popup's short countdown used to lock the menu too (and the popup re-locked the
+  vault when reopened after it ran out); now only the app's own idle-lock ends the session.
+- If the extension auto-locks between opening the menu and picking an entry, the menu reopens
+  with the unlock box instead of failing silently.
+- The in-page unlock box was blank on most sites: its frame was declared with a per-session
+  dynamic URL, which Chrome refuses to load from the extension's regular URL.
 
 ## [1.2.0] — 2026-11-16
 

@@ -81,9 +81,11 @@ running on localhost.
 - **notifications** —
   `Shows a browser notification when a sign-in request is waiting for the user's approval.`
 - **contextMenus** —
-  `Adds one right-click item, "Autofill with concealer", on editable fields so the user can choose a saved login for that field. Nothing is read from the page until the user picks it.`
+  `Adds two right-click items: "Fill with concealer" opens the list of saved logins for the page, and "Save sign-in to concealer" offers to save what the user typed into the page's login form. Nothing is read from the page until the user picks one.`
 - **Host permission `http://127.0.0.1:8787/*`, `http://localhost:8787/*`, `http://concealer.localhost:8787/*`** —
   `Communicates only with the user's own concealer server running locally. No remote hosts are contacted.`
+- **Optional host permission `http://127.0.0.1/*`** (requested only when the user changes ⚙ → App port) —
+  `Lets the extension talk to the user's own concealer running on a different local port (for example a development copy). Requested at that moment, never at install; no remote hosts are contacted.`
 - **Content script on `http://*/*`, `https://*/*`** —
   `Fills a login form on the current page only after the user approved that exact sign-in in the extension, and shows the approval banner on that page. It reads nothing from pages otherwise and sends no page data anywhere.`
 - **Remotely hosted code:** No.

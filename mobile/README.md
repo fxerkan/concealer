@@ -56,10 +56,16 @@ npm run open:ios          # build & run from Xcode / Android Studio
 `www/age.js` is committed pre‑bundled so the app runs without a build step during development;
 re‑run `npm run bundle:age` after bumping `age-encryption`.
 
+## Face ID / fingerprint unlock
+
+Settings → Security & lock → **Turn on Face ID / fingerprint unlock**. The master password goes into
+the device's secure hardware, readable only after a biometric match: iOS Keychain with
+`.biometryCurrentSet` (`ConcealerBiometric` plugin in `ios/App/App/AppDelegate.swift`), Android
+Keystore AES‑GCM key that needs a strong biometric per use (`BiometricPlugin.java`). Enrolling a new
+face/finger invalidates it and the app falls back to the master password.
+
 ## Not yet (deliberately deferred)
 
-- Biometric unlock (Face ID / fingerprint) — the bundle is already master‑password encrypted at
-  rest; add [`@capacitor/biometric`] later to gate the in‑memory unlock.
 - Reveal/copy affordances, field‑level masking parity with the web UI.
 - TR/EN localization (the web UI is bilingual; this app ships English first).
 - Background/auto sync — sync is manual (tap **Sync**) for now.

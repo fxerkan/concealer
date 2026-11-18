@@ -3,9 +3,9 @@
 // master password, then list secrets and copy field values. Token lives in
 // chrome.storage.session (memory-only) and is sent as X-Concealer-Token — the SPA's HttpOnly
 // cookie can't ride cross-origin fetches from an extension page.
-const PORT = 8787;                       // concealer default; matches manifest host_permissions
+let PORT = 8787;                         // concealer default (manifest host_permissions); another port is a dev instance (optional permission)
 const HOST = "com.concealer.host";       // native messaging host
-const BASE = `http://127.0.0.1:${PORT}`;
+let BASE = `http://127.0.0.1:${PORT}`;
 
 const $ = s => document.querySelector(s);
 let TOKEN = null, ROWS = [], _timer = null;
@@ -20,7 +20,9 @@ function toast(msg,kind){ const t=$("#toast"); t.textContent=msg; t.className="t
 // page it gets clipped. Grow <body> to the modal's height while it's open, reset on close.
 function fitModal(id){ const s=$("#"+id).querySelector(".sheet"); if(s) document.body.style.minHeight=(s.offsetHeight+28)+"px"; }  // offsetHeight forces sync layout
 function closeModal(id){ $("#"+id).hidden=true; document.body.style.minHeight=""; }
-function show(id){ for(const s of ["setup","unlock","list"]) $("#"+s).hidden = (s!==id); }
+function show(id){ for(const s of ["setup","unlock","list"]) $("#"+s).hidden = (s!==id);
+  if(id==="unlock"){ setTimeout(()=>$("#pw").focus(),0);   // the Touch ID button only when this vault has a passkey
+    fetch(BASE+"/api/passkeys/options").then(r=>r.json()).then(o=>{ $("#pkunlock").hidden=!o.length; }).catch(()=>{}); } }
 function setStatus(msg,err){ const s=$("#status"); s.textContent=msg||""; s.className="status"+(err?" err":""); }
 
 async function getToken(){ return (await chrome.storage.session.get("tok")).tok || null; }
@@ -28,7 +30,8 @@ async function setToken(t){ TOKEN=t; if(t) await chrome.storage.session.set({tok
 async function getDeadline(){ return (await chrome.storage.session.get("deadline")).deadline || 0; }
 async function setDeadline(ms){ if(ms) await chrome.storage.session.set({deadline:ms}); else await chrome.storage.session.remove("deadline"); }
 async function loadPrefs(){
-  const p=await chrome.storage.local.get(["clip","idle","reveal","theme"]);
+  const p=await chrome.storage.local.get(["clip","idle","reveal","theme","port"]);
+  if(p.port){ PORT=p.port; BASE=`http://127.0.0.1:${PORT}`; }
   CLIP_CLEAR = p.clip==null?20:p.clip;
   EXT_IDLE   = p.idle==null?60:p.idle;
   REVEAL_HIDE= p.reveal==null?10:p.reveal;
@@ -67,6 +70,8 @@ function startTimer(remaining){
 
 // ---- native host / server bring-up ----
 function ensureServer(){
+  // dev instance (⚙ App port): started by hand (./dev.sh); the installed helper must never start or replace it
+  if(PORT!==8787) return sessionUp().then(s=>s?{ok:true,running:true}:{ok:false,err:`nothing on port ${PORT} — start it with ./dev.sh`});
   return new Promise(res=>{
     try{
       chrome.runtime.sendNativeMessage(HOST, {cmd:"ensure", port:PORT}, resp=>{
@@ -115,7 +120,11 @@ async function boot(){
   } else w.hidden=true;
   if(s.unlocked){
     const dl=await getDeadline();
-    const extRem = dl ? (dl-Date.now())/1000 : effIdle();
+    // The vault is still open on the app side: a popup countdown that ran out while the popup was
+    // closed must not lock it (that re-prompted the page menu for the master password). Start a
+    // fresh popup countdown instead; the app's own idle-lock still applies.
+    let extRem = dl ? (dl-Date.now())/1000 : effIdle();
+    if(extRem<=0){ extRem=effIdle(); await setDeadline(Date.now()+extRem*1000); }
     const rem = Math.min(extRem, s.remaining||effIdle());
     if(rem<=0){ await autoLock(); return; }
     $("#lock").hidden=false; startTimer(rem); await loadSecrets();
@@ -130,7 +139,8 @@ async function unlock(){
     const j = await r.json();
     if(j.ok){ await setToken(j.tok); $("#pw").value=""; setStatus("");
       const rem=effIdle(); await setDeadline(Date.now()+rem*1000);
-      $("#lock").hidden=false; startTimer(rem); await loadSecrets(); }
+      $("#lock").hidden=false; startTimer(rem); await loadSecrets();
+      if(j.saved_while_locked) toast(`✓ ${j.saved_while_locked} sign-in(s) saved while locked were added`,"ok"); }
     else { setStatus("wrong password", true); }
   }catch(e){ setStatus("connection error", true); }
   finally{ $("#unlockbtn").disabled=false; }
@@ -198,7 +208,7 @@ async function afDecide(job,action,scope){
   try{
     if(action==="approve") await api("/api/autofill/approve",{method:"POST",body:JSON.stringify({job,scope})});
     else await api("/api/autofill/deny",{method:"POST",body:JSON.stringify({job})});
-    toast(action==="deny"?"denied":"approved");
+    toast(action==="deny"?"denied":"✓ approved", action==="deny"?"":"ok");
     chrome.runtime.sendMessage({type:"concealer-poll"}).catch(()=>{});   // nudge the worker to fill now
   }catch(e){}
   renderAutofill();
@@ -208,7 +218,13 @@ async function afDecide(job,action,scope){
 // The popup is the human owner's surface (like the web UI), so no agent/approval handshake —
 // the user clicked it. We match a website/login secret to the tab's domain, reveal its fields,
 // and hand them to the content script (value goes popup→content script→DOM, never off-box).
-function regDom(h){ const p=(h||"").split(".").filter(Boolean); return p.length>=2?p.slice(-2).join("."):(h||""); }
+const SUFFIX = new Set(["com.tr", "net.tr", "org.tr", "gen.tr", "web.tr", "gov.tr", "edu.tr", "k12.tr", "av.tr", "bel.tr", "co.uk", "org.uk", "ac.uk", "com.au", "co.jp", "com.br", "co.nz", "co.za", "com.cn", "herokuapp.com", "github.io", "vercel.app", "netlify.app", "pages.dev", "workers.dev", "web.app", "firebaseapp.com", "azurewebsites.net", "cloudfront.net", "appspot.com", "onrender.com", "fly.dev", "ngrok.io", "ngrok-free.app", "blogspot.com", "s3.amazonaws.com"]);   // same list as the app's _AF_SUFFIX
+function regDom(host) {         // eTLD+1, mirrors the app's registrable_domain()
+  const p = (host || "").toLowerCase().split(".").filter(Boolean);
+  if (p.length < 2) return host || "";
+  const n = SUFFIX.has(p.slice(-3).join(".")) ? 4 : SUFFIX.has(p.slice(-2).join(".")) ? 3 : 2;
+  return p.slice(-n).join(".");
+}
 function hostOf(u){ try{ return new URL(u).hostname; }catch(e){ return ""; } }
 async function activeTab(){ try{ const [t]=await chrome.tabs.query({active:true,currentWindow:true}); return t; }catch(e){ return null; } }
 async function refreshFillBtn(){
@@ -229,9 +245,9 @@ async function fillThisPage(btn,id,tabId){
   btn.disabled=true;
   try{
     const res=await chrome.runtime.sendMessage({type:"af-fill",id,tabId});
-    if(res&&res.ok) toast(res.exposed?"filled — ⚠ value copied into another field":res.partial?"✓ filled — the rest follows on the next step":"✓ filled", res.exposed?"warn":"ok");
+    if(res&&res.ok) toast(res.exposed?"filled — ⚠ the password also appeared in another field":res.partial?"✓ filled — the rest follows on the next step":"✓ filled", res.exposed?"warn":"ok");
     else toast("couldn't fill this page"+(res&&res.detail?" ("+res.detail+")":""), "warn");
-  }catch(e){ toast("fill failed — reload the page and retry"); }
+  }catch(e){ toast("fill failed — reload the page and retry","warn"); }
   finally{ btn.disabled=false; }
 }
 
@@ -308,14 +324,14 @@ async function fieldValue(e,fname){
 async function copyField(e,fname,btn,restore){
   try{
     const val=await fieldValue(e,fname);
-    if(val===""){ toast("no value to copy"); return; }
+    if(val===""){ toast("no value to copy","warn"); return; }
     await navigator.clipboard.writeText(val);
     api("/api/copy",{method:"POST",body:JSON.stringify({key:e.name,field:fname})}).catch(()=>{});
     btn.textContent="✓"; btn.classList.add("ok");
-    toast(CLIP_CLEAR>0 ? `copied ${fname||"value"} — clears in ${CLIP_CLEAR}s` : `copied ${fname||"value"}`);
+    toast(CLIP_CLEAR>0 ? `✓ copied ${fname||"value"} — clears in ${CLIP_CLEAR}s` : `✓ copied ${fname||"value"}`, "ok");
     if(CLIP_CLEAR>0) setTimeout(()=>navigator.clipboard.writeText("").catch(()=>{}), CLIP_CLEAR*1000);
     setTimeout(()=>{ btn.textContent=restore; btn.classList.remove("ok"); }, 2000);
-  }catch(err){ if(err.message!=="locked") toast("copy failed"); }
+  }catch(err){ if(err.message!=="locked") toast("copy failed","warn"); }
 }
 
 async function revealField(e,fname,fvEl,btn){
@@ -326,7 +342,7 @@ async function revealField(e,fname,fvEl,btn){
       fvEl.textContent=await fieldValue(e,fname); btn.textContent="🙈";
       if(REVEAL_HIDE>0) btn._h=setTimeout(()=>{ fvEl.textContent="••••••••"; btn.textContent="👁"; btn.classList.remove("on"); }, REVEAL_HIDE*1000);
     } else { fvEl.textContent="••••••••"; btn.textContent="👁"; }
-  }catch(err){ if(err.message!=="locked"){ toast("reveal failed"); btn.classList.remove("on"); } }
+  }catch(err){ if(err.message!=="locked"){ toast("reveal failed","warn"); btn.classList.remove("on"); } }
 }
 
 // ---- lock ----
@@ -367,12 +383,16 @@ async function openSettings(){
   $("#s_reveal").value=REVEAL_HIDE;
   $("#s_ver").innerHTML=`conceal<span class="ac">er</span> · v${chrome.runtime.getManifest().version}`;
   const info=$("#s_info");
-  info.innerHTML=`<div><span>Port</span><span>${PORT}</span></div><div><span>Server auto-lock</span><span>${IDLE?Math.round(IDLE/60)+" min":"—"}</span></div>`;
+  $("#s_port").value=PORT;
+  info.innerHTML=`<div><span>Server auto-lock</span><span>${IDLE?Math.round(IDLE/60)+" min":"—"}</span></div>`;
   $("#s_devcmd").textContent = "cer chrome-extension --add-id " + (chrome.runtime.id||"");
   $("#setModal").hidden=false; fitModal("setModal");
   try{ const s=await (await api("/api/settings")).json(); if(s&&"hardened"in s){ info.innerHTML+=`<div><span>Vault hardened</span><span>${s.hardened?"yes":"no"}</span></div>`; fitModal("setModal"); } }catch(e){}
 }
 async function saveSettings(){
+  let port=parseInt($("#s_port").value); if(isNaN(port)||port<1024||port>65535)port=8787;
+  // permissions.request needs the click's user gesture, so it runs before any await
+  const perm = port===8787 ? Promise.resolve(true) : chrome.permissions.request({origins:["http://127.0.0.1/*"]}).catch(()=>false);
   const maxIdle=IDLE||300;
   let clip=parseInt($("#s_clip").value); if(isNaN(clip)||clip<0)clip=0; if(clip>600)clip=600;
   let idle=parseInt($("#s_idle").value); if(isNaN(idle)||idle<10)idle=10; if(idle>maxIdle)idle=maxIdle;
@@ -381,16 +401,27 @@ async function saveSettings(){
   await chrome.storage.local.set({clip,idle,reveal:rev});
   $("#s_clip").value=clip; $("#s_idle").value=idle; $("#s_reveal").value=rev;
   if(TOKEN){ await setDeadline(Date.now()+idle*1000); startTimer(idle); }   // apply new idle immediately
+  if(port!==PORT){
+    if(!(await perm)){ toast("port not allowed","warn"); return; }
+    await chrome.storage.local.set({port}); await setToken(null); await setDeadline(0);   // the token belongs to the other app
+    location.reload();
+  }
 }
 
 // ---- wiring ----
 $("#unlockbtn").onclick=unlock;
+$("#pkunlock").onclick=()=>{ chrome.runtime.sendMessage({type:"af-passkey"}); window.close(); };
 $("#pw").addEventListener("keydown",e=>{ if(e.key==="Enter") unlock(); });
 $("#search").addEventListener("input",e=>render(e.target.value));
 $("#lock").onclick=lock;
 $("#openweb").onclick=openWeb;
 $("#brand").onclick=openWeb;
 $("#gen").onclick=openGen;
+$("#savepage").onclick=async()=>{   // the page's own prompt opens with what is typed there now
+  const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
+  if(!tab||!/^https?:/.test(tab.url||"")){ toast("Open a website first","warn"); return; }
+  chrome.tabs.sendMessage(tab.id,{type:"af-save-open"},{frameId:0}).then(()=>window.close(),()=>toast("Reload the page, then try again","warn"));
+};
 $("#genClose").onclick=()=>closeModal("genModal");
 $("#genModal").onclick=e=>{ if(e.target.id==="genModal") closeModal("genModal"); };
 $("#g_fmt").onchange=()=>{ genOpts(); regen(); };
@@ -400,11 +431,11 @@ $("#g_regen").onclick=regen;
 $("#g_copy").onclick=async()=>{
   const v=$("#g_out").value; if(!v) return;
   await navigator.clipboard.writeText(v);
-  toast(CLIP_CLEAR>0?`copied — clears in ${CLIP_CLEAR}s`:"copied");
+  toast(CLIP_CLEAR>0?`✓ copied — clears in ${CLIP_CLEAR}s`:"✓ copied","ok");
   if(CLIP_CLEAR>0) setTimeout(()=>navigator.clipboard.writeText("").catch(()=>{}),CLIP_CLEAR*1000);
 };
-$("#setupcopy").onclick=async()=>{ await navigator.clipboard.writeText($("#setupcmd").textContent); toast("copied command"); };
-$("#s_devcopy").onclick=async()=>{ await navigator.clipboard.writeText($("#s_devcmd").textContent); toast("copied command"); };
+$("#setupcopy").onclick=async()=>{ await navigator.clipboard.writeText($("#setupcmd").textContent); toast("✓ copied command","ok"); };
+$("#s_devcopy").onclick=async()=>{ await navigator.clipboard.writeText($("#s_devcmd").textContent); toast("✓ copied command","ok"); };
 for(const n of ["dark","light","matrix"]) $("#th_"+n).onclick=()=>setTheme(n);
 $("#settings").onclick=openSettings;
 $("#setClose").onclick=()=>{ saveSettings(); closeModal("setModal"); };

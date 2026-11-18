@@ -35,4 +35,6 @@
     <!-- Least-privilege: only INTERNET (sync with the host). NsdManager does mDNS discovery
          without an app-held multicast lock, so no Wi-Fi / multicast / network-state permissions. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Optional fingerprint / face unlock (BiometricPrompt); no data access. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 </manifest>
