@@ -61,9 +61,9 @@ Open source: https://github.com/fxerkan/concealer
 **Single purpose:**
 
 ```
-A companion UI for the locally-installed concealer secret manager: browse your vault and copy
-secret values from the Chrome toolbar. It communicates only with the user's own concealer server
-running on localhost.
+A companion UI for the locally-installed concealer secret manager: browse your vault, copy secret
+values, and fill or save website sign-ins from the user's own vault. It communicates only with the
+user's own concealer server running on localhost.
 ```
 
 **Permission justifications:**
@@ -87,7 +87,7 @@ running on localhost.
 - **Optional host permission `http://127.0.0.1/*`** (requested only when the user changes ⚙ → App port) —
   `Lets the extension talk to the user's own concealer running on a different local port (for example a development copy). Requested at that moment, never at install; no remote hosts are contacted.`
 - **Content script on `http://*/*`, `https://*/*`** —
-  `Fills a login form on the current page only after the user approved that exact sign-in in the extension, and shows the approval banner on that page. It reads nothing from pages otherwise and sends no page data anywhere.`
+  `Shows the concealer AutoFill menu on login fields and fills the sign-in the user picks (or an agent sign-in the user approved). After the user signs in, it offers to save the username and password they typed; those values go to the user's own concealer server on localhost only when the user clicks Save. It reads nothing else from pages and sends no page data to any remote host.`
 - **Remotely hosted code:** No.
 
 **Data usage disclosures** — tick **Authentication information** (the user's own credentials are filled into the page they approved; never transmitted off-device), then check:
