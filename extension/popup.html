@@ -8,6 +8,7 @@
   <button id="lock" class="ghost ico" title="Lock" hidden>🔒</button>
   <span id="timer" class="timer" hidden></span>
   <span class="sep"></span>
+  <button id="savepage" class="ghost ico" title="Save this page's sign-in">💾</button>
   <button id="gen" class="ghost ico" title="Generate password">🎲</button>
   <button id="openweb" class="ghost ico" title="Open web UI">🌐</button>
   <button id="settings" class="ghost ico" title="Settings">⚙️</button>
@@ -29,6 +30,7 @@
   <div id="aflock" hidden></div>
   <input id="pw" type="password" placeholder="Master password" autocomplete="off">
   <button id="unlockbtn" class="primary">Unlock</button>
+  <button id="pkunlock" class="ghost" hidden>👆 Touch ID / passkey</button>
 </section>
 
 <section id="list" hidden>
@@ -72,6 +74,7 @@
     <label class="setrow">Clipboard auto-clear (seconds)<input id="s_clip" type="number" min="0" max="600"></label>
     <label class="setrow">Extension auto-lock (seconds)<input id="s_idle" type="number" min="10"></label>
     <label class="setrow">Reveal auto-hide (seconds)<input id="s_reveal" type="number" min="5" max="30"></label>
+    <label class="setrow" title="8787 = the installed app. Another port (e.g. 18787) talks to a development instance.">App port<input id="s_port" type="number" min="1024" max="65535"></label>
     <div class="setinfo" id="s_info"></div>
     <div class="setrow">Developer — authorize this build's ID for the native host
       <div class="cmd"><code id="s_devcmd" class="mono"></code><button class="ghost ico" id="s_devcopy" title="copy">📋</button></div>

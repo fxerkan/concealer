@@ -12,7 +12,7 @@ Audit: keys/audit.log (JSONL, HMAC-chained, tamper-evident). Keeps only key
 NAMES and actions, never secret VALUES.
 """
 import os, sys, json, subprocess, secrets as _secrets, http.server, urllib.parse, urllib.request, html, getpass, time, webbrowser
-import hashlib, hmac, shlex, re, contextlib, csv, io, tempfile, base64, shutil, fnmatch, gc, zlib, socket
+import hashlib, hmac, shlex, re, contextlib, csv, io, tempfile, base64, shutil, fnmatch, gc, zlib, socket, threading
 from datetime import datetime, timezone, timedelta
 
 if sys.platform.startswith("win"):
@@ -36,6 +36,7 @@ FILE = os.environ.get("CONCEALER_FILE", os.path.join(HOME, "secrets.enc.yaml"))
 KEY  = os.environ.get("CONCEALER_KEY",  os.path.join(HOME, "keys", "age-key.txt"))
 BACKUP   = os.path.join(HOME, "keys", "age-key.txt.age")
 PUBKEY   = os.path.join(HOME, "keys", "pubkey.txt")
+PENDING  = os.path.join(HOME, "keys", "pending")   # sign-ins saved while locked: ciphertext to PUBKEY, merged at next unlock
 MASTER   = os.path.join(HOME, "keys", "master.json")
 AUDITKEY = os.path.join(HOME, "keys", "audit.key")
 AUDITLOG = os.path.join(HOME, "keys", "audit.log")
@@ -103,6 +104,7 @@ def server_info():
         os.chmod(SERVERINFO, 0o600)
     except OSError: pass
     return info
+def _truthy(v): return str(v).lower() in ("1", "true", "yes", "on")   # cfg flags: CLI stores "1", web stores bool
 def _cfg_persist():   # called from settings POSTs: persist idle/confirm_ops/limits/policies/hibp
     save_cfg({k: CFG[k] for k in ("idle", "confirm_ops", "limits", "policies", "hibp_key", "audit_anchor",
                                   "sync_accept_remote_deletes") if k in CFG})
@@ -241,11 +243,29 @@ def scrub(x):
     return _SCRUB.sub(lambda m: _SCRUB_MAP[m.lastindex - 1][1], str(x))
 
 # ---------------- store ----------------
+# Decrypted vault held in memory while unlocked, keyed on the file stamp + the key that opened it:
+# a big vault costs ~0.2-0.7 s per decrypt and the web UI/extension fire several requests per open.
+# Only served when the same key is already in memory (so it never grants what a decrypt wouldn't),
+# and only in the web server while a session is open (_SESS_KEY) — long-lived MCP/CLI processes
+# keep decrypting per call. _lock_clear() drops it. ponytail: single global entry, fine for one vault per process.
+_LOAD = {"stamp": None, "key": None, "raw": None}
+_LOAD_LOCK = threading.Lock()
+
+def _stamp():
+    st = os.stat(FILE); return (st.st_mtime_ns, st.st_size)
+
 def load():
-    r = subprocess.run(["sops", "-d", "--output-type", "json", FILE],
-                       env=_env(), capture_output=True, text=True)
-    if r.returncode: sys.exit(f"decrypt error: {scrub(r.stderr.strip())}")
-    d = json.loads(r.stdout); d.setdefault("secrets", [])
+    key = _KEY_CACHE if _SESS_KEY else None
+    with _LOAD_LOCK:   # concurrent first requests wait for one decrypt instead of racing N of them
+        stamp = _stamp()
+        if key and _LOAD["key"] == key and _LOAD["stamp"] == stamp: raw = _LOAD["raw"]
+        else:
+            r = subprocess.run(["sops", "-d", "--output-type", "json", FILE],
+                               env=_env(), capture_output=True, text=True)
+            if r.returncode: sys.exit(f"decrypt error: {scrub(r.stderr.strip())}")
+            raw = r.stdout
+            if key: _LOAD.update(stamp=stamp, key=key, raw=raw)
+    d = json.loads(raw); d.setdefault("secrets", [])
     for e in d["secrets"]: norm(e)
     return d
 
@@ -270,7 +290,9 @@ def save(d):
     else:
         r = subprocess.run(cmd + ["/dev/stdin"], input=payload, env=_env(), capture_output=True, text=True)
     if r.returncode: sys.exit(f"encrypt error: {scrub(r.stderr.strip())}")
-    with open(FILE, "w") as f: f.write(r.stdout)
+    with _LOAD_LOCK:
+        with open(FILE, "w") as f: f.write(r.stdout)
+        if _KEY_CACHE and _SESS_KEY: _LOAD.update(stamp=_stamp(), key=_KEY_CACHE, raw=payload)   # next load skips the decrypt
 
 def norm(e):
     """Upgrade old/incomplete records to the new schema (id, type, fields...)."""
@@ -470,8 +492,17 @@ def audit_verify():
     return res
 
 _ACCESS_ACTS = {"reveal", "copy", "get", "inject", "create", "update", "rotate", "set_secret"}
+_LAST_ACC = {"stamp": None, "acc": None}   # last_access() result keyed on the audit-log stamp (log is 10s of MB)
+
 def last_access():
     """name -> {ts, source, action, actor}: last access derived from the audit log."""
+    try: st = os.stat(AUDITLOG); stamp = (st.st_mtime_ns, st.st_size)
+    except OSError: stamp = None
+    if stamp and _LAST_ACC["stamp"] == stamp: return _LAST_ACC["acc"]
+    acc = _last_access()
+    _LAST_ACC.update(stamp=stamp, acc=acc); return acc
+
+def _last_access():
     acc = {}
     for r in audit_rows():
         if r.get("action") in _ACCESS_ACTS:
@@ -1351,7 +1382,7 @@ def sync_serve():
                 audit("pair_revoke", key=p["label"], source="sync", detail="by peer", actor=who); return out({"ok": True})
             if op != "sync": return out({"error": "unknown op"})
             dry = bool(req.get("dry"))
-            ok_del = bool(req.get("allow_deletes")) and str(CFG.get("sync_accept_remote_deletes", "")).lower() in ("1", "true", "yes", "on")
+            ok_del = bool(req.get("allow_deletes")) and _truthy(CFG.get("sync_accept_remote_deletes"))
             work, applied, rej, gone = _sync_merge_checked(d, raw, ok_del)   # a peer can't waive OUR guard unless we opted in
             if applied and not dry: _snapshot(bool(gone)); save(work)
         sent = len(secs(work)); blob = _age_enc_to(p["pub"], json.dumps({"secrets": secs(work)}))
@@ -1732,16 +1763,17 @@ def _agent_labels():
     d = _agents_data()
     return [t["label"] for t in (d["tokens"] if d else []) if t.get("source") == "agent" and not t.get("revoked")]
 
-def mint_token(keytext, label, source="agent", ttl=None):
-    """Mint a new unlock token: store hash + token-wrapped key, return the token VALUE (once)."""
+def mint_token(keytext, label, source="agent", ttl=None, tok=None, meta=None):
+    """Mint a new unlock token: store hash + token-wrapped key, return the token VALUE (once).
+    tok: wrap with a secret made elsewhere (a passkey's PRF output) instead of a random one."""
     d = _agents_data() or {"salt": os.urandom(16).hex(), "tokens": []}
-    tok = _secrets.token_urlsafe(24)
+    tok = tok or _secrets.token_urlsafe(24)
     kh = _scrypt(tok, bytes.fromhex(d["salt"])).hex()
     blob = base64.b64encode(_age_enc_bytes(keytext, tok)).decode()
     exp = (datetime.now(timezone.utc) + timedelta(seconds=ttl)).isoformat(timespec="seconds") if ttl else None
     d["tokens"] = [t for t in d["tokens"] if t["label"] != label]   # same label → replace
-    d["tokens"].append({"label": label, "source": source, "kh": kh, "blob": blob,
-                        "created": now_iso(), "expires": exp, "revoked": False})
+    d["tokens"].append(dict(meta or {}, label=label, source=source, kh=kh, blob=blob,
+                            created=now_iso(), expires=exp, revoked=False))
     _save_agents(d); return tok
 
 def _find_token(tok):
@@ -1779,6 +1811,27 @@ def revoke_token(label):
     if not d: return 0
     n = len(d["tokens"]); d["tokens"] = [] if label == "all" else [t for t in d["tokens"] if t["label"] != label]
     _save_agents(d); return n - len(d["tokens"])
+
+# ---- passkey unlock (WebAuthn PRF) ----
+# A passkey is one more key slot, like an agent token: the authenticator turns (credential, salt)
+# into a 32-byte secret only after Touch ID / Windows Hello / the security key's PIN, and that
+# secret wraps the vault key (mint_token). The secret is never stored; cred id + salt are public.
+# No assertion signature is checked: being able to produce the PRF secret IS the proof.
+def passkeys():
+    d = _agents_data()
+    return [t for t in (d["tokens"] if d else []) if t.get("source") == "passkey" and not t.get("revoked")]
+
+def passkey_add(keytext, name, cred, salt, secret):
+    if not keytext: raise ValueError("this vault keeps its key on disk — run `concealer harden` first")
+    if not (cred and salt and len(secret or "") >= 32): raise ValueError("the authenticator gave no passkey secret (PRF)")
+    name = (name or "passkey").strip()[:40]
+    mint_token(keytext, "passkey:" + name + ":" + cred[:8], source="passkey", tok=secret, meta={"cred": cred, "salt": salt, "name": name})
+
+def passkey_key(cred, secret):
+    """cred + PRF secret → vault key text, or None."""
+    e = _find_token(secret or "")
+    if not e or e.get("source") != "passkey" or e.get("cred") != cred: return None
+    return resolve_token(secret)
 
 _UNLOCK_FOR = None   # "sync"/"pair" while those commands run: gates which token sources may open the vault
 def _unlock_key():
@@ -3207,6 +3260,10 @@ def native_host():
     if port_open(port):
         v = running_version()
         if v == VERSION: return reply({"ok": True, "running": True, "port": port})
+        # Never stop a server this host didn't launch the same way: another port is a dev instance, and a
+        # NEWER version is a checkout run by hand. Stopping either would also swap the vault behind that port.
+        older = v and tuple(map(int, re.findall(r"\d+", v)[:3])) < tuple(map(int, re.findall(r"\d+", VERSION)[:3]))
+        if port != 8787 or (v and not older): return reply({"ok": True, "running": True, "port": port, "version": v})
         # A server from a previous install is holding the port (e.g. its files were removed by
         # an upgrade → "webui.html not found"). Ask it to stop, then launch the current one.
         try: urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{port}/api/shutdown", data=b"", method="POST"), timeout=2).read()
@@ -3723,7 +3780,7 @@ def serve_lan(lan_port, web_port):
     # server started by the Chrome extension idle-exits, so re-spawn it whenever it goes away.
     def _keepalive():
         while True:
-            time.sleep(60)
+            time.sleep(5)    # a socket probe is cheap; a long gap leaves the extension's menu dead after an idle exit
             try: _start_backend()
             except Exception: pass
     threading.Thread(target=_keepalive, daemon=True).start()
@@ -3914,6 +3971,7 @@ def _lock_clear(tok=None):
     if tok is not None:
         _SESSIONS.pop(tok, None); _SESS_KEY.pop(tok, None)
     _KEY_CACHE = None
+    _LOAD.update(stamp=None, key=None, raw=None)   # decrypted-vault cache goes with the key
     if not _SESSIONS:                 # last session gone: drop pending autofill jobs + task grants
         _AF_JOBS.clear(); _AF_GRANTS.clear()
     gc.collect()
@@ -3926,6 +3984,7 @@ def _lock_clear(tok=None):
 # memory-only, cleared on idle auto-lock like the session key.
 _AF_JOBS = {}      # job_id -> {id,agent,domain,secret_id,secret_name,username,status,created,result,exposed}
 _AF_GRANTS = {}    # "agent|domain|secret_id" -> {"exp":epoch,"max":int,"used":int} — "approve for this task"
+_AF_CLAIM = threading.Lock()   # makes approved -> filling a one-shot transition
 _AF_TTL = 120      # seconds a pending/approved job stays live before it expires
 AF_PORT = int(os.environ.get("CONCEALER_WEB_PORT", "8787"))   # loopback port the MCP tool reaches the web server on (extension default: 8787)
 
@@ -3933,13 +3992,19 @@ def _af_host(url):
     try: return (urllib.parse.urlparse(url if "://" in (url or "") else "//" + (url or ""), scheme="http").hostname or "").lower()
     except Exception: return ""
 
+# Two-label public suffixes and shared hosts where every customer is a different site. Without
+# them, "last two labels" would make all .com.tr sites (or all *.herokuapp.com apps) one site.
+# ponytail: short hand-kept list, not the full Public Suffix List; keep in sync with the
+# extension's regDomain() (content.js, sw.js, popup.js).
+_AF_SUFFIX = {"com.tr", "net.tr", "org.tr", "gen.tr", "web.tr", "gov.tr", "edu.tr", "k12.tr", "av.tr", "bel.tr", "co.uk", "org.uk", "ac.uk", "com.au", "co.jp", "com.br", "co.nz", "co.za", "com.cn", "herokuapp.com", "github.io", "vercel.app", "netlify.app", "pages.dev", "workers.dev", "web.app", "firebaseapp.com", "azurewebsites.net", "cloudfront.net", "appspot.com", "onrender.com", "fly.dev", "ngrok.io", "ngrok-free.app", "blogspot.com", "s3.amazonaws.com"}
+
 def registrable_domain(host):
-    """Naive eTLD+1: the last two dot-labels. ponytail: no Public Suffix List, so
-    multi-level TLDs (example.co.uk) collapse to 'co.uk'. Good enough here because the
-    content script re-verifies the exact origin before filling; upgrade to a PSL if
-    cross-subdomain phishing on odd TLDs becomes a concern."""
-    parts = [p for p in (host or "").split(".") if p]
-    return ".".join(parts[-2:]) if len(parts) >= 2 else host or ""
+    """eTLD+1 for matching a sign-in record to a page: the last two dot-labels, or three when the
+    last two are a known public suffix / shared host (_AF_SUFFIX)."""
+    parts = [p for p in (host or "").lower().split(".") if p]
+    if len(parts) < 2 or all(p.isdigit() for p in parts) or ":" in (host or ""): return (host or "").lower()   # localhost / IP
+    n = 4 if ".".join(parts[-3:]) in _AF_SUFFIX else 3 if ".".join(parts[-2:]) in _AF_SUFFIX else 2
+    return ".".join(parts[-n:])
 
 # Field aliases so ANY record type can drive a sign-in, not just website/login: a `custom`
 # "AWS console" record with url/account_id/iam_user/console_password works the same way.
@@ -3967,7 +4032,7 @@ def af_login_view(e):
 # ponytail: hand-kept table; extend when a real site needs it.
 _AF_SAME = [{"microsoftonline.com", "office.com", "office365.com", "outlook.com", "live.com", "microsoft.com", "sharepoint.com"},
             {"openai.com", "chatgpt.com"}, {"google.com", "gmail.com"}, {"apple.com", "icloud.com"},
-            {"proton.me", "protonvpn.com", "protonmail.com"}, {"amazon.com", "amazonaws.com"}]
+            {"proton.me", "protonvpn.com", "protonmail.com"}, {"amazon.com", "amazonaws.com", "signin.aws"}]
 def af_site(dom):
     return next((min(g) for g in _AF_SAME if dom in g), dom)
 
@@ -3989,6 +4054,82 @@ def af_candidates(d, target_url, sel=None):
         rank = (0 if hint and v["account"].lower() == hint else 1, 0 if _af_host(v["url"]) == host else 1, e["name"].lower())
         out.append((rank, e, v))
     return [(e, v) for _, e, v in sorted(out, key=lambda x: x[0])]
+
+def af_extra(e):
+    """Every field of the record, by its saved name, for the content script to fill into the page
+    field whose label / name / id matches that name. Only the URL (not a page field), the password
+    (goes into the password box only, never a text field) and the TOTP seed are left out."""
+    skip = set(_AF_URL + _AF_PW + ("totp",))
+    return {k: x for k, x in (e.get("fields") or {}).items() if isinstance(x, str) and x.strip() and k.lower() not in skip}
+
+def _af_fname(label):
+    """Page label -> field name ("AWS Account ID" -> "aws_account_id")."""
+    return re.sub(r"[^a-z0-9]+", "_", (label or "").lower()).strip("_")[:40]
+
+def af_save(d, b, dry=False):
+    """Save a sign-in captured on a page (extension): update the record for the same site +
+    username (+ account), else create a `login` record. Returns (status, record) where status is
+    "same" (nothing new), "update" or "new". dry=True only classifies (the save prompt asks first)."""
+    url = b.get("url", ""); host = _af_host(url); pw = b.get("password") or ""
+    if not host or not url.startswith(("http://", "https://")) or not pw: raise ValueError("need a web page and a password")
+    user = (b.get("username") or "").strip(); acct = (b.get("account") or "").strip()
+    extra = {_af_fname(k): str(v).strip() for k, v in (b.get("extra") or {}).items() if _af_fname(k) and str(v).strip()}
+    if acct: extra["account_id"] = acct
+    extra = _clean_fields(extra)[0]
+    hit = next((e for e, v in af_candidates(d, url) if v["username"].lower() == user.lower()
+                and (not acct or not v["account"] or v["account"].lower() == acct.lower())), None)
+    if hit:
+        f = hit["fields"]; v = af_login_view(hit)
+        pwk = next((k for k in f if k.lower() in _AF_PW), "password")
+        if v["password"] == pw and all(f.get(k) == x for k, x in extra.items()): return "same", hit
+        if dry: return "update", hit
+        f[pwk] = pw; f.update(extra); hit["updated"] = now_iso(); return "update", hit
+    if dry: return "new", None
+    origin = urllib.parse.urlparse(url); origin = f"{origin.scheme}://{origin.netloc}"   # no path/query: sign-in URLs carry one-time state
+    name = (b.get("name") or "").strip() or registrable_domain(host)
+    names = {e["name"] for e in live(d)}
+    if name in names and user: name = f"{name} ({user})"
+    e = norm({"name": name, "type": "login", "url": origin, "tags": ["autofill"],
+              "fields": dict({"web_url": origin, "username": user, "password": pw}, **extra)})
+    secs(d).append(e); return "new", e
+
+def _ext_ids():   # extension IDs this vault trusts (same set the native host allows)
+    ids = {_EXT_DEV_ID, _EXT_STORE_ID}
+    try: ids |= set(json.load(open(_chrome_state())).get("ids", []))
+    except Exception: pass
+    return ids
+
+def af_queue(b):
+    """Save a sign-in while the vault is LOCKED: encrypt it to the vault's public key (encrypting needs
+    no unlock; stdin→stdout, nothing in plaintext on disk) and park it in keys/pending. The next unlock
+    merges every parked sign-in through af_save (af_flush)."""
+    url = b.get("url", "")
+    if not url.startswith(("http://", "https://")) or not _af_host(url) or not b.get("password"): raise ValueError("need a web page and a password")
+    rec = {k: b[k] for k in ("url", "name", "username", "password", "account", "extra") if b.get(k)}
+    text = json.dumps(rec)
+    if len(text) > 32768: raise ValueError("too large")
+    os.makedirs(PENDING, exist_ok=True)
+    if len(os.listdir(PENDING)) >= 50: raise ValueError("50 sign-ins are already waiting — unlock the vault first")
+    ct = base64.b64decode(_age_enc_to(_recipient(), text))
+    fd = os.open(os.path.join(PENDING, f"{int(time.time() * 1000)}-{_secrets.token_hex(4)}.age"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "wb") as f: f.write(ct)
+
+def af_flush():
+    """Merge parked sign-ins into the (now unlocked) vault; a file is removed only after the save. → count added/updated"""
+    files = sorted(os.path.join(PENDING, f) for f in (os.listdir(PENDING) if os.path.isdir(PENDING) else []) if f.endswith(".age"))
+    if not files: return 0
+    done = []
+    with _vault_lock():
+        d = load()
+        for fp in files:
+            try: st, e = af_save(d, json.loads(_age_dec_priv(open(fp, "rb").read())))
+            except Exception: continue   # unreadable / invalid: leave it for a look, never block the unlock
+            done.append((fp, st, e))
+        if any(st != "same" for _, st, _ in done): save(d)
+    for fp, st, e in done:
+        os.remove(fp)
+        if st != "same": audit("create" if st == "new" else "update", key=e["name"], source="ext", detail="saved while locked")
+    return sum(st != "same" for _, st, _ in done)
 
 def _af_pick_secret(d, target_url, name=None, sel=None):
     """Find a sign-in secret for this request. Returns (record|None, reason).
@@ -4204,6 +4345,8 @@ def serve_web(port):
                 return self._json({"ok": True, "id": si["id"], "name": si.get("label", ""), "version": VERSION})
             if path == "/api/types":
                 return self._json({t: [{"name": f, "secret": k == "secret"} for f, k in fs] for t, fs in TYPES.items()})
+            if path == "/api/passkeys/options":    # PUBLIC (unlock screen): cred ids + PRF salts, nothing secret
+                return self._json([{"cred": t["cred"], "salt": t["salt"]} for t in passkeys()])
             if path == "/api/autofill/status":     # agent polls its own job (status string only, never a value)
                 ag = self._af_agent()
                 if not ag: return self._json({"error": "agent token required"}, 403)
@@ -4269,7 +4412,11 @@ def serve_web(port):
                 return self._json({"idle": CFG["idle"], "confirm_ops": CFG["confirm_ops"],
                                    "limits": CFG.get("limits") or {"default": dict(_DEFAULT_LIMITS), "agents": {}},
                                    "agents": _agent_labels(), "hardened": not os.path.exists(KEY),
-                                   "hibp_key_set": bool(_hibp_key())})   # the key ITSELF is not returned
+                                   "hibp_key_set": bool(_hibp_key()),   # the key ITSELF is not returned
+                                   "audit_anchor": CFG.get("audit_anchor") or {}, "version": VERSION,
+                                   "sync_accept_remote_deletes": _truthy(CFG.get("sync_accept_remote_deletes"))})
+            if path == "/api/passkeys":    # this vault's passkeys (names + dates only)
+                return self._json([{"label": t["label"], "name": t.get("name", ""), "created": t["created"]} for t in passkeys()])
             if path == "/api/backup":      # auto-backup status (password NOT returned)
                 c = _backup_cfg()
                 return self._json({"enabled": c["enabled"], "interval_h": c["interval_h"], "dir": c["dir"],
@@ -4329,15 +4476,22 @@ def serve_web(port):
                 if wait:                               # brute-force cooldown active → refuse without checking pw
                     audit("unlock_blocked", source="web")
                     return self._json({"ok": False, "locked": True, "retry_after": wait}, 429)
-                pw = self._body().get("pw", "")
-                keytext = key_from_master(pw)          # decrypt both verifies and yields the key
-                if keytext or verify_master(pw):       # 2nd condition: legacy (plaintext-key) vault
+                ub = self._body(); pw = ub.get("pw", "")
+                via = "passkey" if ub.get("passkey") else ""
+                # passkey: the PRF secret unwraps the key; master password otherwise
+                keytext = passkey_key(ub["passkey"], ub.get("secret", "")) if via else key_from_master(pw)   # decrypt both verifies and yields the key
+                if keytext or (not via and verify_master(pw)):   # 2nd condition: legacy (plaintext-key) vault
                     _unlock_note(ip, True)
                     tok = _secrets.token_urlsafe(18); _SESSIONS[tok] = time.time()
                     if keytext: _SESS_KEY[tok] = keytext; _KEY_CACHE = keytext   # hardened: bind the key to the session in memory
-                    audit("unlock", source="web")
+                    audit("unlock", source="web", detail=via)
                     _auto_backup_maybe()                   # if the interval elapsed, write a .cer at unlock (key in memory)
                     body = {"ok": True}
+                    try: n = af_flush()                    # sign-ins the extension saved while locked
+                    except (Exception, SystemExit): n = 0
+                    if n: body["saved_while_locked"] = n
+                    try: load(); last_access()             # warm the caches: the UI's first burst of requests is then instant
+                    except (Exception, SystemExit): pass
                     # Extension client can't read the HttpOnly cookie cross-origin; hand it the
                     # token in the body so it can send X-Concealer-Token. The SPA never sets this
                     # header, so its response body stays {ok:true} and the token stays HttpOnly for it.
@@ -4369,14 +4523,17 @@ def serve_web(port):
                 ag = self._af_agent()
                 if not ag: return self._json({"error": "agent token required"}, 403)
                 b = self._body(); target = b.get("target_url", "")
+                # Any LIVE session's key will do (valid() loads it into _KEY_CACHE). Checked BEFORE the
+                # job exists: valid() expiring the last session clears _AF_JOBS.
+                live = any(valid(t) for t in list(_SESSIONS))
                 j = _af_new_job(ag, target, b.get("name")); dom = j["domain"]
                 # If the vault is already unlocked, resolve now so the agent gets fast nomatch/
                 # mismatch feedback and a live task-grant can auto-approve. If LOCKED, the job
                 # stays pending and the extension still alerts (locked-safe /notify) — the user
                 # unlocks to review. The request itself never needs the vault to be open.
-                if _SESSIONS:
+                if live:   # a decrypt failure must not sys.exit inside this handler (drops the connection)
                     try: reason = _af_resolve(j, load())
-                    except Exception: reason = ""
+                    except (Exception, SystemExit): reason = ""
                     if reason == "nomatch":
                         j["status"] = "denied"
                         audit("web_autofill_request", key=b.get("name", "") or dom, source="mcp", detail=f"{dom} nomatch", actor=ag)
@@ -4391,6 +4548,32 @@ def serve_web(port):
                         return self._json({"job": j["id"], "status": "approved"})
                 audit("web_autofill_request", key=j["name"] or dom, source="mcp", detail=dom, actor=ag)
                 return self._json({"job": j["id"], "status": "pending"})
+            if path == "/api/ext/attach":          # the extension joins a vault already unlocked in this browser (e.g. by passkey)
+                if (self.headers.get("Origin") or "").rstrip("/") not in {f"chrome-extension://{i}" for i in _ext_ids()}:
+                    return self._json({"error": "forbidden"}, 403)
+                live = [t for t in list(_SESSIONS) if valid(t)]
+                if not live: return self._json({"error": "locked"}, 401)
+                nt = _secrets.token_urlsafe(18); _SESSIONS[nt] = time.time()
+                if _SESS_KEY.get(live[0]): _SESS_KEY[nt] = _SESS_KEY[live[0]]
+                audit("unlock", source="ext", detail="attach")
+                return self._json({"ok": True, "tok": nt})
+            if path == "/api/autofill/queue":      # extension saves a sign-in WITHOUT a session (no master password re-entry)
+                # Only our extension: a web page can't forge Origin, and this endpoint returns no vault data.
+                if (self.headers.get("Origin") or "").rstrip("/") not in {f"chrome-extension://{i}" for i in _ext_ids()}:
+                    return self._json({"error": "forbidden"}, 403)
+                b = self._body(); dom = registrable_domain(_af_host(b.get("url", "")))
+                try:
+                    if any(valid(t) for t in list(_SESSIONS)):   # open elsewhere (web UI): save right away
+                        with _vault_lock():
+                            d = load(); st, e = af_save(d, b)
+                            if st != "same": save(d)
+                        if st != "same": audit("create" if st == "new" else "update", key=e["name"], source="ext", detail=dom)
+                        return self._json({"status": st, "name": e["name"]})
+                    af_queue(b)
+                except ValueError as ex: return self._json({"error": str(ex)}, 400)
+                except (Exception, SystemExit) as ex: return self._json({"error": scrub(ex)}, 500)
+                audit("autofill_queue", source="ext", detail=dom)
+                return self._json({"status": "queued"})
             if not valid(tok or ""): return self._json({"error": "locked"}, 401)
             if path == "/api/autofill/approve":    # human approves a pending fill (web UI or extension popup)
                 b = self._body(); j = _AF_JOBS.get(b.get("job", ""))
@@ -4419,15 +4602,16 @@ def serve_web(port):
                 if not ok: return self._json({"error": "domain mismatch"}, 409)
                 v = af_login_view(e); dom = registrable_domain(_af_host(b.get("url", "")))
                 audit("web_autofill_fill", key=e["name"], source="ext", detail=dom + " manual")
-                return self._json({"domain": dom, "username": v["username"], "password": v["password"], "account": v["account"]})
+                return self._json({"domain": dom, "username": v["username"], "password": v["password"], "account": v["account"], "extra": af_extra(e)})
             if path == "/api/autofill/claim":      # extension SW claims an approved job -> VALUE DELIVERY (session holds the key)
                 b = self._body(); j = _AF_JOBS.get(b.get("job", ""))
-                if not j or j["status"] != "approved": return self._json({"error": "gone"}, 404)
+                with _AF_CLAIM:   # threaded server: two concurrent claims must not both deliver
+                    if not j or j["status"] != "approved": return self._json({"error": "gone"}, 404)
+                    j["status"] = "filling"
                 d = load(); e = by_id(d, j["secret_id"])
                 if not e: j["status"] = "expired"; return self._json({"error": "gone"}, 404)
-                j["status"] = "filling"
                 v = af_login_view(e)
-                return self._json({"domain": j["domain"], "username": v["username"], "password": v["password"], "account": v["account"]})
+                return self._json({"domain": j["domain"], "username": v["username"], "password": v["password"], "account": v["account"], "extra": af_extra(e)})
             if path == "/api/autofill/result":     # extension reports the fill outcome + post-fill exposure scan
                 b = self._body(); j = _AF_JOBS.get(b.get("job", ""))
                 if not j: return self._json({"error": "gone"}, 404)
@@ -4436,6 +4620,15 @@ def serve_web(port):
                 audit("web_autofill_fill", key=j["secret_name"], source="web", detail=f'{j["domain"]} {"ok" if b.get("ok") else "fail"}')
                 if j["exposed"]: audit("web_autofill_exposed", key=j["secret_name"], source="web", detail=j["domain"])
                 return self._json({"ok": True})
+            if path == "/api/autofill/save":       # extension: save/update a sign-in captured on a page (values in, nothing out)
+                b = self._body(); dry = bool(b.get("dry"))
+                try:
+                    with _vault_lock():
+                        d = load(); st, e = af_save(d, b, dry)
+                        if not dry and st != "same": save(d)
+                except ValueError as ex: return self._json({"error": str(ex)}, 400)
+                if not dry and st != "same": audit("create" if st == "new" else "update", key=e["name"], source="ext", detail=registrable_domain(_af_host(b.get("url", ""))))
+                return self._json({"status": st, "id": e["id"] if e else "", "name": e["name"] if e else ""})
             if path == "/api/secrets":     # create
                 with _vault_lock():
                     b = self._body(); d = load(); e = norm(_entry_from_body(b))
@@ -4471,6 +4664,18 @@ def serve_web(port):
             if path == "/api/gitremedy":   # remediation GUIDE text (NEVER executed)
                 b = self._body()
                 return self._json({"text": git_remediation(b.get("path", ""), b.get("files"), b.get("names"))})
+            if path in ("/api/passkeys", "/api/passkeys/remove"):   # adding/removing an unlock factor: master password required
+                b = self._body()
+                if not verify_master(b.get("pw", "")):
+                    audit("settings_fail", source="web"); return self._json({"error": "bad_pw"}, 403)
+                if path == "/api/passkeys/remove":
+                    n = revoke_token(b.get("label", "")) if str(b.get("label", "")).startswith("passkey:") else 0
+                    audit("passkey_remove", key=b.get("label", ""), source="web")
+                    return self._json({"ok": bool(n)})
+                try: passkey_add(None if os.path.exists(KEY) else _KEY_CACHE, b.get("name"), b.get("cred"), b.get("salt"), b.get("secret"))
+                except ValueError as ex: return self._json({"error": str(ex)}, 400)
+                audit("passkey_add", key=b.get("name", ""), source="web")
+                return self._json({"ok": True})
             if path == "/api/settings":    # verify_master required (sensitive)
                 b = self._body()
                 if not verify_master(b.get("pw", "")):
@@ -4490,10 +4695,17 @@ def serve_web(port):
                     CFG["limits"] = cur
                 if "hibp_key" in b:   # HIBP API key (user's own); empty string = clear
                     CFG["hibp_key"] = str(b["hibp_key"]).strip()
+                if isinstance(b.get("audit_anchor"), dict):
+                    a = b["audit_anchor"]
+                    CFG["audit_anchor"] = {"file": str(a.get("file") or "").strip(), "webhook": str(a.get("webhook") or "").strip(),
+                                           "syslog": bool(a.get("syslog"))}
+                if "sync_accept_remote_deletes" in b: CFG["sync_accept_remote_deletes"] = bool(b["sync_accept_remote_deletes"])
                 _cfg_persist()
                 audit("settings", source="web", detail=f"idle={CFG['idle']}")
                 return self._json({"ok": True, "idle": CFG["idle"], "confirm_ops": CFG["confirm_ops"],
-                                   "limits": CFG.get("limits"), "agents": _agent_labels(), "hibp_key_set": bool(_hibp_key())})
+                                   "limits": CFG.get("limits"), "agents": _agent_labels(), "hibp_key_set": bool(_hibp_key()),
+                                   "hardened": not os.path.exists(KEY), "audit_anchor": CFG.get("audit_anchor") or {}, "version": VERSION,
+                                   "sync_accept_remote_deletes": _truthy(CFG.get("sync_accept_remote_deletes"))})
             if path == "/api/export":      # bundle encrypted with age -p using the master password
                 b = self._body()
                 if not verify_master(b.get("pw", "")):

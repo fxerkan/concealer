@@ -120,6 +120,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
 .modalbox{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;max-width:360px;width:100%}
 .modalt{font-weight:700;font-size:17px;margin-bottom:6px}.modald{color:var(--mut);font-size:14px;margin-bottom:16px;word-break:break-word}
 .modalbox .rowb .btn{margin-top:0;flex:1}
+/* settings sections (mirror the web UI's grouped Settings) */
+.sect{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:4px 14px 14px;margin-bottom:14px}
+.sect h2{font-size:13px;margin:12px 0 2px;color:var(--fg);letter-spacing:.3px}
+.sect .hint{color:var(--mut);font-size:12.5px;margin:6px 2px 0}
+.sect .btn{margin-top:12px}
 </style>
 </head>
 <body>
@@ -157,6 +162,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
       <label>Master password</label>
       <div class="pwrow"><input id="u-pw" type="password" placeholder="Master password"><button class="eye" onclick="togglePw('u-pw',this)"></button></div>
       <button class="btn" id="u-go">Unlock</button>
+      <button class="btn sec" id="u-bio" style="display:none;margin-top:8px"></button>
       <div id="u-msg" class="msg"></div>
       <button class="btn sec" id="u-reset">Use a different host…</button>
     </div>
@@ -177,7 +183,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
     <input id="l-q" class="search" placeholder="Search name, scope, tag, notes…" autocapitalize="off">
     <div class="sortbar">
       <select id="l-filter"><option value="">All types</option></select>
-      <select id="l-sort"><option value="updated" selected>Sort: Updated</option><option value="name">Sort: Name</option><option value="type">Sort: Type</option></select>
+      <select id="l-sort"><option value="updated" selected>Sort: Updated</option><option value="created">Sort: Created</option><option value="name">Sort: Name</option><option value="type">Sort: Type</option></select>
     </div>
     <div id="l-rows"></div>
     <div id="l-empty" class="empty" style="display:none">No secrets yet.<br>Tap + to add one.</div>
@@ -195,19 +201,35 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
     <span class="brand">Settings</span>
   </header>
   <div class="pad">
-    <button class="btn" id="set-sync">Sync now</button>
-    <div id="set-msg" class="msg"></div>
-    <label>Theme</label>
-    <select id="set-theme"><option value="dark">Dark (red)</option><option value="matrix">Matrix (green)</option></select>
+    <div id="set-msg" class="msg" style="margin:0 0 12px"></div>
+    <div class="sect">
+    <h2>Security &amp; lock</h2>
     <label>Auto‑lock</label>
-    <select id="set-idle"><option value="60">After 1 minute</option><option value="120">After 2 minutes</option><option value="300">After 5 minutes</option><option value="600">After 10 minutes</option><option value="0">Never</option></select>
+    <select id="set-idle"><option value="60">After 1 minute</option><option value="120">After 2 minutes</option><option value="300">After 5 minutes</option><option value="600">After 10 minutes</option><option value="900">After 15 minutes</option><option value="1800">After 30 minutes</option><option value="3600">After 1 hour</option><option value="0">Never</option></select>
+    <div id="set-biobox" style="display:none">
+      <label id="set-biolabel">Biometric unlock</label>
+      <button class="btn sec" id="set-bio" style="margin-top:0"></button>
+      <p class="hint">The master password is kept in this device's secure hardware and released only after a match. Enrolling a new face or finger turns it off; the master password always works.</p>
+    </div>
+    <button class="btn danger" id="set-lock">Lock vault</button>
+    </div>
+    <div class="sect">
+    <h2>Sync</h2>
     <label>Host</label>
     <div class="kv"><div class="vv" id="set-host">—</div></div>
+    <button class="btn" id="set-sync" style="margin-top:4px">Sync now</button>
     <button class="btn sec" id="set-changehost">Change host…</button>
-    <button class="btn danger" id="set-lock">Lock vault</button>
-    <label>About</label>
+    </div>
+    <div class="sect">
+    <h2>Appearance</h2>
+    <label>Theme</label>
+    <select id="set-theme"><option value="dark">Dark (red)</option><option value="matrix">Matrix (green)</option></select>
+    </div>
+    <div class="sect">
+    <h2>About</h2>
     <button class="btn sec" id="set-rate">★ Rate concealer</button>
     <button class="btn sec" id="set-support">Support &amp; feedback</button>
+    </div>
     <div class="foot">conceal<span class="ac">er</span> · <span class="verlink" data-ver>v1.0.0</span></div>
   </div>
 </section>
@@ -480,6 +502,7 @@ function renderServers(){
 $("s-rescan").onclick = () => scanning ? stopScan() : scanServers();
 
 // ---- setup ----
+$("s-pw").onkeydown = e => { if(e.key==="Enter") $("s-go").click(); };
 $("s-go").onclick = async () => {
   const host=$("s-host").value.trim(), pw=$("s-pw").value;
   if(!host||!pw){ flash($("s-msg"),"Host and master password are required."); return; }
@@ -490,14 +513,49 @@ $("s-go").onclick = async () => {
 $("s-demo").onclick = enterDemo;
 
 // ---- unlock (offline) ----
+async function unlockWith(pw){ S.secrets = await decryptBundle(b64dec(LS.get("bundle")), pw); S.pw=pw; S.demo=false; flash($("u-msg"),""); openList(); }
 $("u-go").onclick = async () => {
-  const pw=$("u-pw").value; if(!pw){ flash($("u-msg"),"Enter your master password."); return; }
-  try{ S.secrets = await decryptBundle(b64dec(LS.get("bundle")), pw); S.pw=pw; S.demo=false; flash($("u-msg"),""); openList(); }
-  catch{ flash($("u-msg"),"Wrong master password. If this device is paired to a different vault, tap ‘Use a different host’ to re‑import."); }
+  const pw=$("u-pw").value; if(!pw){ flash($("u-msg"),"Enter your master password."); focusPw(); return; }
+  try{ await unlockWith(pw); }
+  catch{ flash($("u-msg"),"Wrong master password. If this device is paired to a different vault, tap ‘Use a different host’ to re‑import."); focusPw(); }
 };
+$("u-pw").onkeydown = e => { if(e.key==="Enter") $("u-go").click(); };
+const focusPw = () => setTimeout(()=>$("u-pw").focus(), 50);
+
+// ---- biometric unlock (Face ID / Touch ID / fingerprint): native ConcealerBiometric plugin ----
+// The native side keeps the master password in the Keychain / Android Keystore, readable only after a
+// biometric match; "bio" in localStorage just remembers that it was turned on.
+const Bio = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ConcealerBiometric;
+let bioKind = "";   // "" = unavailable, else face | touch | fingerprint
+const bioName = () => bioKind==="face" ? "Face ID" : bioKind==="touch" ? "Touch ID" : "fingerprint";
+const bioOn = () => !!bioKind && LS.get("bio")==="1";
+async function bioProbe(){ try{ const r = Bio && await Bio.available(); bioKind = r && r.available ? r.kind : ""; }catch{ bioKind=""; } }
+function bioOff(){ LS.del("bio"); try{ Bio && Bio.clear(); }catch{} }
+let bioBusy = false;
+async function bioUnlock(){
+  if(bioBusy) return; bioBusy = true; flash($("u-msg"),"");
+  try{
+    const {secret} = await Bio.load({reason:"Unlock concealer"});
+    try{ await unlockWith(secret); }
+    catch{ bioOff(); showUnlock(false); flash($("u-msg"),"The vault's master password changed. Unlock with it, then turn "+bioName()+" back on in Settings."); }
+  }catch(err){
+    if(err && err.code==="gone"){ bioOff(); showUnlock(false); flash($("u-msg"),"A new face or fingerprint was enrolled, so "+bioName()+" unlock was turned off. Use the master password, then turn it back on in Settings."); }
+    else if(!(err && err.code==="canceled")) flash($("u-msg"), bioName()+" didn't work. Use the master password.");
+    focusPw();
+  }finally{ bioBusy = false; }
+}
+$("u-bio").onclick = bioUnlock;
+// unlock screen: biometric prompt first when it's on, otherwise the cursor goes straight to the password
+function showUnlock(auto=true){
+  $("u-bio").style.display = bioOn() ? "block" : "none";
+  $("u-bio").textContent = "Unlock with " + bioName();
+  show("unlock");
+  if(auto && bioOn()) bioUnlock(); else focusPw();
+}
 // setup screen reached from inside the app (non-destructive): show a Back button, keep the stored vault
-function showSetup(fromApp){ $("s-back").style.display = (fromApp && LS.get("bundle")) ? "block" : "none"; $("s-host").value=S.host||""; show("setup"); scanServers(); }
-$("s-back").onclick = () => { stopScan(); (S.pw && S.secrets.length) ? (renderList(), show("list")) : show("unlock"); };
+function showSetup(fromApp){ $("s-back").style.display = (fromApp && LS.get("bundle")) ? "block" : "none"; $("s-host").value=S.host||""; show("setup"); scanServers();
+  setTimeout(()=>$(S.host ? "s-pw" : "s-host").focus(), 50); }
+$("s-back").onclick = () => { stopScan(); (S.pw && S.secrets.length) ? (renderList(), show("list")) : showUnlock(false); };
 $("u-reset").onclick = () => showSetup(true);
 
 // ---- list ----
@@ -517,6 +575,7 @@ function renderList(){
   if(q) rows = rows.filter(e => (e.name+" "+scopeStr(e)+" "+(e.tags||[]).join(" ")+" "+(e.notes||"")).toLowerCase().includes(q));
   rows.sort((a,b)=> sort==="type" ? (a.type||"").localeCompare(b.type||"")||(a.name||"").localeCompare(b.name||"")
     : sort==="updated" ? (b.updated||"").localeCompare(a.updated||"")
+    : sort==="created" ? (b.created||"").localeCompare(a.created||"")
     : (a.name||"").localeCompare(b.name||""));
   const ls = LS.get("lastSync"), foot = $("l-foot");
   foot.textContent = live(S.secrets).length + " secrets · " + (ls ? "last sync " + relTime(ls) : "not synced");
@@ -594,18 +653,27 @@ function tickLock(){
   if(left <= 0) lock();
 }
 function stopLock(){ if(lockIv){ clearInterval(lockIv); lockIv=null; } $("l-timer").textContent=""; }
-function lock(){ stopLock(); S.pw=""; S.secrets=[]; S.demo=false; boot(); }
+function lock(){ stopLock(); S.pw=""; S.secrets=[]; S.demo=false; LS.get("bundle") ? showUnlock(false) : boot(); }   // no surprise Face ID sheet right after locking
 // lockAt is absolute wall-clock time, so backgrounding doesn't restart it — on return we just re-tick
 // (and lock immediately if the deadline passed while the app was in the background).
-document.addEventListener("visibilitychange", () => { if(!document.hidden && lockIv) tickLock(); });
+// coming back to a locked app → offer biometric unlock straight away
+document.addEventListener("visibilitychange", () => { if(document.hidden) return; if(lockIv) tickLock(); if(curView()==="unlock" && bioOn()) bioUnlock(); });
 
 // ---- settings ----
 function openSettings(){
   $("set-theme").value = LS.get("theme")==="matrix" ? "matrix" : "dark";
   $("set-idle").value = String(idleSecs());
   $("set-host").textContent = S.host || "—";
+  $("set-biobox").style.display = (bioKind && !S.demo) ? "block" : "none";
+  $("set-biolabel").textContent = bioName() + " unlock";
+  $("set-bio").textContent = (bioOn() ? "Turn off " : "Turn on ") + bioName() + " unlock";
   flash($("set-msg"),""); show("settings");
 }
+$("set-bio").onclick = async () => {
+  if(bioOn()){ bioOff(); openSettings(); flash($("set-msg"), bioName()+" unlock turned off.","ok"); return; }
+  try{ await Bio.store({secret:S.pw, reason:"Turn on "+bioName()+" unlock"}); LS.set("bio","1"); openSettings(); flash($("set-msg"), bioName()+" unlock is on.","ok"); }
+  catch(err){ if(!(err && err.code==="canceled")) flash($("set-msg"),"Couldn't turn on "+bioName()+" unlock: "+((err&&err.message)||err)); }
+};
 $("set-back").onclick = () => { renderList(); show("list"); };
 $("set-sync").onclick = () => doSync($("set-msg"));
 $("set-theme").onchange = () => setTheme($("set-theme").value);
@@ -732,10 +800,10 @@ setTheme(LS.get("theme") || "dark");   // apply persisted choice on load
 
 // ---- boot ----
 function boot(){
-  if(LS.get("bundle")){ show("unlock"); }
+  if(LS.get("bundle")){ showUnlock(); }
   else { showSetup(false); }
 }
-boot();
+bioProbe().then(boot);
 
 // ---- Android hardware/gesture back: navigate to the previous screen instead of closing the app ----
 function curView(){ return views.find(v => $("v-"+v).classList.contains("on")); }
@@ -746,7 +814,7 @@ function goBack(){
     case "edit":    (S.editing>=0 ? openDetail(S.editing) : openList()); break;
     case "settings":renderList(); show("list"); break;
     case "conflict":pendingSync=null; openList(); break;
-    case "setup":   if(LS.get("bundle")){ stopScan(); (S.pw&&S.secrets.length) ? (renderList(),show("list")) : show("unlock"); }
+    case "setup":   if(LS.get("bundle")){ stopScan(); (S.pw&&S.secrets.length) ? (renderList(),show("list")) : showUnlock(false); }
                     else if(_Plugins.App) _Plugins.App.minimizeApp(); break;
     default:        if(_Plugins.App) _Plugins.App.minimizeApp();   // list/unlock = root → go to home, don't kill the app
   }

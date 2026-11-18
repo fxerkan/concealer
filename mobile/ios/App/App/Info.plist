@@ -35,6 +35,8 @@
 	<array>
 		<string>_concealer._tcp</string>
 	</array>
+	<key>NSFaceIDUsageDescription</key>
+	<string>concealer uses Face ID to unlock your vault instead of the master password.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>concealer syncs your vault with the host running on your local network.</string>
 	<key>UILaunchStoryboardName</key>
