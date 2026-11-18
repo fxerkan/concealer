@@ -62,6 +62,8 @@ the same version line. Dates are UTC.
   ~20 ms on 480 records). While the vault is unlocked in the web app, the decrypted vault stays
   in its memory until the file changes, so each open no longer decrypts it again; locking or the
   idle lock drops it. The last-access column no longer re-reads the whole audit log on every list.
+- The extension popup opens on your **20 most used secrets** (recent and frequent use ranked
+  together) instead of the first 50 by name; typing searches the whole vault as before.
 
 - **Settings** is reorganised into sections with a side menu: Security & lock, Appearance, AI
   agents (MCP), Browser extension, Integrations, Sync, Portability, Backup and About. Auto-lock is

@@ -492,17 +492,20 @@ def audit_verify():
     return res
 
 _ACCESS_ACTS = {"reveal", "copy", "get", "inject", "create", "update", "rotate", "set_secret"}
-_LAST_ACC = {"stamp": None, "acc": None}   # last_access() result keyed on the audit-log stamp (log is 10s of MB)
+_AUD_MEMO = {}   # fn -> (audit-log stamp, result): the log is 10s of MB, re-read only when it changes
 
+def _audit_memo(f):
+    def w():
+        try: st = os.stat(AUDITLOG); stamp = (st.st_mtime_ns, st.st_size)
+        except OSError: return f()
+        hit = _AUD_MEMO.get(f.__name__)
+        if hit and hit[0] == stamp: return hit[1]
+        r = f(); _AUD_MEMO[f.__name__] = (stamp, r); return r
+    return w
+
+@_audit_memo
 def last_access():
     """name -> {ts, source, action, actor}: last access derived from the audit log."""
-    try: st = os.stat(AUDITLOG); stamp = (st.st_mtime_ns, st.st_size)
-    except OSError: stamp = None
-    if stamp and _LAST_ACC["stamp"] == stamp: return _LAST_ACC["acc"]
-    acc = _last_access()
-    _LAST_ACC.update(stamp=stamp, acc=acc); return acc
-
-def _last_access():
     acc = {}
     for r in audit_rows():
         if r.get("action") in _ACCESS_ACTS:
@@ -512,6 +515,7 @@ def _last_access():
                                 "action": r["action"], "actor": r.get("actor", "")}
     return acc
 
+@_audit_memo
 def access_stats():
     """name -> {count, last}: usage count + last access derived from the audit log (value-access actions only)."""
     st = {}
@@ -4386,10 +4390,11 @@ def serve_web(port):
             if path == "/api/secrets":
                 d = load(); sel = {dim: q[dim] for dim in DIMS if q.get(dim)}
                 rows = filt(d, sel, q.get("tag"), q.get("q"), q.get("type"), q.get("collection"))
-                acc = last_access()
+                acc = last_access(); st = access_stats()
                 out = []
                 for e in rows:
-                    pe = entry_public(e); pe["access"] = acc.get(e["name"]); out.append(pe)
+                    pe = entry_public(e); pe["access"] = acc.get(e["name"])
+                    pe["uses"] = (st.get(e["name"]) or {}).get("count", 0); out.append(pe)
                 return self._json(out)
             if path.startswith("/api/secret/"):
                 sid = path.rsplit("/", 1)[-1]; d = load(); e = by_id(d, sid)
@@ -4490,7 +4495,7 @@ def serve_web(port):
                     try: n = af_flush()                    # sign-ins the extension saved while locked
                     except (Exception, SystemExit): n = 0
                     if n: body["saved_while_locked"] = n
-                    try: load(); last_access()             # warm the caches: the UI's first burst of requests is then instant
+                    try: load(); last_access(); access_stats()   # warm the caches: the UI's first burst of requests is then instant
                     except (Exception, SystemExit): pass
                     # Extension client can't read the HttpOnly cookie cross-origin; hand it the
                     # token in the body so it can send X-Concealer-Token. The SPA never sets this
