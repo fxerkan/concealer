@@ -259,9 +259,16 @@ function matches(e,q){
 }
 
 const RENDER_CAP = 50;   // don't build thousands of DOM nodes on open (felt like a hang) — search narrows it
+const TOP_N = 20;        // empty search: the most recently + most often used secrets only
+// frecency: uses damped by days since the last use; never-used records sort last (by name)
+function frecency(e){
+  const ts=e.access&&e.access.ts; if(!ts) return 0;
+  return (e.uses||1) / (1 + (Date.now()-Date.parse(ts))/864e5);
+}
 function render(q){
   const box=$("#rows"); box.textContent="";
-  const list = ROWS.filter(e=>matches(e,q));
+  const top = !q;
+  const list = top ? ROWS.slice().sort((a,b)=>frecency(b)-frecency(a)).slice(0,TOP_N) : ROWS.filter(e=>matches(e,q));
   if(!list.length){ const d=document.createElement("div"); d.className="empty"; d.textContent="no secrets"; box.appendChild(d); return; }
   const shown = list.slice(0, RENDER_CAP);
   for(const e of shown){
@@ -284,7 +291,11 @@ function render(q){
     };
     item.append(row,panel); box.appendChild(item);
   }
-  if(list.length > shown.length){
+  if(top && ROWS.length > list.length){
+    const d=document.createElement("div"); d.className="empty";
+    d.textContent=`${list.length} most used of ${ROWS.length} — type to search all`;
+    box.appendChild(d);
+  } else if(list.length > shown.length){
     const d=document.createElement("div"); d.className="empty";
     d.textContent=`showing ${shown.length} of ${list.length} — type to filter`;
     box.appendChild(d);
