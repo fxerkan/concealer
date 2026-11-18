@@ -78,8 +78,8 @@ jobs:
           python3 mobile/store/play_upload.py "${{ inputs.android_track || 'internal' }}"
 
   ios:
-    # App Store requires the current iOS SDK (Xcode 26+); newest image + newest Xcode.
-    runs-on: macos-15
+    # App Store requires the current iOS SDK (iOS 27 SDK / Xcode 27 from April 2027, ITMS-90725).
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
       - run: echo "IOS_BUILD_NUMBER=$(date +%s)" >> "$GITHUB_ENV"
