@@ -11,6 +11,9 @@ nav_exclude: true
 concealer'ın kendisi tarafından yerel olarak sunulan profesyonel bir tek sayfalık uygulama — tam CRUD, filtreleme, secret başına deploy ve kurcalamaya karşı korunaklı bir denetim (audit) görüntüleyicisi.
 {: .fs-5 .fw-300 }
 
+<video controls preload="none" playsinline poster="/assets/video/concealer-WebUI.jpg" aria-label="concealer web UI in 40 seconds" style="display:block;width:100%;border-radius:12px;margin:1.5rem 0;background:#000"><source src="/assets/video/concealer-WebUI.mp4" type="video/mp4"></video>
+
+
 1. TOC
 {:toc}
 
@@ -43,7 +46,13 @@ concealer web 8080       # özel port
 - **[Riskler]({{ site.baseurl }}/tr/risks.html)** — sağlık genel bakışı (rotation / expiry / yeniden kullanım), yeniden kullanılan-değer etki alanı, shell-history taraması ve isteğe bağlı **Maruz kalma** kontrolleri (HIBP Pwned Passwords, e-posta ihlali, git-geçmişi taraması).
 - **[Politika]({{ site.baseurl }}/tr/policy.html)** — kullanıcı-tanımlı rotation / expiry / yeniden kullanım / adlandırma / etiketleme kuralları; ihlal listeleri, toplu düzeltme ve bildirimler ile; ayrıca agent başına MCP erişim limitlerini barındırır.
 - **Klasör tara** — bir dizini, **shell geçmişini** veya **canlı ortam / shell-profil değişkenlerini** (`scan --envvars`) başıboş secret'lar için tarayıp içe aktarır, kaynağa göre etiketleyerek, sunucu tarafı klasör tarayıcısı ve OS-yerel seçici ile birlikte.
-- **Ayarlar** — boşta kalma zaman aşımı, hangi işlemlerin onay gerektirdiği ve **HIBP API anahtarınız**. (Agent başına MCP hız sınırları [Politika]({{ site.baseurl }}/tr/policy.html)'ya taşındı.)
+- **Ayarlar** — yan menülü tek sayfa: Güvenlik ve kilit (otomatik kilit seçenekleri, hangi işlemlerin ana parola istediği, passkey'ler), Görünüm, AI ajanları (ajan başına MCP sınırları), Tarayıcı eklentisi, Entegrasyonlar (HIBP, audit çapası), Eşitleme, Taşınabilirlik, Yedek, Hakkında.
+- **Passkey / Touch ID ile kilit açma** — Ayarlar → Güvenlik ve kilit altından passkey ekle, sonra Touch ID, Windows Hello ya da bir güvenlik anahtarıyla aç. Bir anahtar yuvası daha (WebAuthn PRF); ana parola da çalışır. Passkey'ler `http://localhost`'a aittir.
+- Sıralanabilir **Oluşturuldu** ve **Güncellendi** sütunları.
+
+![Ayarlar: güvenlik ve kilit, passkey'ler]({{ site.baseurl }}/assets/new/web-settings.jpg)
+
+![Passkey / Touch ID ile kilit açma]({{ site.baseurl }}/assets/new/web-passkey-unlock.jpg)
 
 ---
 

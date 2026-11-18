@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>concealer</title>
 <style>
 /* Covert (Dark) — near-black + red signal. red = redaction / classified marker. Mirrors the web/TUI identity. */
@@ -16,7 +16,7 @@
 :root[data-theme="matrix"] body{text-shadow:0 0 2px rgba(57,255,20,.25)}
 .logo .mid{fill:var(--ac)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%}
+html,body{margin:0;height:100%;overflow:hidden;touch-action:manipulation}   /* views scroll inside; the document never does, so the header can't slide under the notch */
 body{background:var(--bg);color:var(--fg);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   margin:0;padding:0;overflow:hidden}   /* the whole page never scrolls; each view scrolls only its own content area */
 /* brand: the "er" suffix = red redaction bar (house rule + the 'conceal' action) */
@@ -52,6 +52,7 @@ input,select,textarea{width:100%;background:var(--panel);border:1px solid var(--
 input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
 .btn{display:block;width:100%;background:var(--ac);color:var(--ink);border:0;border-radius:10px;padding:14px;font-size:16px;
   font-weight:700;margin-top:18px}.btn:active{background:var(--ac2)}
+.bio-ic{vertical-align:-4px;margin-right:8px;color:var(--ac)}
 .btn.sec{background:var(--panel2);color:var(--fg);border:1px solid var(--line);font-weight:600}
 .btn.danger{background:var(--bad);color:#fff}
 .msg{margin-top:14px;padding:11px 13px;border-radius:10px;font-size:14px;display:none}
@@ -148,7 +149,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
     <div id="s-msg" class="msg"></div>
     <p class="small">The host must be running the <b>concealer service</b> (or <b>concealer lan</b>). Values are end‑to‑end encrypted with your master password; they never travel in plaintext.</p>
   </div>
-  <div class="lfoot">conceal<span class="ac">er</span> · <span class="verlink" data-ver>v1.0.0</span></div>
+  <div class="lfoot">conceal<span class="ac">er</span> · <span class="verlink" data-ver>v1.2.2</span></div>
 </section>
 
 <!-- UNLOCK: local bundle exists, offline capable -->
@@ -167,7 +168,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
       <button class="btn sec" id="u-reset">Use a different host…</button>
     </div>
   </div>
-  <div class="lfoot">conceal<span class="ac">er</span> · <span class="verlink" data-ver>v1.0.0</span></div>
+  <div class="lfoot">conceal<span class="ac">er</span> · <span class="verlink" data-ver>v1.2.2</span></div>
 </section>
 
 <!-- VAULT: list -->
@@ -177,6 +178,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
     <span id="demo-badge" style="display:none;background:#e5484d;color:#fff;font:700 10px/1.6 ui-monospace,monospace;padding:2px 6px;border-radius:5px;letter-spacing:.5px;margin-left:6px">DEMO</span>
     <span class="sp"></span>
     <span class="lockt" id="l-timer" title="auto-lock"></span>
+    <button class="icona" id="l-lock" aria-label="Lock"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
     <button class="icona settingsbtn" id="l-settings" aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
   </header>
   <div class="pad">
@@ -235,7 +237,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
     <button class="btn sec" id="set-rate">★ Rate concealer</button>
     <button class="btn sec" id="set-support">Support &amp; feedback</button>
     </div>
-    <div class="foot">conceal<span class="ac">er</span> · <span class="verlink" data-ver>v1.0.0</span></div>
+    <div class="foot">conceal<span class="ac">er</span> · <span class="verlink" data-ver>v1.2.2</span></div>
   </div>
 </section>
 
@@ -325,6 +327,8 @@ import { Decrypter, Encrypter } from "./age.js";
 import { DIMS, scopeStr, live, nowIso, newId, canon, nameKey, newer, dedupeById, analyze, resolveOne, resolveAll } from "./sync.js";
 
 const $ = id => document.getElementById(id);
+// keyboard focus must never pan the page: the brand header stays pinned below the Dynamic Island / notch
+addEventListener("scroll", () => { if(scrollY) scrollTo(0,0); });
 const EYE = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
 const EYEOFF = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
 window.togglePw = (id, btn) => { const el = $(id); const show = el.type === "password"; el.type = show ? "text" : "password"; btn.innerHTML = show ? EYEOFF : EYE; };
@@ -538,6 +542,8 @@ const focusPw = () => setTimeout(()=>$("u-pw").focus(), 50);
 // The native side keeps the master password in the Keychain / Android Keystore, readable only after a
 // biometric match; "bio" in localStorage just remembers that it was turned on.
 const Bio = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ConcealerBiometric;
+const BIO_FP = '<svg class="bio-ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></svg>';
+const BIO_FACE = '<svg class="bio-ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/></svg>';
 let bioKind = "";   // "" = unavailable, else face | touch | fingerprint
 const bioName = () => bioKind==="face" ? "Face ID" : bioKind==="touch" ? "Touch ID" : "fingerprint";
 const bioOn = () => !!bioKind && LS.get("bio")==="1";
@@ -560,7 +566,7 @@ $("u-bio").onclick = bioUnlock;
 // unlock screen: biometric prompt first when it's on, otherwise the cursor goes straight to the password
 function showUnlock(auto=true){
   $("u-bio").style.display = bioOn() ? "block" : "none";
-  $("u-bio").textContent = "Unlock with " + bioName();
+  $("u-bio").innerHTML = (bioKind==="face" ? BIO_FACE : BIO_FP) + "Unlock with " + bioName();
   show("unlock");
   if(auto && bioOn()) bioUnlock(); else focusPw();
 }
@@ -573,7 +579,7 @@ $("u-reset").onclick = () => showSetup(true);
 // ---- list ----
 const scopeFmt = e => DIMS.map(k=>e[k]||"*").join(" / ");
 function openList(){ stopScan(); $("u-pw").value=""; $("s-pw").value=""; $("demo-badge").style.display = S.demo?"inline-block":"none";
-  $("l-add").style.display = $("l-settings").style.display = S.af ? "none" : "";
+  $("l-add").style.display = $("l-settings").style.display = $("l-lock").style.display = S.af ? "none" : "";
   startLock(); refreshFilters(); renderList(); show("list"); }
 function refreshFilters(){    // populate the type filter with the types actually present
   const types=[...new Set(live(S.secrets).map(e=>e.type||"api_key"))].sort();
@@ -753,7 +759,7 @@ $("set-back").onclick = () => { renderList(); show("list"); };
 $("set-sync").onclick = () => doSync($("set-msg"));
 $("set-theme").onchange = () => setTheme($("set-theme").value);
 $("set-idle").onchange = () => { LS.set("idle", $("set-idle").value); startLock(); };
-$("set-lock").onclick = lock;
+$("set-lock").onclick = $("l-lock").onclick = lock;
 $("set-changehost").onclick = () => showSetup(true);
 // Rate + Support (open externally). Store URLs are fixed in the binary on purpose: nothing the app opens
 // is decided by a remote page, so what App Review sees is exactly what ships.
@@ -763,7 +769,7 @@ const RATE_URL = {
   ios: "https://apps.apple.com/app/id6816103801?action=write-review",
   android: "https://play.google.com/store/apps/details?id=com.fxerkan.concealer",
 };
-$("set-rate").onclick = () => openExternal(RATE_URL[platform()] || "https://concealer.fxerkan.com");
+$("set-rate").onclick = () => platform()==="ios" && _Plugins.ConcealerRate ? _Plugins.ConcealerRate.open() : openExternal(RATE_URL[platform()] || "https://concealer.fxerkan.com");
 $("set-support").onclick = () => openExternal("mailto:concealer@fxerkan.com?subject=" + encodeURIComponent("concealer mobile — feedback"));
 
 // ---- detail (read-only: reveal + copy) ----
@@ -796,11 +802,21 @@ function openDetail(i){
 }
 
 // ---- edit ----
+// strong random password: 20 chars, all four classes, rejection sampling (no modulo bias)
+const DICE = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r=".6" fill="currentColor"/><circle cx="15.5" cy="15.5" r=".6" fill="currentColor"/><circle cx="12" cy="12" r=".6" fill="currentColor"/></svg>`;
+function genPw(n=20){
+  const C=["ABCDEFGHJKLMNPQRSTUVWXYZ","abcdefghijkmnopqrstuvwxyz","23456789","!@#$%^&*-_=+?"], A=C.join("");
+  for(;;){ let out=""; const b=new Uint8Array(64);
+    while(out.length<n){ crypto.getRandomValues(b); for(const x of b) if(x < 256-256%A.length && out.length<n) out+=A[x%A.length]; }
+    if(C.every(c=>[...out].some(ch=>c.includes(ch)))) return out; }
+}
 function fieldRow(k,v,sec){
   const d=document.createElement("div"); d.className="frow";
-  const rev = sec ? `<button class="linkx reveal" aria-label="reveal">${EYE}</button>` : "";
+  const gen = sec && !/otp/i.test(k);   // a TOTP seed comes from the service, never from a generator
+  const rev = sec ? `${gen?`<button class="linkx gen" aria-label="generate">${DICE}</button>`:""}<button class="linkx reveal" aria-label="reveal">${EYE}</button>` : "";
   d.innerHTML=`<input class="k" placeholder="field" value="${esc(k)}"><input class="v${sec?' sec':''}" type="${sec?'password':'text'}" placeholder="value" value="${esc(v)}">${rev}<button class="linkx x" aria-label="remove"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>`;
   const vi=d.querySelector(".v");
+  if(gen) d.querySelector(".gen").onclick=()=>{ vi.value=genPw(); vi.type="text"; d.querySelector(".reveal").innerHTML=EYEOFF; };
   if(sec) d.querySelector(".reveal").onclick=(ev)=>{ const p=vi.type==="password"; vi.type=p?"text":"password"; ev.currentTarget.innerHTML=p?EYEOFF:EYE; };
   d.querySelector(".x").onclick=()=>d.remove();
   return d;
@@ -863,7 +879,8 @@ function relTime(iso){
   if(!d && m) p.push(m+" min"+(m>1?"s":""));
   return (p.slice(0,2).join(", ")||"just now") + " ago";
 }
-// version label → GitHub project (all footers)
+// version label → GitHub project (all footers); text = the installed build's version, not a hard-coded one
+if(_Plugins.App && _Plugins.App.getInfo) _Plugins.App.getInfo().then(i => document.querySelectorAll("[data-ver]").forEach(el => el.textContent = "v" + i.version)).catch(()=>{});
 [...document.querySelectorAll(".verlink")].forEach(el => el.onclick = () => openExternal("https://github.com/fxerkan/concealer"));
 
 // ---- theme (red default / matrix green) — mirrors the web/TUI ----

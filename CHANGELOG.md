@@ -7,10 +7,15 @@ its first public release at **`1.0.0`** (alongside the mobile app) and follows
 [semver](https://semver.org/) from there; the desktop tool and mobile app share
 the same version line. Dates are UTC.
 
-## [1.2.1] — 2026-11-17
+## [1.2.2] — 2026-11-18
 
 ### Added
 
+- Mobile: a Lock button sits next to the auto-lock countdown on the secrets list.
+- Mobile: a dice button on password and other secret fields generates a strong 20-character password (it's left off TOTP seeds).
+- **A short film for every interface** — Chrome extension, CLI, Web UI, TUI, MCP and mobile — on
+  each one's page of the website, plus a "What's new" section and a changelog page with
+  screenshots of the new features.
 - The Chrome extension offers to **save sign-ins** you type, password-manager style: after you
   sign in, a prompt asks to save the site (or to update the password when it changed). Extra
   fields on the page, such as the AWS console's account ID, come along, and you can add more
@@ -57,6 +62,9 @@ the same version line. Dates are UTC.
 
 ### Changed
 
+- Mobile: no pinch or double-tap zoom anymore; the app behaves like an app, not a web page.
+- Passkey / Touch ID / Face ID unlock buttons use theme-colored fingerprint and face icons instead of
+  the 👆 emoji (web UI, Chrome extension, mobile).
 - **Faster opening on a big vault.** The web UI and the extension popup now open almost
   instantly on a vault with hundreds of secrets (the requests fired on open went from ~1 s to
   ~20 ms on 480 records). While the vault is unlocked in the web app, the decrypted vault stays
@@ -76,8 +84,11 @@ the same version line. Dates are UTC.
 
 ### Fixed
 
-- Web UI: the secrets table header no longer paints over the open filter dropdowns
-  (Type, Collection, Tenant, …), which blocked their search box and options.
+- Mobile: the footer shows the installed app's real version instead of a fixed v1.0.0.
+- iOS: "Rate concealer" now opens the App Store's review page directly. Before, it went through Safari, which couldn't open it.
+- Mobile: the concealer logo and name stay pinned at the top, below the Dynamic Island / notch,
+  even while the keyboard is open. The app now resizes above the keyboard instead of sliding the page up.
+- `cer run [scope] -- <cmd>` treated the `--` separator as the command to run.
 - Sorting the secrets list by a date column (Updated, Last access) did nothing: every row
   compared equal. Dates now sort in order.
 - The filter dropdowns (Type, Collection, …) are no longer covered by the list's table header.
@@ -124,6 +135,13 @@ the same version line. Dates are UTC.
   with the unlock box instead of failing silently.
 - The in-page unlock box was blank on most sites: its frame was declared with a per-session
   dynamic URL, which Chrome refuses to load from the extension's regular URL.
+
+## [1.2.1] — 2026-11-17
+
+### Fixed
+
+- Web UI: the secrets table header no longer paints over the open filter dropdowns
+  (Type, Collection, Tenant, …), which blocked their search box and options.
 
 ## [1.2.0] — 2026-11-16
 

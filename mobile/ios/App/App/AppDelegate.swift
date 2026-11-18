@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import LocalAuthentication
+import StoreKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -53,6 +54,28 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 class ViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(BiometricPlugin())
+        bridge?.registerPluginInstance(RatePlugin())
+    }
+}
+
+/// "Rate concealer": the App Store app's write-review page. An https apps.apple.com link opened from the
+/// web view lands in Safari, which can't hand off to the store; where the store app is missing
+/// (Simulator), fall back to the system in-app rating sheet.
+@objc(RatePlugin)
+public class RatePlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "RatePlugin"
+    public let jsName = "ConcealerRate"
+    public let pluginMethods: [CAPPluginMethod] = [CAPPluginMethod(name: "open", returnType: CAPPluginReturnPromise)]
+    @objc func open(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let url = URL(string: "itms-apps://apps.apple.com/app/id6816103801?action=write-review")!
+            UIApplication.shared.open(url) { ok in
+                if !ok, let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+                    SKStoreReviewController.requestReview(in: scene)
+                }
+                call.resolve(["store": ok])
+            }
+        }
     }
 }
 

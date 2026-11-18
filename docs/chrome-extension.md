@@ -12,9 +12,9 @@ Open your vault and copy secret values straight from the Chrome toolbar — with
 `cer web`. The popup starts the local server on demand and locks itself when idle.
 {: .fs-5 .fw-300 }
 
-<div style="position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden;margin:1.5rem 0">
-  <iframe src="https://www.youtube-nocookie.com/embed/HNTiNCzyjJw" title="concealer Chrome extension: agent sign-in and AutoFill" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>
-</div>
+<video controls preload="none" playsinline poster="/assets/video/concealer-Extension.jpg" aria-label="concealer Chrome extension: AutoFill, save sign-ins, Touch ID" style="display:block;width:100%;border-radius:12px;margin:1.5rem 0;background:#000"><source src="/assets/video/concealer-Extension.mp4" type="video/mp4"></video>
+
+
 
 1. TOC
 {:toc}
@@ -109,6 +109,26 @@ See the [Windows guide]({{ site.baseurl }}/WINDOWS.html) for environment details
 - **🎲 Generate** — strong passwords / hex / base64url / UUID, copy with one click.
 - **🌐 / brand name** — open the full web UI in a tab.
 - Generate, Web UI, and Settings all work **before** you unlock.
+
+## AutoFill and saving sign-ins
+
+- **Fill** — click a sign-in field and pick the account; the password goes straight into the form.
+  Every saved field comes back by its name (account ID, region, …). Right-click anywhere →
+  **Fill with concealer** works too.
+- **Save** — after a successful sign-in the extension asks to save it, or to update a password that
+  changed. Name, URL, username, password and the page's other fields are prefilled; **+ Add field…**
+  lists the page's remaining inputs. Right-click → **Save sign-in to concealer** or 💾 in the popup
+  saves by hand. **Never for this site** stops the prompt there.
+- **Vault locked?** Saving needs no master password: the sign-in is encrypted to the vault's public
+  key, waits in `keys/pending/`, and is added at your next unlock.
+
+![The extension asking to save a sign-in, with the account ID and region]({{ site.baseurl }}/assets/new/ext-save-page.jpg)
+
+## Unlock with Touch ID / a passkey
+
+Add a passkey once in the web UI (**Settings → Security & lock → Add a passkey on this device**),
+then the popup's fingerprint button unlocks with Touch ID, Windows Hello or a security key. The
+master password keeps working.
 
 ## Themes
 

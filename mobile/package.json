@@ -1,6 +1,6 @@
 {
   "name": "concealer-mobile",
-  "version": "1.0.0",
+  "version": "1.2.2",
   "private": true,
   "description": "concealer mobile app (iOS + Android) — offline vault open with the master password + bidirectional sync with the host.",
   "scripts": {
@@ -16,6 +16,7 @@
     "@capacitor/app": "^6.0.3",
     "@capacitor/core": "^6.0.0",
     "@capacitor/ios": "^6.0.0",
+    "@capacitor/keyboard": "^6.0.4",
     "capacitor-zeroconf": "^3.0.0"
   },
   "devDependencies": {

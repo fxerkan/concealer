@@ -12,6 +12,9 @@ has_children: true
 A professional single-page app served locally by concealer itself — full CRUD, filtering, per-secret deploy, and a tamper-evident audit viewer.
 {: .fs-5 .fw-300 }
 
+<video controls preload="none" playsinline poster="/assets/video/concealer-WebUI.jpg" aria-label="concealer web UI in 40 seconds" style="display:block;width:100%;border-radius:12px;margin:1.5rem 0;background:#000"><source src="/assets/video/concealer-WebUI.mp4" type="video/mp4"></video>
+
+
 1. TOC
 {:toc}
 
@@ -44,7 +47,13 @@ Binds to `127.0.0.1` **only** — it is a single-user local convenience, not a h
 - **[Risks]({{ site.baseurl }}/risks.html)** — health overview (rotation / expiry / reuse), reused-value blast radius, shell-history scan, and opt-in **Exposure** checks (HIBP Pwned Passwords, email breach, git-history scan).
 - **[Policy]({{ site.baseurl }}/policy.html)** — user-defined rotation / expiry / reuse / naming / tagging rules with violation lists, bulk-fix, and notifications; also hosts the per-agent MCP access limits.
 - **Scan folder** — sweep a directory, **shell history**, or **live environment / shell-profile variables** (`scan --envvars`) for stray secrets and import them, tagged by origin, with a server-side folder browser and OS-native picker.
-- **Settings** — idle timeout, which operations require confirmation, and your **HIBP API key**. (Per-agent MCP rate limits moved to [Policy]({{ site.baseurl }}/policy.html).)
+- **Settings** — one page with a side menu: Security & lock (auto-lock presets, which operations ask for the master password, passkeys), Appearance, AI agents (per-agent MCP limits), Browser extension, Integrations (HIBP, audit anchor), Sync, Portability, Backup, About.
+- **Passkey / Touch ID unlock** — add a passkey under Settings → Security & lock, then unlock with Touch ID, Windows Hello or a security key. It is one more key slot (WebAuthn PRF); the master password keeps working. Passkeys belong to `http://localhost`.
+- **Created** and **Updated** columns, both sortable.
+
+![Settings: security & lock, with passkeys]({{ site.baseurl }}/assets/new/web-settings.jpg)
+
+![Unlock with a passkey / Touch ID]({{ site.baseurl }}/assets/new/web-passkey-unlock.jpg)
 
 ---
 

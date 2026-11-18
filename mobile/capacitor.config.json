@@ -2,8 +2,19 @@
   "appId": "com.fxerkan.concealer",
   "appName": "concealer",
   "webDir": "www",
-  "server": { "androidScheme": "https" },
+  "server": {
+    "androidScheme": "https"
+  },
   "plugins": {
-    "CapacitorHttp": { "enabled": true }
+    "CapacitorHttp": {
+      "enabled": true
+    },
+    "Keyboard": {
+      "resize": "native",
+      "resizeOnFullScreen": true
+    }
+  },
+  "ios": {
+    "scrollEnabled": false
   }
 }

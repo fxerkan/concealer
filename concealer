@@ -23,7 +23,7 @@ if sys.platform.startswith("win"):
         try: _s.reconfigure(encoding="utf-8")
         except Exception: pass
 
-VERSION = "1.2.1"   # tracks the public mobile-app release; semver from here on
+VERSION = "1.2.2"   # tracks the public mobile-app release; semver from here on
 BASE = os.path.dirname(os.path.realpath(__file__))
 def _default_home():
     # Repo checkout: vault lives next to the script → keep BASE (don't break existing installs).
@@ -3592,6 +3592,8 @@ def cli(argv):
             print(f"cp: {e['name']} -> {ne['name']} @ 📁{to or '(root)'} (id {ne['id']})")
     elif cmd == "run":
         sel = _sel(a); names = [sel.pop("name")] if "name" in sel else None   # --name X → inject only X
+        if a and a[0] == "--": a.pop(0)          # `cer run [scope] -- cmd …`: the usual separator, not the command
+        if not a: sys.exit("usage: concealer run [scope] [--] <cmd...>")
         for dim in ("repo", "project"): sel.setdefault(dim, detect(dim))
         env, _, _ = inject_env(sel, source="cli", actor=_cli_actor(), command=" ".join(a), names=names)
         sys.stderr.write(f"[concealer] {label(sel)}\n")

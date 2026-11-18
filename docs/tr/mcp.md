@@ -11,6 +11,9 @@ nav_exclude: true
 concealer, AI ajanlarının secret'ları hiç **görmeden** **kullanabilmesi** için bir MCP stdio sunucusu ile birlikte gelir. Ajan, isimleri listeleyebilir ve değerleri bir komutun ortamına enjekte edebilir — plaintext değerler, okuduğu her şeyden ayıklanır.
 {: .fs-5 .fw-300 }
 
+<video controls preload="none" playsinline poster="/assets/video/concealer-MCP.jpg" aria-label="concealer MCP server for AI agents" style="display:block;width:100%;border-radius:12px;margin:1.5rem 0;background:#000"><source src="/assets/video/concealer-MCP.mp4" type="video/mp4"></video>
+
+
 1. TOC
 {:toc}
 

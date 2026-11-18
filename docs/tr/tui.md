@@ -11,6 +11,9 @@ nav_exclude: true
 Aynı şifreli kasa üzerinde etkileşimli bir terminal arayüzü — kabuğunuzdan çıkmadan secret'ları gözatın, arayın, ekleyin, silin ve görüntüleyin.
 {: .fs-5 .fw-300 }
 
+<video controls preload="none" playsinline poster="/assets/video/concealer-TUI.jpg" aria-label="concealer TUI in 30 seconds" style="display:block;width:100%;border-radius:12px;margin:1.5rem 0;background:#000"><source src="/assets/video/concealer-TUI.mp4" type="video/mp4"></video>
+
+
 1. TOC
 {:toc}
 

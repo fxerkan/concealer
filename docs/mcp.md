@@ -11,6 +11,9 @@ nav_order: 8
 concealer ships an MCP stdio server so AI agents can **use** secrets without ever **seeing** them. The agent can list names and inject values into a command's environment — plaintext values are redacted from everything it reads.
 {: .fs-5 .fw-300 }
 
+<video controls preload="none" playsinline poster="/assets/video/concealer-MCP.jpg" aria-label="concealer MCP server for AI agents" style="display:block;width:100%;border-radius:12px;margin:1.5rem 0;background:#000"><source src="/assets/video/concealer-MCP.mp4" type="video/mp4"></video>
+
+
 1. TOC
 {:toc}
 

@@ -147,3 +147,4 @@ button.ok{color:var(--ok);border-color:var(--ok)}
 
 #fillpage{margin-bottom:9px;display:flex;flex-direction:column;gap:6px}
 #fillpage[hidden]{display:none}
+.bio-ic{vertical-align:-3px;margin-right:6px;color:var(--acc)}

@@ -12,7 +12,7 @@ import { SHORTS } from "./Shorts";
 const T = 12;
 const total = (xs: { len: number }[]) => xs.reduce((a, s) => a + s.len, 0) - T * (xs.length - 1);
 
-const Film: React.FC<{ scenes: { C: React.FC; len: number }[] }> = ({ scenes }) => {
+export const Film: React.FC<{ scenes: { C: React.FC; len: number }[] }> = ({ scenes }) => {
   const n = total(scenes);
   return (
     <>

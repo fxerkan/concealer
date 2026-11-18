@@ -221,6 +221,16 @@ section{padding:64px 0}
 /* architecture diagrams (dark-native SVGs on a matching frame) */
 .diagram{margin:0;border:1px solid var(--line2);border-radius:14px;overflow:hidden;background:#0a0b0d;box-shadow:0 22px 60px rgba(0,0,0,.4)}
 .diagram img{display:block;width:100%;height:auto}
+/* what's new + per-interface films */
+.newgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+@media(max-width:860px){.newgrid{grid-template-columns:1fr}}
+.ncard{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.ncard figure{margin:0;background:#0b0c0f;border-bottom:1px solid var(--line);height:260px;display:flex;align-items:center;justify-content:center}
+.ncard figure img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.ncard .b{padding:18px 20px}.ncard h3{margin:0 0 8px;font-size:18px}.ncard p{margin:0;color:var(--mut);font-size:14.5px}
+.ncard .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:1px;color:var(--acc);margin-bottom:6px}
+.newmore{text-align:center;color:var(--mut);margin-top:22px;font-size:14.5px}.newmore a{color:var(--acc)}
+.shot figure video{display:block;width:100%;height:auto;background:#000}
 .diagcap{text-align:center;color:var(--mut);font-size:14px;margin:14px 0 0}
 
 /* code block */
@@ -285,7 +295,8 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
     <span class="brand" translate="no"><img src="/assets/logo.svg" alt="">conceal<span class="ac">er</span></span>
     <nav>
       <a class="lnk" data-collapse href="/getting-started.html" data-i18n="nav_docs">Docs</a>
-      <a class="lnk" data-collapse href="/chrome-extension.html" data-i18n="nav_ext">Extension</a>
+      <a class="lnk" data-collapse href="#new" data-i18n="nav_new">What's new</a>
+<a class="lnk" data-collapse href="/chrome-extension.html" data-i18n="nav_ext">Extension</a>
       <a class="lnk" data-collapse href="https://github.com/fxerkan/concealer" target="_blank" rel="noopener">GitHub</a>
       <a class="lnk" data-collapse href="mailto:concealer@fxerkan.com?subject=concealer%20support" data-i18n="nav_support">Support</a>
       <button class="lnk" id="installbtn" data-collapse data-i18n="nav_install" style="border:0;background:none;font-family:inherit;cursor:pointer">Install</button>
@@ -340,6 +351,24 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
   </div>
 </section>
 
+<!-- ===== WHAT'S NEW ===== -->
+<section id="new">
+  <div class="wrap">
+    <div class="sec-h">
+      <div class="eyebrow" data-i18n="new_eyebrow">New in 1.2.2</div>
+      <h2 data-i18n="new_h">Sign in faster. Unlock with a look.</h2>
+      <p data-i18n="new_p">AutoFill that saves what you type, Touch ID and Face ID unlock, and concealer as your phone's password autofill.</p>
+    </div>
+    <div class="newgrid">
+      <div class="ncard"><figure><img src="/assets/new/ext-save-prompt.png" width="698" height="866" alt="concealer Chrome extension asking to save a sign-in, with account ID and region fields" loading="lazy"></figure><div class="b"><div class="tag">CHROME EXTENSION</div><h3 data-i18n="n1_h">AutoFill that saves your sign-ins</h3><p data-i18n="n1_p">After a successful sign-in the extension offers to save it, or to update a changed password. Account ID, region and any other field come along, and AutoFill puts every one back. Vault locked? It is saved anyway and added at your next unlock.</p></div></div>
+      <div class="ncard"><figure><img src="/assets/new/m-faceid-prompt.jpg" width="552" height="1200" alt="concealer mobile app asking for Face ID on the unlock screen" loading="lazy"></figure><div class="b"><div class="tag">iOS · ANDROID</div><h3 data-i18n="n2_h">Face ID &amp; fingerprint unlock</h3><p data-i18n="n2_p">The mobile app opens with Face ID, Touch ID or your fingerprint. The master password stays in the phone's secure hardware and is released only after a match; enrolling a new face or finger turns it off.</p></div></div>
+      <div class="ncard"><figure><img src="/assets/new/android-autofill.jpg" width="1290" height="900" alt="Android autofill with concealer: Fill with concealer, pick a sign-in, filled" loading="lazy"></figure><div class="b"><div class="tag">ANDROID</div><h3 data-i18n="n3_h">Your phone's password autofill</h3><p data-i18n="n3_p">Choose concealer as Android's autofill service: sign-in fields in every app and browser offer “Fill with concealer”. Unlock, pick the sign-in (the app's own come first) and it is filled. New sign-ins can be saved the same way.</p></div></div>
+      <div class="ncard"><figure><img src="/assets/new/web-passkey-unlock.jpg" width="1512" height="810" alt="concealer web UI unlock screen with Unlock with passkey / Touch ID" loading="lazy"></figure><div class="b"><div class="tag">WEB UI · EXTENSION</div><h3 data-i18n="n4_h">Touch ID &amp; passkey unlock</h3><p data-i18n="n4_p">Unlock the web UI and the extension with Touch ID, Windows Hello or a security key instead of typing the master password, which keeps working.</p></div></div>
+    </div>
+    <p class="newmore" data-i18n="new_more">Also new: a redesigned Settings page, a Created column, a popup that opens on your most-used secrets, and a short film for every interface. <a href="/changelog.html">Full changelog →</a></p>
+  </div>
+</section>
+
 <!-- ===== WHY / FEATURES ===== -->
 <section>
   <div class="wrap">
@@ -376,8 +405,8 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
 <!-- ===== INTERFACES / SCREENSHOTS ===== -->
 <section class="strip"><div class="wrap" style="display:block">
   <div class="sec-h" style="margin-bottom:34px">
-    <div class="eyebrow" data-i18n="ui_eyebrow">Five ways in</div>
-    <h2 data-i18n="ui_h">CLI · Web UI · TUI · MCP · Chrome Extension</h2>
+    <div class="eyebrow" data-i18n="ui_eyebrow">Six ways in</div>
+    <h2 data-i18n="ui_h">CLI · Web UI · TUI · MCP · Chrome · Mobile</h2>
     <p data-i18n="ui_p">The same encrypted vault, however you like to work.</p>
   </div>
 
@@ -388,7 +417,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <p data-i18n="s_cli_p">Set, get, run-with and deploy secrets from the terminal — scoped by tenant / project / environment / repo. <code>cer run</code> injects them into a child process's environment and redacts the values from its output.</p>
       <p><code>cer set · cer get · cer run · cer list</code></p>
     </div>
-    <figure><img src="/assets/cli-terminal.png" width="1200" height="720" alt="concealer CLI — set, get, run and list secrets" loading="lazy"></figure>
+    <figure><video controls preload="none" playsinline poster="/assets/video/concealer-CLI.jpg" aria-label="concealer CLI — set, get, run and list secrets"><source src="/assets/video/concealer-CLI.mp4" type="video/mp4"></video></figure>
   </div>
 
   <div class="shot">
@@ -398,7 +427,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <p data-i18n="s_web_p">Type-aware forms, searchable multi-select filters, per-secret deploy renderers, clipboard copy with auto-clear, and a tamper-evident audit viewer. Bilingual (TR/EN), dark/light/matrix themes, localhost only.</p>
       <p><code>concealer web</code> → http://127.0.0.1:8787</p>
     </div>
-    <figure><img src="/assets/app-secrets.png" width="3570" height="2380" alt="concealer Web UI — searchable, scoped secrets" loading="lazy"></figure>
+    <figure><video controls preload="none" playsinline poster="/assets/video/concealer-WebUI.jpg" aria-label="concealer Web UI — searchable, scoped secrets"><source src="/assets/video/concealer-WebUI.mp4" type="video/mp4"></video></figure>
   </div>
 
   <div class="shot">
@@ -408,7 +437,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <p data-i18n="s_tui_p">Browse, search, add, delete and reveal secrets without leaving the terminal — arrow keys, instant filtering, type-aware editing.</p>
       <p><code>concealer tui</code></p>
     </div>
-    <figure><img src="/assets/tui-secrets.png" width="2546" height="1650" alt="concealer TUI — terminal secret browser" loading="lazy"></figure>
+    <figure><video controls preload="none" playsinline poster="/assets/video/concealer-TUI.jpg" aria-label="concealer TUI — terminal secret browser"><source src="/assets/video/concealer-TUI.mp4" type="video/mp4"></video></figure>
   </div>
 
   <div class="shot">
@@ -418,7 +447,7 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <p data-i18n="s_mcp_p">Register an agent, hand it a revocable token, and it can inject a DB password to run a query — while the value stays redacted from its context. Every call is audited with source=mcp.</p>
       <p><code>concealer agent register claude</code></p>
     </div>
-    <figure><img src="/assets/mcp-secret-list.gif" width="1200" height="866" alt="Agent listing concealer secrets over MCP — names only, never values" loading="lazy"></figure>
+    <figure><video controls preload="none" playsinline poster="/assets/video/concealer-MCP.jpg" aria-label="Agent listing concealer secrets over MCP — names only, never values"><source src="/assets/video/concealer-MCP.mp4" type="video/mp4"></video></figure>
   </div>
 
   <div class="shot">
@@ -428,7 +457,17 @@ footer .links{display:flex;gap:18px;flex-wrap:wrap}
       <p data-i18n="s_ext_p">Open your vault and copy secret values straight from Chrome — no <code>cer web</code>. Multi-field secrets expand for per-field copy &amp; reveal; the popup starts on demand and self-locks when idle. Dark / White / Matrix themes.</p>
       <p><a href="https://chromewebstore.google.com/detail/concealer/hecffnhjbhldmdpcnpkpcffmodnemdcj">Add to Chrome →</a> · <code>cer chrome-extension</code> · <a href="/chrome-extension.html">full guide →</a></p>
     </div>
-    <figure><img src="/assets/ext-list.png" width="1280" height="800" alt="concealer Chrome extension — copy secrets from the toolbar" loading="lazy"></figure>
+    <figure><video controls preload="none" playsinline poster="/assets/video/concealer-Extension.jpg" aria-label="concealer Chrome extension — copy secrets from the toolbar"><source src="/assets/video/concealer-Extension.mp4" type="video/mp4"></video></figure>
+  </div>
+
+  <div class="shot">
+    <div class="txt">
+      <div class="eyebrow">Mobile</div>
+      <h3 data-i18n="s_mob_h">Your vault in your pocket</h3>
+      <p data-i18n="s_mob_p">iOS and Android: the vault opens offline with your master password, or Face ID / fingerprint, and syncs with your host over Wi‑Fi. On Android concealer is also the password autofill for every app.</p>
+      <p><a href="https://apps.apple.com/app/id6816103801">App Store →</a> · <a href="https://play.google.com/store/apps/details?id=com.fxerkan.concealer">Google Play →</a> · <a href="/mobile.html">guide →</a></p>
+    </div>
+    <figure><video controls preload="none" playsinline poster="/assets/video/concealer-Mobile.jpg" aria-label="concealer mobile app: Face ID unlock and Android password autofill"><source src="/assets/video/concealer-Mobile.mp4" type="video/mp4"></video></figure>
   </div>
 </div></section>
 
@@ -605,7 +644,7 @@ document.getElementById('theme').onclick=()=>setTheme(html.getAttribute('data-th
 
 /* ===== language toggle (EN/TR, persists like the app: concealer_lang) ===== */
 const I18N={
- en:{nav_docs:"Docs",nav_ext:"Extension",nav_install:"Install",nav_comparison:"Comparison",nav_support:"Support",copy:"Copy",copied:"Copied ✓",
+ en:{nav_docs:"Docs",nav_new:"What's new",new_eyebrow:"New in 1.2.2",new_h:"Sign in faster. Unlock with a look.",new_p:"AutoFill that saves what you type, Touch ID and Face ID unlock, and concealer as your phone's password autofill.",n1_h:"AutoFill that saves your sign-ins",n1_p:"After a successful sign-in the extension offers to save it, or to update a changed password. Account ID, region and any other field come along, and AutoFill puts every one back. Vault locked? It is saved anyway and added at your next unlock.",n2_h:"Face ID &amp; fingerprint unlock",n2_p:"The mobile app opens with Face ID, Touch ID or your fingerprint. The master password stays in the phone's secure hardware and is released only after a match; enrolling a new face or finger turns it off.",n3_h:"Your phone's password autofill",n3_p:"Choose concealer as Android's autofill service: sign-in fields in every app and browser offer “Fill with concealer”. Unlock, pick the sign-in (the app's own come first) and it is filled. New sign-ins can be saved the same way.",n4_h:"Touch ID &amp; passkey unlock",n4_p:"Unlock the web UI and the extension with Touch ID, Windows Hello or a security key instead of typing the master password, which keeps working.",new_more:"Also new: a redesigned Settings page, a Created column, a popup that opens on your most-used secrets, and a short film for every interface. <a href=\"/changelog.html\">Full changelog →</a>",s_mob_h:"Your vault in your pocket",s_mob_p:"iOS and Android: the vault opens offline with your master password, or Face ID / fingerprint, and syncs with your host over Wi‑Fi. On Android concealer is also the password autofill for every app.",nav_ext:"Extension",nav_install:"Install",nav_comparison:"Comparison",nav_support:"Support",copy:"Copy",copied:"Copied ✓",
   sup_eyebrow:"Support",sup_h:"Questions, bugs or feedback?",sup_p:"Reach out directly — we read every message and usually reply within a day.",sup_btn:"✉️ Email support",sup_issue:"Open a GitHub issue",
   hero_tag:"The local-only secret manager for the AI-coding era.",
   hero_sub:"No cloud, no telemetry, no account.<br>Your agents use secrets without ever <em class=\"u\">seeing</em> them.",
@@ -621,7 +660,7 @@ const I18N={
   f5_h:"Tamper-evident audit",f5_p:"Every read, write, copy and inject is appended to an HMAC-chained log with a monotonic seq and a tail anchor. Names and actions only — never values.",
   f6_h:"One place, many projects",f6_p:"Disambiguate the same value across repos by tenant / project / environment / repo. The most-specific scope wins at inject time.",
   arch_eyebrow:"Under the hood",arch_h:"One file, delegated crypto, five ways in",arch_p:"Every interface funnels into a single Python script that shells out to SOPS + age. The encrypted vault and key material never leave your machine.",arch_cap:"The MCP flow: agents use a secret without the value ever entering their context.",
-  ui_eyebrow:"Five ways in",ui_h:"CLI · Web UI · TUI · MCP · Chrome Extension",ui_p:"The same encrypted vault, however you like to work.",
+  ui_eyebrow:"Six ways in",ui_h:"CLI · Web UI · TUI · MCP · Chrome · Mobile",ui_p:"The same encrypted vault, however you like to work.",
   s_cli_h:"One command, any secret",s_cli_p:"Set, get, run-with and deploy secrets from the terminal — scoped by tenant / project / environment / repo. cer run injects them into a child process's environment and redacts the values from its output.",
   s_ext_h:"Copy secrets from your toolbar",s_ext_p:"Open your vault and copy secret values straight from Chrome — no cer web. Multi-field secrets expand for per-field copy & reveal; the popup starts on demand and self-locks when idle. Dark / White / Matrix themes.",cta_ext:"Chrome Extension",
   s_web_h:"A professional local console",s_web_p:"Type-aware forms, searchable multi-select filters, per-secret deploy renderers, clipboard copy with auto-clear, and a tamper-evident audit viewer. Bilingual (TR/EN), dark/light/matrix themes, localhost only.",
@@ -633,7 +672,7 @@ const I18N={
   modal_l_brew:"· macOS / Linux",modal_l_pipx:"· all platforms",
   modal_l_ext:"· toolbar UI",modal_cws:"Add to Chrome",modal_ext:"Then run <code>cer chrome-extension</code> once → <a href=\"/chrome-extension\">Chrome Extension guide</a>.",
   modal_alt:"Prefer the manual route? See the <a href=\"/installation\">Installation guide</a>."},
- tr:{nav_docs:"Dokümanlar",nav_ext:"Eklenti",nav_install:"Kurulum",nav_comparison:"Karşılaştırma",nav_support:"Destek",copy:"Kopyala",copied:"Kopyalandı ✓",
+ tr:{nav_docs:"Dokümanlar",nav_new:"Yenilikler",new_eyebrow:"1.2.2 ile gelenler",new_h:"Daha hızlı giriş. Bir bakışla kilit açma.",new_p:"Yazdığını kaydeden AutoFill, Touch ID ve Face ID ile kilit açma, ve telefonunun parola otomatik doldurma servisi olarak concealer.",n1_h:"Girişlerini kaydeden AutoFill",n1_p:"Başarılı bir girişten sonra eklenti kaydetmeyi ya da değişen parolayı güncellemeyi önerir. Hesap ID, bölge ve diğer alanlar da gelir; AutoFill hepsini geri doldurur. Kasa kilitli mi? Yine de kaydedilir, bir sonraki kilit açışta kasaya eklenir.",n2_h:"Face ID ve parmak izi ile kilit açma",n2_p:"Mobil uygulama Face ID, Touch ID ya da parmak izinle açılır. Ana parola telefonun güvenli donanımında durur, yalnızca eşleşme sonrası verilir; yeni bir yüz ya da parmak eklenirse kapanır.",n3_h:"Telefonunun parola otomatik doldurması",n3_p:"concealer'ı Android'in otomatik doldurma servisi seç: her uygulama ve tarayıcıdaki giriş alanları “Fill with concealer” önerir. Kilidi aç, girişi seç (uygulamanınkiler önce gelir), doldurulsun. Yeni girişler de aynı yolla kaydedilir.",n4_h:"Touch ID ve passkey ile kilit açma",n4_p:"Web arayüzünü ve eklentiyi ana parolayı yazmadan Touch ID, Windows Hello ya da bir güvenlik anahtarıyla aç; ana parola da çalışmaya devam eder.",new_more:"Ayrıca: yeniden tasarlanan Ayarlar sayfası, Oluşturuldu sütunu, en çok kullandığın secret'larla açılan popup ve her arayüz için kısa bir film. <a href=\"/changelog.html\">Tüm değişiklikler →</a>",s_mob_h:"Kasan cebinde",s_mob_p:"iOS ve Android: kasa ana parolanla ya da Face ID / parmak iziyle çevrimdışı açılır, Wi‑Fi üzerinden ana makineyle eşitlenir. Android'de concealer her uygulamanın parola otomatik doldurma servisidir.",nav_ext:"Eklenti",nav_install:"Kurulum",nav_comparison:"Karşılaştırma",nav_support:"Destek",copy:"Kopyala",copied:"Kopyalandı ✓",
   sup_eyebrow:"Destek",sup_h:"Soru, hata ya da geri bildirim?",sup_p:"Doğrudan yaz — her mesajı okuyoruz ve genelde bir gün içinde yanıtlıyoruz.",sup_btn:"✉️ E-posta ile destek",sup_issue:"GitHub'da konu aç",
   hero_tag:"Yapay zekâ ile kodlama çağı için yerel, tek dosyalı gizli bilgi yöneticisi.",
   hero_sub:"Bulut yok, telemetri yok, hesap yok.<br>Ajanların gizli bilgileri <em class=\"u\">görmeden</em> kullanır.",
@@ -649,7 +688,7 @@ const I18N={
   f5_h:"Kurcalamaya-dayanıklı denetim",f5_p:"Her okuma, yazma, kopyalama ve enjeksiyon; monoton seq ve kuyruk çıpası olan HMAC-zincirli bir günlüğe eklenir. Yalnız ad ve eylem — değer asla.",
   f6_h:"Tek yer, çok proje",f6_p:"Aynı değeri repolar arasında tenant / project / environment / repo ile ayrıştır. Enjeksiyonda en spesifik kapsam kazanır.",
   arch_eyebrow:"Kaputun altında",arch_h:"Tek dosya, devredilmiş şifreleme, beş giriş yolu",arch_p:"Her arayüz, SOPS + age'e shell açan tek bir Python betiğine akar. Şifreli kasa ve anahtar malzemesi makineni asla terk etmez.",arch_cap:"MCP akışı: ajanlar bir secret'ı, değeri context'lerine hiç girmeden kullanır.",
-  ui_eyebrow:"Beş giriş yolu",ui_h:"CLI · Web UI · TUI · MCP · Chrome Eklentisi",ui_p:"Aynı şifreli kasa, nasıl çalışmak istersen.",
+  ui_eyebrow:"Altı giriş yolu",ui_h:"CLI · Web UI · TUI · MCP · Chrome · Mobil",ui_p:"Aynı şifreli kasa, nasıl çalışmak istersen.",
   s_cli_h:"Tek komut, her secret",s_cli_p:"Secret'ları terminalden ekle, al, çalıştır ve dağıt — tenant / proje / ortam / repo ile kapsamlı. cer run bunları bir alt sürecin ortamına enjekte eder ve değerleri çıktıdan maskeler.",
   s_ext_h:"Secret'ları araç çubuğundan kopyala",s_ext_p:"Kasanı aç ve secret değerlerini doğrudan Chrome'dan kopyala — cer web yok. Çok alanlı secret'lar alan bazlı kopyala & göster için açılır; popup ihtiyaç anında başlar, boşta kendini kilitler. Dark / White / Matrix temaları.",cta_ext:"Chrome Eklentisi",
   s_web_h:"Profesyonel yerel konsol",s_web_p:"Tipe duyarlı formlar, aranabilir çoklu-seçim filtreleri, secret başına deploy şablonları, otomatik-temizlenen panoya kopyalama ve kurcalamaya-dayanıklı denetim görüntüleyici. İki dilli (TR/EN), koyu/açık/matrix temalar, yalnız localhost.",

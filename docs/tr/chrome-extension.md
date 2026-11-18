@@ -12,9 +12,9 @@ Kasanı aç ve secret değerlerini `cer web` yazmadan doğrudan Chrome araç çu
 yerel sunucuyu ihtiyaç anında başlatır ve boşta kalınca kendini kilitler.
 {: .fs-5 .fw-300 }
 
-<div style="position:relative;padding-top:56.25%;border-radius:12px;overflow:hidden;margin:1.5rem 0">
-  <iframe src="https://www.youtube-nocookie.com/embed/HNTiNCzyjJw" title="concealer Chrome extension: agent sign-in and AutoFill" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe>
-</div>
+<video controls preload="none" playsinline poster="/assets/video/concealer-Extension.jpg" aria-label="concealer Chrome extension: AutoFill, save sign-ins, Touch ID" style="display:block;width:100%;border-radius:12px;margin:1.5rem 0;background:#000"><source src="/assets/video/concealer-Extension.mp4" type="video/mp4"></video>
+
+
 
 1. TOC
 {:toc}
@@ -109,6 +109,26 @@ Ortam ayrıntıları için [Windows rehberi]({{ site.baseurl }}/tr/WINDOWS.html)
 - **🎲 Üret** — güçlü parola / hex / base64url / UUID üret, tek tıkla kopyala.
 - **🌐 / ürün adı** — tam web arayüzünü yeni sekmede açar.
 - Üret, Web UI ve Ayarlar kilitliyken bile çalışır.
+
+## AutoFill ve girişleri kaydetme
+
+- **Doldurma** — bir giriş alanına tıkla, hesabı seç; parola doğrudan forma gider. Kaydedilmiş her
+  alan adıyla geri gelir (hesap ID, bölge, …). Sayfada herhangi bir yerde sağ tık →
+  **Fill with concealer** da çalışır.
+- **Kaydetme** — başarılı bir girişten sonra eklenti kaydetmeyi ya da değişen parolayı güncellemeyi
+  önerir. Ad, URL, kullanıcı adı, parola ve sayfadaki diğer alanlar hazır gelir; **+ Add field…**
+  sayfanın kalan alanlarını listeler. Sağ tık → **Save sign-in to concealer** ya da popup'taki 💾 ile
+  elle kaydedilir. **Never for this site** o sitede sormayı bırakır.
+- **Kasa kilitli mi?** Kaydetmek ana parola istemez: giriş kasanın açık anahtarıyla şifrelenir,
+  `keys/pending/` içinde bekler ve bir sonraki kilit açışta kasaya eklenir.
+
+![Eklentinin hesap ID ve bölgeyle birlikte girişi kaydetmeyi önermesi]({{ site.baseurl }}/assets/new/ext-save-page.jpg)
+
+## Touch ID / passkey ile kilit açma
+
+Web arayüzünde bir kez passkey ekle (**Ayarlar → Güvenlik ve kilit → Bu cihaza passkey ekle**);
+ardından popup'taki parmak izi düğmesi Touch ID, Windows Hello ya da bir güvenlik anahtarıyla
+kilidi açar. Ana parola da çalışmaya devam eder.
 
 ## Temalar
 

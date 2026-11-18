@@ -1,5 +1,6 @@
 import { Composition, Folder } from "remotion";
-import { SHORTS_FRAMES, ShortsFilm, STORE_FRAMES, StoreFilm, YT_FRAMES, YouTubeFilm } from "./Films";
+import { FEATURE_FILMS, featureFrames } from "./features";
+import { Film, SHORTS_FRAMES, ShortsFilm, STORE_FRAMES, StoreFilm, YT_FRAMES, YouTubeFilm } from "./Films";
 
 export const RemotionRoot: React.FC = () => (
   <Folder name="concealer">
@@ -9,5 +10,9 @@ export const RemotionRoot: React.FC = () => (
     <Composition id="YouTube-Tour" component={YouTubeFilm} durationInFrames={YT_FRAMES} fps={30} width={1920} height={1080} />
     {/* 9:16 for YouTube Shorts / Reels / TikTok */}
     <Composition id="Shorts-9x16" component={ShortsFilm} durationInFrames={SHORTS_FRAMES} fps={30} width={1080} height={1920} />
+    {/* one short film per interface, embedded on that interface's docs page */}
+    {(Object.keys(FEATURE_FILMS) as (keyof typeof FEATURE_FILMS)[]).map((k) => (
+      <Composition key={k} id={`Feature-${k}`} component={() => <Film scenes={FEATURE_FILMS[k]} />} durationInFrames={featureFrames(k)} fps={30} width={1920} height={1080} />
+    ))}
   </Folder>
 );

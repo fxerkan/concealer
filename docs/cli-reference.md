@@ -11,6 +11,9 @@ nav_order: 5
 Every command, with its parameters. `cer` is the short alias for `concealer` — both names work identically.
 {: .fs-5 .fw-300 }
 
+<video controls preload="none" playsinline poster="/assets/video/concealer-CLI.jpg" aria-label="concealer CLI in 35 seconds" style="display:block;width:100%;border-radius:12px;margin:1.5rem 0;background:#000"><source src="/assets/video/concealer-CLI.mp4" type="video/mp4"></video>
+
+
 ```
 concealer <command> [options]          # short: cer <command>
 ```

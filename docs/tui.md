@@ -11,6 +11,9 @@ nav_order: 7.5
 An interactive terminal interface over the same encrypted vault — browse, search, add, delete, and reveal secrets without leaving your shell.
 {: .fs-5 .fw-300 }
 
+<video controls preload="none" playsinline poster="/assets/video/concealer-TUI.jpg" aria-label="concealer TUI in 30 seconds" style="display:block;width:100%;border-radius:12px;margin:1.5rem 0;background:#000"><source src="/assets/video/concealer-TUI.mp4" type="video/mp4"></video>
+
+
 1. TOC
 {:toc}
 
