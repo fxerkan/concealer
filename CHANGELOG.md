@@ -32,6 +32,11 @@ the same version line. Dates are UTC.
   and released only after a match; enrolling a new face or finger turns it off. The cursor goes
   straight to the master password box, Enter unlocks, and Settings is grouped into Security & lock,
   Sync, Appearance and About like the web UI.
+- Android app: **concealer as the system password autofill service.** Turn it on in Settings →
+  Password autofill. Sign-in fields in other apps and browsers then offer "Fill with concealer": you
+  unlock (fingerprint works), pick the sign-in (the site's or app's own come first) and it's filled.
+  After you sign in somewhere new, Android offers to save it to concealer, or to update the password
+  of the saved one.
 - The extension can join a vault that is already unlocked in the browser (used after a passkey
   unlock), so it doesn't ask for the master password a second time.
 - **Saving a sign-in never asks for the master password.** While the vault is locked, the sign-in

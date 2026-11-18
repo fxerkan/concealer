@@ -213,6 +213,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--ac2)}
     </div>
     <button class="btn danger" id="set-lock">Lock vault</button>
     </div>
+    <div class="sect" id="set-afbox" style="display:none">
+    <h2>Password autofill</h2>
+    <button class="btn sec" id="set-af"></button>
+    <p class="hint">Sign-in fields in other apps and browsers offer “Fill with concealer”. You unlock the vault, pick the sign-in, and it's filled in. New sign-ins can be saved the same way.</p>
+    </div>
     <div class="sect">
     <h2>Sync</h2>
     <label>Host</label>
@@ -379,7 +384,7 @@ const b64dec = b64 => { const s=atob(b64); const u=new Uint8Array(s.length); for
 // DIMS, scopeStr, live, nowIso, newId, canon, nameKey, newer, dedupeById, analyze, resolveOne → imported from ./sync.js
 
 const LS = { get:k=>localStorage.getItem("cer."+k), set:(k,v)=>localStorage.setItem("cer."+k,v), del:k=>localStorage.removeItem("cer."+k) };
-const S = { host:LS.get("host")||"", pw:"", secrets:[], editing:null, pairId:LS.get("pairId")||"", demo:false };
+const S = { host:LS.get("host")||"", pw:"", secrets:[], editing:null, pairId:LS.get("pairId")||"", demo:false, af:null, rev:"" };
 
 // ---- crypto ----
 async function encryptBundle(secrets, pw){
@@ -391,7 +396,13 @@ async function decryptBundle(bytes, pw){
   const plain = await d.decrypt(bytes, "uint8array");
   return JSON.parse(new TextDecoder().decode(plain)).secrets || [];
 }
-async function persist(){ if(S.demo) return; const bytes = await encryptBundle(S.secrets, S.pw); LS.set("bundle", b64enc(bytes)); }
+async function persist(){ if(S.demo) return; const bytes = await encryptBundle(S.secrets, S.pw); LS.set("bundle", b64enc(bytes)); S.rev=String(Date.now()); LS.set("rev", S.rev); }
+// The Android autofill screen is a second WebView on the same storage: when it saved a sign-in, adopt
+// that bundle before this (older) in-memory copy gets persisted over it.
+async function adoptNewer(){
+  if(!S.pw || S.demo || (LS.get("rev")||"") === S.rev) return;
+  try{ S.secrets = await decryptBundle(b64dec(LS.get("bundle")), S.pw); S.rev = LS.get("rev")||""; refreshFilters(); renderList(); }catch{}
+}
 
 // ---- demo mode (offline, no host): explore the full app with sample data ----
 // Same sample set as the web UI / CLI `concealer demo`. All values are dummy (DEMO/test only).
@@ -513,7 +524,8 @@ $("s-go").onclick = async () => {
 $("s-demo").onclick = enterDemo;
 
 // ---- unlock (offline) ----
-async function unlockWith(pw){ S.secrets = await decryptBundle(b64dec(LS.get("bundle")), pw); S.pw=pw; S.demo=false; flash($("u-msg"),""); openList(); }
+async function unlockWith(pw){ S.secrets = await decryptBundle(b64dec(LS.get("bundle")), pw); S.pw=pw; S.demo=false; S.rev=LS.get("rev")||""; flash($("u-msg"),"");
+  S.af && S.af.mode==="save" ? afSaveForm() : openList(); }
 $("u-go").onclick = async () => {
   const pw=$("u-pw").value; if(!pw){ flash($("u-msg"),"Enter your master password."); focusPw(); return; }
   try{ await unlockWith(pw); }
@@ -560,7 +572,9 @@ $("u-reset").onclick = () => showSetup(true);
 
 // ---- list ----
 const scopeFmt = e => DIMS.map(k=>e[k]||"*").join(" / ");
-function openList(){ stopScan(); $("u-pw").value=""; $("s-pw").value=""; $("demo-badge").style.display = S.demo?"inline-block":"none"; startLock(); refreshFilters(); renderList(); show("list"); }
+function openList(){ stopScan(); $("u-pw").value=""; $("s-pw").value=""; $("demo-badge").style.display = S.demo?"inline-block":"none";
+  $("l-add").style.display = $("l-settings").style.display = S.af ? "none" : "";
+  startLock(); refreshFilters(); renderList(); show("list"); }
 function refreshFilters(){    // populate the type filter with the types actually present
   const types=[...new Set(live(S.secrets).map(e=>e.type||"api_key"))].sort();
   const sel=$("l-filter"), cur=sel.value;
@@ -569,6 +583,7 @@ function refreshFilters(){    // populate the type filter with the types actuall
 }
 $("l-q").oninput = renderList; $("l-filter").onchange = renderList; $("l-sort").onchange = renderList;
 function renderList(){
+  if(S.af) return afRenderList();
   const q=$("l-q").value.toLowerCase().trim(), ft=$("l-filter").value, sort=$("l-sort").value;
   let rows = live(S.secrets);
   if(ft) rows = rows.filter(e => (e.type||"api_key")===ft);
@@ -592,6 +607,58 @@ function renderList(){
   [...$("l-rows").children].forEach(c=> c.onclick=()=>openDetail(+c.dataset.i));
 }
 $("l-add").onclick = () => openEdit(-1);
+
+// ---- Android password autofill (ConcealerAutofill plugin; the app runs inside AutofillActivity) ----
+// fill: the list becomes a picker (this site's sign-ins first) and a tap hands username + password back
+// to the app being filled. save: the captured sign-in opens prefilled in the editor (or updates the
+// existing record for that site + username).
+const AF = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.ConcealerAutofill;
+async function afProbe(){ try{ const r = AF && await AF.context(); if(r && r.mode) S.af = r; }catch{} }
+const hostOf = u => { try{ return new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(u) ? u : "https://"+u).hostname.toLowerCase(); }catch{ return ""; } };
+const regDom = h => /^[\d.]+$/.test(h) ? h : h.split(".").slice(-2).join(".");   // ponytail: last two labels; misses co.uk-style suffixes
+const APPWORDS = new Set(["com","org","net","android","mobile","app","apps","client","www"]);
+const afUser = e => { const f=e.fields||{}; return f.username||f.email||f.user||f.login||""; };
+const afPass = e => { const f=e.fields||{}; return f.password || Object.entries(f).filter(([k])=>/pass/i.test(k)).map(([,v])=>v)[0] || ""; };
+function afMatch(e){
+  const a=S.af, f=e.fields||{}, hosts=[e.url, f.web_url].filter(Boolean).map(hostOf).filter(Boolean);
+  if(a.domain) return hosts.some(h => regDom(h)===regDom(a.domain.toLowerCase()));
+  if(!a.pkg) return false;
+  if([e.url, f.web_url, e.notes].some(x => (x||"").toLowerCase().includes("androidapp://"+a.pkg.toLowerCase()))) return true;
+  const toks = a.pkg.toLowerCase().split(".").filter(t => t.length>2 && !APPWORDS.has(t));
+  return toks.some(t => (e.name||"").toLowerCase().includes(t) || hosts.some(h => h.includes(t)));
+}
+function afRenderList(){
+  const q=$("l-q").value.toLowerCase().trim();
+  let rows = live(S.secrets).filter(e => afPass(e) || afUser(e));
+  if(q) rows = rows.filter(e => (e.name+" "+(e.url||"")+" "+afUser(e)+" "+(e.tags||[]).join(" ")).toLowerCase().includes(q));
+  rows = rows.map(e => [afMatch(e), e]).sort((x,y) => (y[0]-x[0]) || (x[1].name||"").localeCompare(y[1].name||""));
+  const site = S.af.domain || S.af.pkg || "this app";
+  $("l-foot").textContent = "Tap a sign-in to fill it into " + site;
+  $("l-empty").style.display = rows.length ? "none" : "block";
+  $("l-empty").textContent = "No sign-ins in the vault.";
+  $("l-rows").innerHTML = rows.map(([m,e]) => `<div class="card" data-i="${S.secrets.indexOf(e)}">
+      <div class="crow"><span class="nm">${esc(e.name||"(unnamed)")}</span>${m?'<span class="type-badge t-login">match</span>':''}</div>
+      <div class="sc">${esc(afUser(e) || hostOf(e.url||"") || "")}</div></div>`).join("");
+  [...$("l-rows").children].forEach(c => c.onclick = () => afFill(S.secrets[+c.dataset.i]));
+}
+async function afFill(e){
+  try{ await AF.fill({username: afUser(e), password: afPass(e)}); }
+  catch(err){ flash($("l-msg"), "Couldn't fill: " + ((err && err.message) || err)); }
+}
+function afSaveForm(){
+  const a=S.af, site = a.domain ? "https://"+a.domain : a.pkg ? "androidapp://"+a.pkg : "";
+  const ex = live(S.secrets).find(e => afMatch(e) && afUser(e)===(a.username||""));
+  if(ex){
+    openEdit(S.secrets.indexOf(ex));
+    const row = [...$("e-fields").children].find(r => r.querySelector(".k").value==="password");
+    row ? (row.querySelector(".v").value = a.password) : $("e-fields").appendChild(fieldRow("password", a.password, true));
+    $("e-title").textContent = "Update password";
+  } else {
+    openEdit(-1, {name: a.domain || a.pkg || "Sign-in", type:"login", tags:["autofill"], url:site, notes:"",
+      fields:{web_url:site, username:a.username||"", password:a.password||"", totp:""}});
+    $("e-title").textContent = "Save sign-in";
+  }
+}
 $("l-settings").onclick = openSettings;
 let pendingSync = null;
 async function doSync(msgEl){
@@ -657,7 +724,7 @@ function lock(){ stopLock(); S.pw=""; S.secrets=[]; S.demo=false; LS.get("bundle
 // lockAt is absolute wall-clock time, so backgrounding doesn't restart it — on return we just re-tick
 // (and lock immediately if the deadline passed while the app was in the background).
 // coming back to a locked app → offer biometric unlock straight away
-document.addEventListener("visibilitychange", () => { if(document.hidden) return; if(lockIv) tickLock(); if(curView()==="unlock" && bioOn()) bioUnlock(); });
+document.addEventListener("visibilitychange", () => { if(document.hidden) return; if(lockIv) tickLock(); adoptNewer(); if(curView()==="unlock" && bioOn()) bioUnlock(); });
 
 // ---- settings ----
 function openSettings(){
@@ -668,7 +735,15 @@ function openSettings(){
   $("set-biolabel").textContent = bioName() + " unlock";
   $("set-bio").textContent = (bioOn() ? "Turn off " : "Turn on ") + bioName() + " unlock";
   flash($("set-msg"),""); show("settings");
+  afStatus();
 }
+async function afStatus(){
+  let st = null; try{ st = AF && await AF.status(); }catch{}
+  $("set-afbox").style.display = (st && st.supported && !S.demo) ? "block" : "none";
+  if(st) $("set-af").textContent = st.enabled ? "✓ Autofill service is on — change in Android settings" : "Use concealer for autofill";
+}
+$("set-af").onclick = () => AF.enable();
+document.addEventListener("visibilitychange", () => { if(!document.hidden && curView()==="settings") afStatus(); });
 $("set-bio").onclick = async () => {
   if(bioOn()){ bioOff(); openSettings(); flash($("set-msg"), bioName()+" unlock turned off.","ok"); return; }
   try{ await Bio.store({secret:S.pw, reason:"Turn on "+bioName()+" unlock"}); LS.set("bio","1"); openSettings(); flash($("set-msg"), bioName()+" unlock is on.","ok"); }
@@ -732,10 +807,10 @@ function fieldRow(k,v,sec){
 }
 $("e-addfield").onclick = () => $("e-fields").appendChild(fieldRow("","",false));
 $("e-type").onchange = () => applyTemplate($("e-type").value);
-$("e-back").onclick = () => (S.editing>=0 ? openDetail(S.editing) : openList());
-function openEdit(i){
+$("e-back").onclick = () => S.af ? AF.done() : (S.editing>=0 ? openDetail(S.editing) : openList());
+function openEdit(i, preset){
   S.editing = i;
-  const e = i>=0 ? S.secrets[i] : {name:"",type:"api_key",tags:[],url:"",notes:"",fields:{}};
+  const e = i>=0 ? S.secrets[i] : (preset || {name:"",type:"api_key",tags:[],url:"",notes:"",fields:{}});
   $("e-title").textContent = i>=0? "Edit" : "New secret";
   $("e-name").value=e.name||""; $("e-type").value=e.type||"api_key";
   DIMS.forEach(k=> $("e-"+k).value = e[k]||"");
@@ -761,7 +836,8 @@ $("e-save").onclick = async () => {
   e.field_meta=e.field_meta||{}; e.collection=e.collection||""; e.rotation=e.rotation||{}; e.env_alias=e.env_alias||"";
   e.deleted=""; e.updated=nowIso();
   if(i<0) S.secrets.push(e);
-  await persist(); openList();
+  await persist();
+  if(S.af) AF.done(); else openList();
 };
 $("e-del").onclick = () => {
   if(S.editing<0) return;
@@ -803,11 +879,12 @@ function boot(){
   if(LS.get("bundle")){ showUnlock(); }
   else { showSetup(false); }
 }
-bioProbe().then(boot);
+Promise.all([bioProbe(), afProbe()]).then(boot);
 
 // ---- Android hardware/gesture back: navigate to the previous screen instead of closing the app ----
 function curView(){ return views.find(v => $("v-"+v).classList.contains("on")); }
 function goBack(){
+  if(S.af){ AF.done(); return; }   // leaving the autofill screen returns to the app being filled
   if($("modal").style.display === "flex"){ $("modal").style.display="none"; return; }
   switch(curView()){
     case "detail":  openList(); break;

@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(DiscoveryPlugin.class);   // native NsdManager mDNS discovery
         registerPlugin(BiometricPlugin.class);   // fingerprint / face unlock (Keystore-bound)
+        registerPlugin(AutofillPlugin.class);    // autofill service status / enable
         super.onCreate(savedInstanceState);
     }
 }

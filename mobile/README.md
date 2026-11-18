@@ -64,6 +64,18 @@ the device's secure hardware, readable only after a biometric match: iOS Keychai
 Keystore AES‑GCM key that needs a strong biometric per use (`BiometricPlugin.java`). Enrolling a new
 face/finger invalidates it and the app falls back to the master password.
 
+## Password autofill (Android 8+)
+
+Settings → **Password autofill → Use concealer for autofill** opens Android's autofill-service
+picker. Afterwards sign-in fields in other apps and browsers offer **Fill with concealer**:
+`ConcealerAutofillService` finds the username/password fields (autofill hints → input type → HTML
+attributes → id/hint text) and returns one *locked* dataset; tapping it opens `AutofillActivity`
+(the same web app in a second WebView), where you unlock and pick a sign-in (this site's or app's
+records first). `AutofillPlugin.fill()` hands only that username + password back. Submitted sign-ins
+trigger a save prompt that opens the editor prefilled (or updates the password of the existing record
+for that site + username). The service itself never holds vault data; the captured password for a
+save goes to the activity in-process, not through the Intent.
+
 ## Not yet (deliberately deferred)
 
 - Reveal/copy affordances, field‑level masking parity with the web UI.
