@@ -1,7 +1,8 @@
 <!doctype html>
 <!-- Self-check for content.js against AWS-console-shaped sign-in forms (not shipped; build.py
      packs an explicit file list). Serve the extension dir over http and open this page:
-       python3 -m http.server 8790 -d extension  →  http://127.0.0.1:8790/test_autofill.html
+       python3 -m http.server 18791 -d extension  →  http://localhost:18791/test_autofill.html
+     (localhost, not 127.0.0.1: the stub derives the fill domain from the last two host labels)
      The chrome.runtime stub plays the service worker; the result lands in <pre id=out> and the title. -->
 <meta charset="utf-8"><title>running</title>
 <div id="app"></div><pre id="out"></pre>
@@ -10,7 +11,7 @@ const ROWS = [{ id: "a", name: "aws-acct-a", account: "111111111111", username: 
               { id: "r", name: "aws-root", account: "", username: "root@example.com" }];
 const CREDS = { a: { username: "alice", password: "sk-DUMMY-a", account: "111111111111" },
                 r: { username: "root@example.com", password: "sk-DUMMY-r", account: "" } };
-const listeners = []; let cont = null, locked = false;
+const listeners = []; let cont = null, locked = false, lockedRows = [];
 const listener = (m, s, r) => { for (const f of listeners) if (f(m, s, r) === true) return; };
 const dom = location.hostname.split(".").slice(-2).join(".");
 const fill = m => new Promise(res => listener(Object.assign({ type: "concealer-fill", domain: dom }, m), {}, res));
@@ -19,9 +20,9 @@ window.chrome = { runtime: { getURL: p => p,
   async sendMessage(m) {                                   // plays sw.js suggest()/fillWithId()
     if (m.type === "af-suggest") {
       if (m.hasPw && cont) { const c = cont; cont = null; await fill({ username: c.username, password: c.password }); return { continued: true }; }
-      return locked ? { locked: true } : { rows: ROWS };
+      return locked ? { locked: true, rows: lockedRows } : { rows: ROWS };
     }
-    if (m.type === "af-fill") { const c = CREDS[m.id]; const r = await fill(c); if (r.partial) cont = c; return r; }
+    if (m.type === "af-fill") { if (locked) return { locked: true }; const c = CREDS[m.id]; const r = await fill(c); if (r.partial) cont = c; return r; }
   } } };
 const app = document.getElementById("app");
 const IAM = `<form><label for=account>Account ID (12 digits) or account alias</label><input id=account name=account>
@@ -33,6 +34,8 @@ const IAM1 = `<form><label for=resolving_input>Account ID (12 digits) or account
 const IAM2 = `<form><label for=username>IAM username</label><input id=username name=username>
   <label for=password>Password</label><input id=password name=password type=password></form>`;
 const SEARCH = `<input type=search name=q placeholder=Search>`;
+const OUTLOOK = `<div role=search><input id=topSearchInput aria-label="Search for email, meetings"></div>`;
+const LOOSE = `<input id=note><input id=pw type=password>`;   // a password box elsewhere on the page
 const SHARE = `<div role=dialog><input id=awsui-input-7 type=email aria-label="Add user name or email address"><input id=awsui-input-8 placeholder="Search users"></div>`;
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const $ = s => document.querySelector(s);
@@ -42,6 +45,15 @@ async function main() {
   const churn = setInterval(() => { const d = document.createElement("i"); document.body.appendChild(d); d.remove(); }, 50);   // AWS-style constant DOM churn
   app.innerHTML = SEARCH; $("input").focus(); await wait(500);
   ok(!panel(), "no panel when focusing a search box");
+  app.innerHTML = OUTLOOK; $("input").focus(); await wait(400);
+  ok(!panel(), "no panel on a search box inside role=search (Outlook)");
+  app.innerHTML = LOOSE; $("#note").focus(); await wait(400);
+  ok(!panel(), "no panel on an unlabeled text box just because a password box is on the page");
+  listener({ type: "af-open-menu" }, {}, () => {}); await wait(300);
+  ok(!!panel(), "...but right-click 'Fill with concealer' still opens it there");
+  $("#pw").focus(); await wait(50);
+  ok(!panel() || _sugAnchor === $("#pw"), "focus moving to another field closes the menu");
+  sugClose();
   app.innerHTML = SHARE; $("#awsui-input-7").focus(); await wait(400);
   ok(!panel(), "no panel on a share dialog's 'user or email' box (label only, no password form)");
   $("#awsui-input-8").focus(); await wait(400);
@@ -56,9 +68,20 @@ async function main() {
   ok(!!panel(), "right-click 'Fill with concealer' opens the menu");
   document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); locked = true;
   $("#password").focus(); await wait(300);
-  ok(!!panel(), "locked vault: menu still opens (with the in-page unlock frame)");
+  ok(!!panel(), "locked vault: menu still opens (one 'Unlock to fill…' line)");
+  ok(document.activeElement === $("#password"), "an automatic menu does not steal the cursor");
   locked = false; listener({ type: "af-unlocked" }, {}, () => {}); await wait(300);
   ok(!!panel() && _sugAnchor === $("#password"), "after unlock the menu reopens on the same field");
+  listener({ type: "af-menu-close" }, {}, () => {}); await wait(50);
+  ok(!panel(), "Esc inside the unlock frame (relayed by the SW) closes the menu");
+  locked = true; lockedRows = ROWS; $("#username").focus(); await wait(300);
+  ok(!!panel(), "locked vault with known entries: the menu lists them");
+  unlockThenFill($("#username"), "a"); await wait(50);   // = clicking "aws-acct-a" in the locked list
+  ok(!!panel() && _pendingId === "a", "picking one asks for the master password first");
+  locked = false; listener({ type: "af-unlocked" }, {}, () => {}); await wait(300);
+  ok(!panel() && $("#password").value === "sk-DUMMY-a", "after unlock the picked entry fills and the menu closes");
+  $("#password").value = $("#username").value = $("#account").value = "";
+  $("#username").focus(); await wait(300);
   ok(document.documentElement.innerText.indexOf("aws-acct-a") < 0, "panel text is not readable from the page (closed shadow root)");
   await chrome.runtime.sendMessage({ type: "af-fill", id: "a" });
   ok($("#account").value === "111111111111", "account id filled");

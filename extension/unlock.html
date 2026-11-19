@@ -4,16 +4,15 @@
 <html><head><meta charset="utf-8">
 <style>
   html,body{margin:0;background:#101216;color:#e8e8e6;font:12px/1.4 -apple-system,system-ui,sans-serif}
-  form{display:flex;gap:6px;padding:2px 4px 4px}
+  form{display:flex;gap:6px;padding:2px 4px;margin:0}
   input{flex:1;min-width:0;background:#0a0b0d;color:#e8e8e6;border:1px solid #2a2f37;border-radius:7px;padding:6px 8px;font:inherit;outline:none}
   input:focus{border-color:#ff4d4d}
   button{cursor:pointer;border:0;border-radius:7px;padding:6px 10px;font:600 12px system-ui;background:#ff4d4d;color:#0a0b0d}
   #pk{display:flex;align-items:center;background:#1a1d23;color:#ff4d4d;border:1px solid #2a2f37}
   #pk[hidden]{display:none}
   button:disabled{opacity:.6;cursor:default}
-  #st{padding:0 6px;color:#8a909b;min-height:15px} #st.err{color:#ff6b6b}
+  input.err{border-color:#ff6b6b} input.err::placeholder{color:#ff6b6b}
 </style></head><body>
 <form id="f"><input id="pw" type="password" placeholder="Master password" autocomplete="off"><button id="go">Unlock</button><button id="pk" type="button" title="Touch ID / passkey" hidden><svg class="bio-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></svg></button></form>
-<div id="st"></div>
 <script src="unlock.js"></script>
 </body></html>

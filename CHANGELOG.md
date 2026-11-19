@@ -17,6 +17,23 @@ the same version line. Dates are UTC.
   own UI running in an AutoFill extension; it reads the same encrypted vault the app keeps, shared
   through an App Group.
 
+### Fixed
+
+- Extension: the autofill menu no longer pops up over search boxes and other unrelated fields
+  (Outlook's search bar, for one). It opens by itself only on password, email, username, account or
+  tenant fields; anywhere else, right-click › Fill with concealer still opens it. The locked menu also
+  stopped pulling the cursor into its master-password box, so what you type stays in the field you
+  clicked.
+- Extension: the autofill menu closes as soon as you click, tab or scroll elsewhere, or press Esc
+  (also from the master-password box). The unlock box is one line tall now, so it no longer covers the
+  page.
+- Extension: when the vault is locked, the menu still lists the sign-ins this site matched while it
+  was last open (names and usernames only, kept in memory until the browser quits). Pick one and it
+  asks for the master password, then fills it. Sites with nothing known yet show a single "Unlock to
+  fill…" line instead of a password box.
+- Extension: nothing of the extension's shows up on concealer's own web UI any more: no autofill
+  menu, no save prompt, no approval banner.
+
 ## [1.2.2] — 2026-11-18
 
 ### Added

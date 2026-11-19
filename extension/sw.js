@@ -80,7 +80,11 @@ async function suggest(tab, hasPw) {
     await ensureApp();
     try { rows = await api("/api/autofill/match?url=" + encodeURIComponent(tab.url)); } catch (e2) { return { rows: [] }; }
   }
-  if (rows === null) return { locked: true };
+  // Locked: list what this site matched the last time the vault was open (names + usernames only,
+  // kept in storage.session = memory, gone when the browser quits). Picking one unlocks, then fills.
+  const mk = "m:" + host;
+  if (rows === null) return { locked: true, rows: (await chrome.storage.session.get(mk))[mk] || [] };
+  chrome.storage.session.set({ [mk]: rows.map(({ id, name, username, account }) => ({ id, name, username, account })) });
   const last = (await chrome.storage.local.get("last:" + regDomain(host)))["last:" + regDomain(host)];
   rows.sort((a, b) => (b.id === last) - (a.id === last));
   return { rows };
@@ -308,6 +312,7 @@ chrome.runtime.onMessage.addListener((msg, _s, reply) => {
   }
   // The in-page unlock frame (unlock.html) succeeded: let that tab's menu show the entries.
   if (msg.type === "af-unlocked" && _s.tab) { chrome.tabs.sendMessage(_s.tab.id, { type: "af-unlocked" }, { frameId: 0 }).catch(() => {}); tick(); return; }
+  if (msg.type === "af-menu-close" && _s.tab) { chrome.tabs.sendMessage(_s.tab.id, { type: "af-menu-close" }, { frameId: 0 }).catch(() => {}); return; }
   // The on-page banner sends the user's decision; the SW has the token to act on it.
   if (msg.type === "af-decide") {
     (async () => {

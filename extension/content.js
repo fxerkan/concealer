@@ -31,7 +31,12 @@ const labelOf = el => ((el.labels && el.labels[0] && el.labels[0].textContent) |
 // What the page's AUTHOR declared the field to be (not what a label says): name / id / autocomplete.
 const attrsOf = el => [el.name, el.id, el.getAttribute("autocomplete")].join(" ").toLowerCase();
 const CRED = /user|e-?mail|login|resolving|account|tenant|alias/;
-const isSearch = el => el.type === "search" || /search|combobox/.test(el.getAttribute("role") || "") || /search|query|filter|find/.test(hintOf(el));
+const isSearch = el => el.type === "search" || /search|combobox/.test(el.getAttribute("role") || "") || /search|query|filter|find/.test(hintOf(el)) ||
+  !!el.closest('[role="search"], search') || /list|both/.test(el.getAttribute("aria-autocomplete") || "");
+// Opening the menu by itself needs a field that IS a credential (password, email, or a name/id/
+// autocomplete/label saying user/login/account/tenant). findFields()'s "first text box next to a
+// password" guess is fine for filling, never for popping a menu over the page.
+const autoField = el => el.type === "password" || (!isSearch(el) && (el.type === "email" || CRED.test(attrsOf(el)) || CRED.test(labelOf(el))));
 
 // Login fields, incl. the AWS console's extra "Account ID or alias" box (IAM sign-in) and its
 // chooser page, where one box (#resolving_input) comes first and the rest on the next page.
@@ -126,7 +131,7 @@ function afShowBanner(m) {
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
-  if (!msg) return;
+  if (!msg || IS_VAULT) return;   // the vault's own UI shows approvals itself; nothing of ours goes there
   if (msg.type === "af-banner") { afShowBanner(msg); return; }
   if (msg.type === "af-banner-clear") { afRemove(msg.job); return; }
   if (msg.type === "af-banner-clear-all") { for (const el of document.querySelectorAll("[id^='__cer_af_']")) el.remove(); return; }
@@ -162,9 +167,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
 // credentials for opens a concealer menu under it (also via right-click "Autofill with
 // concealer"). Only names/usernames/account ids come here; the password is fetched by the SW
 // only after the user picks an entry, and goes straight into the form.
-let _sugHost = null, _sugAnchor = null, _scanT = 0, _contKey = "";
-function sugClose() { if (_sugHost) { _sugHost.remove(); _sugHost = null; _sugAnchor = null; } }
-function sugShow(anchor, res) {
+let _sugHost = null, _sugAnchor = null, _scanT = 0, _contKey = "", _pendingId = "";
+function sugClose() { if (_sugHost) { _sugHost.remove(); _sugHost = null; _sugAnchor = null; } _pendingId = ""; }
+async function fillPick(anchor, id) {
+  const out = await chrome.runtime.sendMessage({ type: "af-fill", id });
+  if (out && out.locked) { unlockThenFill(anchor, id); return; }   // locked meanwhile: unlock right here
+  if (!out || !out.ok) console.warn("concealer: fill failed", out && out.detail);
+}
+// The master password is typed into an EXTENSION frame, not into this page's DOM, so the site can't
+// read or keylog it. On success the SW sends "af-unlocked": the picked entry fills, or the menu refills.
+function unlockThenFill(anchor, id) { sugShow(anchor, { locked: true, rows: [], unlock: true }, true); _pendingId = id || ""; }
+function sugShow(anchor, res, manual) {
   sugClose();
   const host = document.createElement("div"); _sugHost = host; _sugAnchor = anchor;
   const r = anchor.getBoundingClientRect();
@@ -189,26 +202,26 @@ function sugShow(anchor, res) {
     if (sub) b.appendChild(afEl("div", "color:#8a909b", sub));
     b.addEventListener("click", fn); box.appendChild(b);
   };
-  if (res.locked) {
-    // The master password is typed into an EXTENSION frame, not into this page's DOM, so the
-    // site can't read or keylog it. After unlock the SW sends "af-unlocked" and the menu refills.
-    box.appendChild(afEl("div", "padding:0 6px 4px;color:#8a909b", "Vault is locked — unlock to fill"));
-    const fr = afEl("iframe", "display:block;width:100%;height:62px;border:0;background:#101216");
-    fr.src = chrome.runtime.getURL("unlock.html");
-    fr.addEventListener("load", () => fr.focus());   // the frame then puts the cursor in its password box
+  const sub = c => [c.account && "account " + c.account, c.username].filter(Boolean).join(" · ");
+  if (res.locked && res.unlock) {
+    const fr = afEl("iframe", "display:block;width:100%;height:36px;border:0;background:#101216");
+    fr.src = chrome.runtime.getURL("unlock.html") + "?focus=1";   // the user asked for it: cursor goes in
+    fr.addEventListener("load", () => fr.focus());
     box.appendChild(fr);
+  } else if (res.locked && res.rows.length) {
+    // Locked, but this site matched these the last time the vault was open: pick one, then unlock.
+    box.appendChild(afEl("div", "padding:0 8px 2px;color:#8a909b", "🔒 Locked — pick one to unlock and fill"));
+    for (const c of res.rows) item(c.name, sub(c), () => unlockThenFill(anchor, c.id));
+  } else if (res.locked) {
+    // Nothing known for this site yet: one small line, no password box until the user asks for it.
+    item("🔒 Unlock to fill…", "", () => unlockThenFill(anchor, ""));
   } else if (!res.rows.length) {
     box.appendChild(afEl("div", "padding:2px 8px 4px;color:#8a909b", "No saved sign-in for this site."));
     item("Save a sign-in for this site…", "what is typed on the page now; every field stays editable", () => {
       sugClose(); chrome.runtime.sendMessage({ type: "af-captured", data: capture(), manual: true }).catch(() => {});
     });
   } else {
-    for (const c of res.rows) item(c.name, [c.account && "account " + c.account, c.username].filter(Boolean).join(" · "), async () => {
-      sugClose();
-      const out = await chrome.runtime.sendMessage({ type: "af-fill", id: c.id });
-      if (out && out.locked) { openMenu(anchor, true); return; }   // locked meanwhile: show the unlock box right here
-      if (!out || !out.ok) console.warn("concealer: fill failed", out && out.detail);
-    });
+    for (const c of res.rows) item(c.name, sub(c), () => { sugClose(); fillPick(anchor, c.id); });
   }
   root.appendChild(box); document.documentElement.appendChild(host);
 }
@@ -217,25 +230,32 @@ async function ask(hasPw) { try { return await chrome.runtime.sendMessage({ type
 async function openMenu(anchor, always) {
   const res = await ask(false);
   if (!res || res.continued) return;
-  if (always || res.locked || (res.rows && res.rows.length)) sugShow(anchor, res);
+  res.rows = res.rows || [];
+  if (always || res.locked || (res.rows && res.rows.length)) sugShow(anchor, res, always);
 }
 function loginField(el) { const f = findFields(); return f && [f.acct, f.user, f.pw].includes(el) ? el : null; }
 let _opening = null;   // focusin + click fire together on one click: ask once
 function onField(e) {
-  const el = loginField(e.target);
+  const el = loginField(e.target) && autoField(e.target) ? e.target : null;
   if (!el || _opening === el || (_sugHost && _sugAnchor === el)) return;
   _opening = el; openMenu(el, false).finally(() => { _opening = null; });
 }
+// The menu closes as soon as the user is somewhere else: a click or focus outside it, Esc (also
+// from inside the unlock frame, relayed by the SW), focus leaving for one of the page's own
+// frames, a scroll that would leave it floating, or its field leaving the page.
+const outside = t => t !== _sugHost && t !== _sugAnchor;
+document.addEventListener("focusin", e => { if (_sugHost && outside(e.target)) sugClose(); }, true);
 document.addEventListener("focusin", onField, true);
 document.addEventListener("click", onField, true);
-document.addEventListener("mousedown", e => {   // click outside closes (the panel is one retargeted node)
-  if (_sugHost && e.target !== _sugHost && e.target !== _sugAnchor) sugClose();
-}, true);
+document.addEventListener("mousedown", e => { if (_sugHost && outside(e.target)) sugClose(); }, true);
 document.addEventListener("keydown", e => { if (e.key === "Escape") sugClose(); }, true);
+document.addEventListener("scroll", e => { if (_sugHost && e.target !== document) sugClose(); }, true);
+window.addEventListener("blur", () => setTimeout(() => { if (_sugHost && outside(document.activeElement)) sugClose(); }, 0));
 // Multi-step sign-in: when a password box shows up, let the SW finish a pending fill. Throttled,
 // not debounced — pages with constant DOM churn (AWS's animated ad) would reset a debounce forever.
 function scan() {
   _scanT = 0;
+  if (_sugAnchor && !_sugAnchor.isConnected) sugClose();
   const f = findFields();
   if (!f || !f.pw) { _contKey = ""; return; }   // password box gone (next step): re-arm for the one that follows
   if (location.href + "|pw" === _contKey) return;
@@ -245,8 +265,14 @@ new MutationObserver(() => { if (!_scanT) _scanT = setTimeout(scan, 300); })
   .observe(document.documentElement, { childList: true, subtree: true });
 scan();
 chrome.runtime.onMessage.addListener(msg => {
-  if (msg && msg.type === "af-unlocked" && _sugAnchor) { openMenu(_sugAnchor, true); return; }
-  if (!msg || msg.type !== "af-open-menu") return;
+  if (!msg || IS_VAULT) return;
+  if (msg.type === "af-menu-close") { sugClose(); return; }
+  if (msg.type === "af-unlocked" && _sugAnchor) {
+    const a = _sugAnchor, id = _pendingId;
+    if (id) { sugClose(); fillPick(a, id); } else openMenu(a, true);
+    return;
+  }
+  if (msg.type !== "af-open-menu") return;
   const a = document.activeElement, f = findFields();
   const anchor = (a && a.tagName === "INPUT" && a) || (f && (f.acct || f.user || f.pw));
   if (anchor) openMenu(anchor, true);
@@ -376,10 +402,9 @@ function saveShow(m) {
   root.appendChild(box); document.documentElement.appendChild(host);
 }
 chrome.runtime.onMessage.addListener((msg, _s, reply) => {
-  if (!msg || window.top !== window) return;
+  if (!msg || window.top !== window || IS_VAULT) return;
   if (msg.type === "af-save-prompt") { saveShow(msg); return; }
   if (msg.type === "af-save-open") {   // context menu / popup: save what is on the page right now, editable
-    if (IS_VAULT) return;
     chrome.runtime.sendMessage({ type: "af-captured", data: capture(), manual: true }).catch(() => {});
   }
 });
